@@ -36,10 +36,24 @@ fixed; see "Documented assumptions" in `docs/music-engine.md` for the resulting 
 rule, the diminished-7th double-flat spelling, and the natural-minor-vs-harmonic-minor scope note.
 
 ## Phase 3 — Harmonic graph engine + Zoom 1–4 + tests
-- [ ] harmony module (functions, secondary dominants, borrowed chords, substitutions)
-- [ ] graph module (node/edge generation, relationship metadata)
-- [ ] Zoom 1–4 classification
-- [ ] Tests per relationship type and zoom level
+- [x] harmony module (function classification, functional-minor overlay, 14 relationship families)
+- [x] graph module (query API: `relationshipsFrom`, `relationshipsAtDepth`, `relationshipsBetween`)
+- [x] Zoom 1–4 classification (fixed per family, documented in `music-engine.md`)
+- [x] Tests per relationship type and zoom level, incl. negative/exclusion cases and a second
+      major/minor key pair (G major, E natural minor) to catch mode-invariance bugs
+
+Verified 2026-08-11: `npm run test` (183 tests, 21 files), `typecheck`, `lint`, `build` all pass.
+Ran `music-theory-review` twice (once mid-implementation on the first draft, once on the settled
+design) — caught and fixed 6 real issues before considering the phase done: three families
+(`borrowed`/`chromaticMediant`/`nearbyKey`) independently rediscovering the same target chord under
+different labels; two natural-minor-specific mathematical coincidences (V7/III ≡ diatonic bVII7,
+and the leading-tone dim7 ≡ the bVII→i passing-diminished chord) that would have shown duplicate
+edges; tritone substitution using a generic +6-semitone spelling (C#7) instead of the conventional
+bII7-of-resolution-target spelling (Db7); and the tonic-anchored families (relative,
+functionalDominant, borrowed, nearbyKey, distantKey) failing to fire from Cmaj7 because they
+checked exact chord identity instead of root. UI work (Phase 4) intentionally not started — see the
+report delivered alongside this commit for full architecture, relationship-type, and Zoom-rule
+detail; per explicit instruction this phase stops here for review before Phase 4 begins.
 
 ## Phase 4 — Core harmonic map UI
 - [ ] Custom map renderer (current chord + relevant neighbors, progressive expansion)

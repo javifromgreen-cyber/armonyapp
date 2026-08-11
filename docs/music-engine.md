@@ -84,3 +84,72 @@ Non-obvious rules chosen during implementation, per the "don't guess — write i
   gives a minor key its dominant pull. The harmony module (Phase 3) is responsible for layering
   that functional dominant (secondary-dominant-style, borrowing the raised 7th) on top of this base
   scale — it is intentionally not baked into the raw key/scale layer.
+
+## Documented assumptions (Phase 3 — harmony + harmonic graph)
+
+`src/domain/harmony` and `src/domain/graph` implement product-spec §8's relationship families and
+§29's graph model. Non-obvious rules and interpretive decisions:
+
+- **Functional minor without touching the scale.** `functionalMinor.ts`'s `functionalDominant`
+  needs no mode branching and no harmonic-minor scale: building a `dominant7`-quality chord on a
+  natural-minor key's own (unaltered) 5th scale degree already produces the raised 3rd
+  automatically, because chord construction (`../chords`) builds each formula degree relative to
+  the given root using its own interval pattern — e.g. `buildChord(E, "dominant7")` gives E G# B D
+  regardless of what key E came from. Only the leading tone itself (used for the vii°/vii°7 chord)
+  needs an explicit re-spelling (natural-minor's subtonic, raised a semitone, same letter). This is
+  the mechanism behind "E7 → Am through G#" in A minor.
+- **classifyFunction's degree→function mapping is a deliberate simplification**, applied
+  identically to major and natural-minor (1,3,6 = tonic; 2,4 = predominant; 5,7 = dominant). It
+  does not distinguish natural minor's *weak* v/VII (minor v, major subtonic VII) from major's
+  *strong* V/vii° — that distinction is exactly what the separate `functionalDominant` /
+  `leadingToneDiminished` relationship family exists to carry, as additional edges alongside (not
+  replacing) the plain diatonic ones. Refining minor-key function labels further (e.g. calling VII
+  "subtonic" rather than "dominant") is deferred.
+- **Tonic/predominant/dominant relationships are metadata, not a separate edge family.** Rather
+  than emitting a redundant third edge to the same target chord, each `diatonic` edge carries the
+  target's function in its explanation params. Product-spec §8's "basic tonic, predominant and
+  dominant relationships" (Zoom 1) is satisfied by the `diatonic` + `relative` +
+  `functionalDominant` families together, not a dedicated relationship type.
+- **"Frequent accessible chromatic relationships" (Zoom 2) and "sophisticated chromatic movement"
+  (Zoom 3)** from product-spec §8 are not implemented as their own families — they're interpreted
+  as already covered by the concrete, named families at those zoom levels (`secondaryDominant` /
+  `borrowed` / `substitution` at Zoom 2; `chromaticMediant` primarily at Zoom 3). No edge exists
+  whose only justification is "Zoom 2 needs more chromatic content."
+- **Cross-family de-duplication.** Several relationship families can independently derive the
+  exact same target chord via different (but both musically valid) reasoning paths. Rather than
+  show two edges with different labels to the same chord, the more specific/named family wins and
+  the more generic one excludes it:
+  - `chromaticMediant` and `commonTone` exclude any target that coincides with `borrowed`'s
+    canonical set (e.g. C major's bIII, Eb, would otherwise also qualify as a chromatic mediant of
+    C — `borrowed` keeps it).
+  - In *any* natural-minor key, V7/III (a secondary dominant) and the diatonic bVII7 are
+    *mathematically* the same chord — both land a major 7th above the tonic, by construction of
+    natural minor's interval pattern, not a coincidence of one key. `secondaryDominant` excludes
+    this case; `diatonicSeventh` keeps it.
+  - In *any* natural-minor key, the functional leading-tone diminished 7th
+    (`functionalLeadingToneDiminished`) and the passing-diminished chord between bVII and i are
+    also always the same chord (both "a diminished 7th on the raised leading tone").
+    `passingDiminished` excludes this case; `functionalDominant`'s `leadingToneDiminished` keeps
+    it.
+  - This is verified generically (not just for C major/A minor) — see
+    `src/domain/graph/harmonicGraph.test.ts`'s cross-key duplicate-edge checks.
+- **Tritone substitution is spelled as the conventional bII7 of the resolution target**, not a
+  generic +6-semitone transposition of the source. `transposeChord(G7, 6)` would give C#7 (the
+  generic ascending-tritone/augmented-4th spelling from `../intervals/transpose`), but every real
+  chart spells G7's tritone sub as Db7 — because it's understood as "bII7 of C" (what G7 resolves
+  to), not as an abstract interval from G. `tritoneSubstitution.ts` computes it that way,
+  reusing `secondaryDominant.ts`'s `recognizedDominants()`, which pairs each recognized dominant
+  with what it resolves to.
+- **"Anchored at tonic" families are quality-agnostic.** `relative`, `functionalDominant`,
+  `borrowed`, `nearbyKey`, and `distantKey` all only fire from the tonic chord. They check via
+  `harmonicFunction.ts`'s `isTonic()` (root pitch class matches scale degree 1) rather than exact
+  chord identity, so they still fire when exploring from Cmaj7, C6, etc. — not only the bare
+  triad. This matters directly for product-spec's own worked example ("exploring Cmaj7").
+- **`nearbyKey` (Zoom 3, "nearby modulation relationships") intentionally skips the immediately
+  closely-related keys** (dominant, subdominant, relative) because their tonics are, by
+  construction, already diatonic chords the Zoom 1 `diatonic` family exposes — a same-chord
+  "modulation" edge would just be a relabeled duplicate. It instead goes one hop further along the
+  circle of fifths (dominant-of-the-dominant, subdominant-of-the-subdominant, and their relatives),
+  which are guaranteed non-diatonic new tonal centers.
+- **Guitar/bass/piano-facing families are deliberately absent from this list** — Phase 3 is
+  harmony/graph only; instrument representations are Phase 7-9.
