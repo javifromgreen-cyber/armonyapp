@@ -22,11 +22,18 @@ localized hero copy. Marketing home and `/app` are intentionally minimal placeho
 lands in Phase 4 (map) and Phase 14 (marketing site).
 
 ## Phase 2 — Music theory engine + tests
-- [ ] notes, intervals, chords, keys modules
-- [ ] Chord catalogue from spec §10
-- [ ] Enharmonic spelling rules
-- [ ] Transposition
-- [ ] Unit tests per `music-engine.md`
+- [x] notes, intervals, chords, keys modules
+- [x] Chord catalogue from spec §10 (all 17 qualities)
+- [x] Enharmonic spelling rules (context-driven via scale degree, never sharps-only)
+- [x] Transposition (note-level and chord-level, including the tritone edge case)
+- [x] Unit tests per `music-engine.md`
+
+Verified 2026-08-11: `npm run test` (80 tests, 5 files), `typecheck`, `lint`, `build` all pass.
+Ran the `music-theory-review` skill against the new code before marking this phase done; it found
+a real bug (tritone transposition wasn't invertible — `transposeNote(transposeNote(C,6),-6)` gave
+B# instead of C) and a test-coverage gap (natural-minor diatonic chords were unasserted). Both
+fixed; see "Documented assumptions" in `docs/music-engine.md` for the resulting tritone-direction
+rule, the diminished-7th double-flat spelling, and the natural-minor-vs-harmonic-minor scope note.
 
 ## Phase 3 — Harmonic graph engine + Zoom 1–4 + tests
 - [ ] harmony module (functions, secondary dominants, borrowed chords, substitutions)
