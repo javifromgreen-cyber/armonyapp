@@ -7,14 +7,19 @@ At the end of every phase: run tests, typecheck, lint, build; fix errors; confir
 record notable decisions here or in `architecture.md`.
 
 ## Phase 1 — Architecture and core infrastructure
-- [ ] Next.js + TypeScript (strict) + Tailwind scaffold
-- [ ] Repository layout per `architecture.md`
-- [ ] next-intl wired with `en`/`es` namespaces, no hard-coded UI strings
-- [ ] Base dark-first design tokens (Tailwind theme)
-- [ ] Vitest configured for `/src/domain`
-- [ ] ESLint + TypeScript strict mode clean
-- [ ] `.env.example`, README
-- [ ] CI-equivalent local scripts: `lint`, `typecheck`, `test`, `build`
+- [x] Next.js + TypeScript (strict) + Tailwind scaffold
+- [x] Repository layout per `architecture.md`
+- [x] next-intl wired with `en`/`es` namespaces, no hard-coded UI strings
+- [x] Base dark-first design tokens (Tailwind theme, `.light` reserved for future light mode)
+- [x] Vitest configured for `/src/domain` (passes with 0 tests until Phase 2 adds the engine)
+- [x] ESLint + TypeScript strict mode clean
+- [x] `.env.example`, README
+- [x] CI-equivalent local scripts: `lint`, `typecheck`, `test`, `build`
+
+Verified 2026-08-11: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build` all pass;
+manual check of `/`, `/es`, `/app`, `/es/app` on a production server returned 200 with correctly
+localized hero copy. Marketing home and `/app` are intentionally minimal placeholders — real UI
+lands in Phase 4 (map) and Phase 14 (marketing site).
 
 ## Phase 2 — Music theory engine + tests
 - [ ] notes, intervals, chords, keys modules

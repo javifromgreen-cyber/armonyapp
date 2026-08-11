@@ -1,0 +1,25 @@
+{
+  "common": {
+    "brand": "Armony",
+    "startFree": "Empezar gratis",
+    "logIn": "Iniciar sesión"
+  },
+  "marketing": {
+    "hero": {
+      "title": "Descubre a dónde pueden llevarte tus acordes.",
+      "subtitle": "Explora la armonía. Escucha cada camino. Tócalo en tu instrumento. Construye tu progresión."
+    },
+    "loop": {
+      "explore": "Explorar",
+      "understand": "Entender",
+      "hear": "Escuchar",
+      "play": "Tocar",
+      "compose": "Componer"
+    }
+  },
+  "app": {
+    "shell": {
+      "comingSoon": "El mapa armónico llegará en la próxima fase de desarrollo."
+    }
+  }
+}

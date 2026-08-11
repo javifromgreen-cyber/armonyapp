@@ -1,0 +1,25 @@
+{
+  "common": {
+    "brand": "Armony",
+    "startFree": "Start Free",
+    "logIn": "Log in"
+  },
+  "marketing": {
+    "hero": {
+      "title": "See where your chords can go.",
+      "subtitle": "Explore harmony. Hear every path. Play it on your instrument. Build your progression."
+    },
+    "loop": {
+      "explore": "Explore",
+      "understand": "Understand",
+      "hear": "Hear",
+      "play": "Play",
+      "compose": "Compose"
+    }
+  },
+  "app": {
+    "shell": {
+      "comingSoon": "The harmonic map is coming in the next build phase."
+    }
+  }
+}

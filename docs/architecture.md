@@ -32,12 +32,14 @@
       /bass                  fretboard model, patterns/arpeggios
       /piano                 keyboard model, voicings/inversions
     /entitlements            plan -> feature flags, pure functions, no Stripe/Supabase imports
-  /app                      Next.js App Router: marketing routes + /app (the product) routes
+  /app/[locale]             Next.js App Router: marketing routes + /app (the product) routes, one locale segment
+                            globals.css (Tailwind entry + dark-first design tokens) lives in src/app
   /components               presentational + composed UI components (React), consume /domain only through hooks/adapters
   /server                   Supabase server clients, Stripe webhook handlers, route handlers
   /lib                      cross-cutting utilities (not music domain, not UI)
-  /messages                 en.json / es.json translation namespaces (next-intl)
-  /styles                   Tailwind entry, design tokens
+  /i18n                     next-intl routing/navigation/request config
+  proxy.ts                  next-intl locale routing (Next.js 16 "Proxy" convention)
+/messages                   en.json / es.json translation namespaces (next-intl)
 /supabase
   /migrations               SQL migrations
   seed.sql
@@ -84,5 +86,14 @@ service-role only.
 
 ## Deviations from spec
 
-None yet. This section is updated whenever an implementation decision diverges from
-`product-spec.md`, with rationale.
+- **No separate top-level `/styles` directory.** Tailwind's entry point and dark-first CSS
+  variable tokens live in `src/app/globals.css`, following Next.js App Router convention, and are
+  imported once from `src/app/[locale]/layout.tsx`. This is a location choice only — the design
+  tokens and dark/light theming approach described in `product-spec.md` §4 are unchanged.
+- **Locale-prefixed routing.** To satisfy i18n (§3) without duplicating routes, all routes live
+  under `src/app/[locale]/...`. `next-intl`'s `localePrefix: "as-needed"` means the default locale
+  (English) is served unprefixed (`/`, `/app`) and Spanish is prefixed (`/es`, `/es/app`), so the
+  product's `/app` URL from §2 holds for the default-locale case.
+- **Next.js 16 "Proxy" convention.** Next.js 16 renamed the `middleware.ts` file convention to
+  `proxy.ts` (same request-interception role, used here for `next-intl`'s locale routing). The
+  file lives at `src/proxy.ts`.

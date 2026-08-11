@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/*
+ * Dark-first design tokens. Dark is the default and only theme in v1; the
+ * `.light` class is reserved for a future light theme (product-spec §4) and
+ * should redefine the same variable set without any component changes.
+ */
+:root {
+  color-scheme: dark;
+
+  --background: #0b0c0f;
+  --surface: #131519;
+  --surface-raised: #1b1e24;
+  --border: #262a31;
+
+  --foreground: #f4f5f7;
+  --foreground-muted: #9aa0ab;
+
+  --accent: #7c8cff;
+  --accent-foreground: #0b0c0f;
+
+  --dominant: #ff8a5c;
+  --predominant: #5ccfff;
+  --tonic: #7c8cff;
+}
+
+.light {
+  color-scheme: light;
+
+  --background: #ffffff;
+  --surface: #f5f6f8;
+  --surface-raised: #ffffff;
+  --border: #e2e4e9;
+
+  --foreground: #14161a;
+  --foreground-muted: #5b606b;
+
+  --accent: #4c5fe0;
+  --accent-foreground: #ffffff;
+
+  --dominant: #d9622f;
+  --predominant: #1f8fb8;
+  --tonic: #4c5fe0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-dominant: var(--dominant);
+  --color-predominant: var(--predominant);
+  --color-tonic: var(--tonic);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

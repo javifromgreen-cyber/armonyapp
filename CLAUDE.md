@@ -1,5 +1,7 @@
 # Armony — persistent project rules
 
+@AGENTS.md
+
 Full spec: `docs/product-spec.md`. Architecture: `docs/architecture.md`. Music engine design:
 `docs/music-engine.md`. Phase status: `docs/roadmap.md`. Read the relevant doc before large
 changes — do not re-derive product decisions from memory.
