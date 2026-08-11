@@ -15,6 +15,8 @@ export interface ChordContextPanelProps {
   /** The map's currently active Zoom — relationships shown here must never go deeper than what's on the map (see chordDisplayInfo.ts). */
   zoom: ZoomLevel;
   onExploreFrom: (chord: Chord) => void;
+  /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
+  onAddToProgression: (chord: Chord) => void;
 }
 
 function explanationText(
@@ -38,6 +40,7 @@ export function ChordContextPanel({
   context,
   zoom,
   onExploreFrom,
+  onAddToProgression,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
@@ -117,10 +120,8 @@ export function ChordContextPanel({
         )}
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          title={tPanel("comingSoon")}
-          className="cursor-not-allowed rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground-muted opacity-60"
+          onClick={() => onAddToProgression(chord)}
+          className="rounded-full border border-accent px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           {tPanel("addToProgression")}
         </button>

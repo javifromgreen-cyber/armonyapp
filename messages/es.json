@@ -53,9 +53,27 @@
       "contextualRole": "Rol contextual",
       "relationshipToSource": "Relación con {chord}",
       "addToProgression": "Añadir a la progresión",
-      "comingSoon": "Disponible en una fase posterior",
       "selectPrompt": "Selecciona un acorde en el mapa para ver sus detalles.",
       "additionalRelationships": "También relacionado como:"
+    },
+    "progression": {
+      "title": "Progresión",
+      "empty": "Selecciona un acorde y añádelo para empezar tu progresión.",
+      "bpmLabel": "BPM",
+      "timeSignatureLabel": "Compás",
+      "durationLabel": "Duración",
+      "beats": "{count, plural, one {# tiempo} other {# tiempos}}",
+      "remove": "Eliminar {chord} de la progresión",
+      "moveEarlier": "Mover {chord} antes en la progresión",
+      "moveLater": "Mover {chord} después en la progresión",
+      "clear": "Vaciar progresión",
+      "transposeLabel": "Transportar",
+      "transposeUp": "Transportar un semitono arriba",
+      "transposeDown": "Transportar un semitono abajo",
+      "chordTab": "Acorde",
+      "progressionTab": "Progresión ({count})",
+      "playButton": "Reproducir",
+      "playDisabledHint": "La reproducción llega en una fase posterior"
     }
   },
   "harmony": {

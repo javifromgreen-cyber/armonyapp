@@ -168,9 +168,47 @@ Diatonic + Relative minor only; Zoom 2 badge "+2" / panel adds Substitute chord.
 tests), `typecheck`, `lint`, `build` all pass.
 
 ## Phase 5 — Progression builder
-- [ ] Add/remove/reorder chords, durations, BPM, time signature
-- [ ] Transposition of full progression
-- [ ] Persistent bottom strip UI
+- [x] Framework-free progression domain (`src/domain/progression`): add/remove/reorder chords,
+      per-item duration, BPM, time signature, clear, context-aware transposition — all pure
+      functions, no React
+- [x] "Add to progression" enabled (uses the panel's SELECTED chord, never the explored/central
+      one); select/explore/add stay fully distinct — SELECT/EXPLORE and ADD dispatch to two
+      separate reducers, so there is no code path from selecting/exploring to progression mutation
+- [x] Persistent progression UI: desktop full-width strip below the map; mobile via a single
+      tabbed bottom sheet shared with the chord panel (never two stacked sheets)
+- [x] Reorder (move-earlier/move-later buttons, no drag-and-drop dependency), duration dropdown
+      (1/2/4/8 beats), BPM (validated/clamped, commit-on-blur), time signature (4/4, 3/4, 6/8),
+      clear
+- [x] Transposition (±1 semitone buttons) via the existing context-aware engine
+      (`transposeChord`/`transposeNote`) — correct conventional enharmonic spelling, not a naive
+      shift; progression survives changing the map's harmonic context (verified live: G Major
+      re-centers the map, progression chords stay untouched)
+- [x] Disabled "Play" transport placeholder (Phase 6 scaffolding only, per instruction — no audio)
+- [x] All new UI copy in `en`/`es` via next-intl (`app.progression.*`)
+
+Verified 2026-08-11: `npm run test` (296 tests, 32 files — up from 267; new coverage:
+`progression.test.ts` covering add/remove/reorder/duration-clamping/BPM-clamping/time-signature/
+clear/transposition incl. the product-spec worked example Cmaj7→Dmaj7 + Am7→Bm7 at +2 semitones and
+a round-trip enharmonic-correctness check, plus `progressionReducer.test.ts`), `typecheck`, `lint`,
+`build` all pass. Manually exercised in a real browser (dev server + Playwright) end-to-end: C
+Major/Zoom 1, selected and added 4 chords, confirmed the map never recentered/mutated during
+selects+adds, edited a card's duration, reordered by moving a card earlier, changed BPM to 120,
+transposed +1 semitone (F→Gb, Am→Bbm, Cmaj7→Dbmaj7, Dm→Ebm, correct conventional spelling), changed
+harmonic context to G Major and confirmed the progression was untouched, cleared it. Also verified
+Zoom 3, Spanish (full translation incl. "Contexto armónico"/"Añadir a la progresión"/"Vaciar
+progresión"), and mobile (collapsed tab-bar peek showing live chord + progression counts, expanding
+to the Progression tab without hiding the map, adding a chord from the map while the sheet was
+collapsed). Zero console/page errors across all runs. Ran `product-scope-review` (verdict: aligned
+— three-action rule and loop integrity intact, no DAW-style chrome, no invented Free limits) and
+`release-check` before considering this done.
+
+Caught and fixed one real bug during verification, before it ever reached the user: an early
+implementation rendered `ProgressionEditor` twice simultaneously (once in the desktop strip, once
+CSS-hidden inside the mobile sheet) so it would "work" via CSS visibility alone but leave two live
+component instances editing the same shared state redundantly at every breakpoint. Replaced with a
+`useSyncExternalStore`-based `useIsDesktop()` hook so exactly one layout (desktop sidebar+strip vs.
+mobile tabbed sheet) is ever mounted at a time — also resolved a `react-hooks/set-state-in-effect`
+lint error the first `useEffect`-based attempt at the same hook had triggered.
 
 ## Phase 6 — Audio
 - [ ] Tone.js setup, neutral harmonic playback
