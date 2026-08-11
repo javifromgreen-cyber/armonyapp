@@ -5,6 +5,7 @@ import { buildChord, type Chord } from "../../chords/chord";
 import { chordsEqual } from "../chordIdentity";
 import { isTonic } from "../harmonicFunction";
 import { borrowedChords } from "./borrowed";
+import { isRecognizedDominant } from "./secondaryDominant";
 import type { HarmonicEdge } from "../types";
 
 function dominantKeyOf(key: Key): Key {
@@ -33,7 +34,7 @@ function tonicTriad(key: Key): Chord {
  * coincides with ../borrowed's bVII, which gets the more specific label).
  */
 export function nearbyKeyRelationships(source: Chord, context: Key): HarmonicEdge[] {
-  if (!isTonic(source, context)) return [];
+  if (!isTonic(source, context) || isRecognizedDominant(source, context)) return [];
 
   const dominantOfDominant = dominantKeyOf(dominantKeyOf(context));
   const subdominantOfSubdominant = subdominantKeyOf(subdominantKeyOf(context));

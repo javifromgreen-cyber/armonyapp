@@ -3,6 +3,8 @@ import { noteAtScaleDegree, type ScaleDegree } from "../../intervals/scaleDegree
 import { buildChord, type Chord } from "../../chords/chord";
 import type { ChordQualityId } from "../../chords/chordQuality";
 import { isTonic } from "../harmonicFunction";
+import { chordsEqual } from "../chordIdentity";
+import { isRecognizedDominant } from "./secondaryDominant";
 import type { Explanation, HarmonicEdge, ZoomLevel } from "../types";
 
 interface BorrowedChordSpec {
@@ -66,17 +68,24 @@ export function borrowedChords(context: Key): Chord[] {
  * Zoom 2 (common) and Zoom 3 (broader) modal interchange, anchored at the
  * tonic chord: e.g. in C major, C -> Fm (iv), Ab (bVI), Bb (bVII) at Zoom 2,
  * and C -> Eb (bIII), Db (bII, Neapolitan), Ddim (borrowed ii°) at Zoom 3.
+ * Excludes a chord whose root merely coincides with the tonic while it's
+ * actually a recognized dominant (e.g. C7 in C major is V7/IV, not "the
+ * tonic"), and never targets the source itself — relevant for A minor's
+ * single-item borrowed set, the Picardy third, whose degree/quality are
+ * identical to the tonic-anchor chord when you're exploring FROM it.
  */
 export function borrowedRelationships(source: Chord, context: Key): HarmonicEdge[] {
-  if (!isTonic(source, context)) return [];
+  if (!isTonic(source, context) || isRecognizedDominant(source, context)) return [];
 
-  return specsFor(context).map((spec) => ({
-    source,
-    target: buildChord(noteAtScaleDegree(context.tonic, spec.degree), spec.quality),
-    relationshipType: "borrowed",
-    harmonicDepth: spec.depth,
-    strength: spec.strength,
-    explanation: explanation(spec.explanationKey),
-    context,
-  }));
+  return specsFor(context)
+    .map((spec) => ({
+      source,
+      target: buildChord(noteAtScaleDegree(context.tonic, spec.degree), spec.quality),
+      relationshipType: "borrowed" as const,
+      harmonicDepth: spec.depth,
+      strength: spec.strength,
+      explanation: explanation(spec.explanationKey),
+      context,
+    }))
+    .filter((edge) => !chordsEqual(edge.target, source));
 }

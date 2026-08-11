@@ -25,4 +25,12 @@ describe("relativeRelationships", () => {
     expect(relativeRelationships(parseChordSymbol("G"), cMajor)).toEqual([]);
     expect(relativeRelationships(parseChordSymbol("Am"), cMajor)).toEqual([]);
   });
+
+  it("negative: C7's root coincides with the tonic, but C7 is V7/IV, not the tonic", () => {
+    expect(relativeRelationships(parseChordSymbol("C7"), cMajor)).toEqual([]);
+  });
+
+  it("negative: A7's root coincides with A minor's tonic, but A7 is V7/iv", () => {
+    expect(relativeRelationships(parseChordSymbol("A7"), aMinor)).toEqual([]);
+  });
 });

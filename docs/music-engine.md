@@ -90,6 +90,13 @@ Non-obvious rules chosen during implementation, per the "don't guess — write i
 `src/domain/harmony` and `src/domain/graph` implement product-spec §8's relationship families and
 §29's graph model. Non-obvious rules and interpretive decisions:
 
+- **14 generator functions, 15 `RelationshipType` tags.** `src/domain/graph/harmonicGraph.ts`'s
+  `RELATIONSHIP_GENERATORS` list has 14 entries (one per family module); `types.ts`'s
+  `RELATIONSHIP_TYPES` has 15 entries. The difference is `functionalDominantRelationships`, a
+  single generator function that emits edges of two distinct types (`functionalDominant` and
+  `leadingToneDiminished`) depending on which chord it's describing. Both numbers are correct —
+  they're just counting different things.
+
 - **Functional minor without touching the scale.** `functionalMinor.ts`'s `functionalDominant`
   needs no mode branching and no harmonic-minor scale: building a `dominant7`-quality chord on a
   natural-minor key's own (unaltered) 5th scale degree already produces the raised 3rd
@@ -140,11 +147,14 @@ Non-obvious rules chosen during implementation, per the "don't guess — write i
   to), not as an abstract interval from G. `tritoneSubstitution.ts` computes it that way,
   reusing `secondaryDominant.ts`'s `recognizedDominants()`, which pairs each recognized dominant
   with what it resolves to.
-- **"Anchored at tonic" families are quality-agnostic.** `relative`, `functionalDominant`,
-  `borrowed`, `nearbyKey`, and `distantKey` all only fire from the tonic chord. They check via
-  `harmonicFunction.ts`'s `isTonic()` (root pitch class matches scale degree 1) rather than exact
-  chord identity, so they still fire when exploring from Cmaj7, C6, etc. — not only the bare
-  triad. This matters directly for product-spec's own worked example ("exploring Cmaj7").
+- **"Anchored at tonic" families are quality-agnostic, but not root-only.** `relative`,
+  `functionalDominant`, `borrowed`, `nearbyKey`, and `distantKey` all only fire from the tonic
+  chord. They check via `harmonicFunction.ts`'s `isTonic()` (root pitch class matches scale degree
+  1) so they still fire when exploring from Cmaj7, C6, etc. — not only the bare triad — but `isTonic`
+  alone is not sufficient: they additionally require `!isRecognizedDominant(source, context)` (from
+  `secondaryDominant.ts`), because a chord's root can coincide with the tonic while the chord itself
+  is a *different* recognized thing (C7 in C major has root C, but C7 is V7/IV). See "Documented
+  assumptions (Phase 3 correctness pass)" below for the bug this fixes.
 - **`nearbyKey` (Zoom 3, "nearby modulation relationships") intentionally skips the immediately
   closely-related keys** (dominant, subdominant, relative) because their tonics are, by
   construction, already diatonic chords the Zoom 1 `diatonic` family exposes — a same-chord
@@ -153,3 +163,50 @@ Non-obvious rules chosen during implementation, per the "don't guess — write i
   which are guaranteed non-diatonic new tonal centers.
 - **Guitar/bass/piano-facing families are deliberately absent from this list** — Phase 3 is
   harmony/graph only; instrument representations are Phase 7-9.
+
+## Documented assumptions (Phase 3 correctness pass)
+
+A follow-up review of the initial Phase 3 implementation found that "root position happens to
+coincide with the tonic" was being used, in several places, as a stand-in for "this chord IS the
+tonic" — which breaks for any chord that is itself a recognized dominant rooted on the tonic
+degree (the clearest case: C7 in C major, root C, but musically V7/IV, not tonic-function at all).
+Fixes, all covered by regression tests:
+
+- **`secondaryDominantRelationships` had a self-referential bug.** It gated its "list all
+  secondary dominants" branch on `diatonicDegreeOf(source, context) === 1` (root is the tonic).
+  Since C7's root is C, querying `secondaryDominantRelationships("C7", cMajor)` matched that
+  branch and returned all 5 secondary dominants **including a self-loop edge from C7 to itself**,
+  instead of recognizing that C7 already *is* one of those five and should only resolve (to F).
+  Fixed by additionally checking the source isn't itself one of the targets. The same
+  root-coincidence hazard existed in `relative.ts`, `functionalDominant.ts` (the relationship
+  file), `borrowed.ts`, `nearbyKey.ts`, and `distantKey.ts` — all of which gated purely on
+  `isTonic()`. Each now also excludes `isRecognizedDominant(source, context)`.
+  `borrowed.ts` additionally gained a same-target self-loop filter for A minor's Picardy third
+  (its only borrowed-chord entry has the same root *and* the same degree spec as the tonic-anchor
+  chord itself, so querying from the Picardy chord could otherwise produce a Picardy→Picardy edge).
+- **Root-only classification is not enough for a chord's *displayed* function, either.** The
+  original `substitutionRelationships` used `harmonicFunction.ts`'s `classifyFunction` (root-only)
+  on the *source* chord directly, so `substitutionRelationships("C7", cMajor)` computed C7 as
+  "tonic-function" and offered Em/Am as substitutes — as if C7 (a secondary dominant) were
+  interchangeable with the plain tonic triad. Fixed by introducing
+  `src/domain/harmony/contextualRole.ts`, a fourth, explicitly-separated concept alongside chord
+  identity, the diatonic/root functional family, and chord-to-chord relationships:
+  - **chord identity** (`Chord`) — root + quality, no context.
+  - **diatonic/root functional family** (`classifyFunction`) — root-only tonic/predominant/dominant;
+    a simple, always-available fallback, not a claim about what the chord is actually doing.
+  - **contextual role** (`contextualRole`) — refines or overrides the root family using the
+    chord's actual quality and any already-modeled specific relationship: if the chord's quality
+    natively matches the plain diatonic triad or diatonic 7th chord at its root, the root family is
+    accurate and used as-is (e.g. G7 in C major really is the diatonic V7); otherwise it checks, in
+    order, the minor-key functional dominant/leading-tone chords, recognized secondary dominants
+    (returning which degree they target), and borrowed chords; only if nothing more specific
+    matches does it fall back to the plain root family (e.g. Csus4 in C major has no more specific
+    story, so "tonic" is a reasonable simple fallback — this is the "basic/root-derived family may
+    still exist as a simple fallback" requirement). Returns undefined only when the chord's root
+    isn't diatonic at all.
+  - **relationship to another chord** (`HarmonicEdge`) — unchanged.
+
+  `substitutionRelationships` now requires `contextualRole(source, context)` to be a plain
+  tonic/predominant/dominant kind before computing substitutes, and additionally excludes
+  same-ROOT targets (not just exact chord identity) — "Cmaj7 substitutes for C" isn't a meaningful
+  substitution, just the same root with an extension.

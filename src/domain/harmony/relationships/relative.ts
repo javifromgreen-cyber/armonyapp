@@ -2,6 +2,7 @@ import type { Key } from "../../keys/key";
 import { relativeKey } from "../../keys/key";
 import { buildChord, type Chord } from "../../chords/chord";
 import { isTonic } from "../harmonicFunction";
+import { isRecognizedDominant } from "./secondaryDominant";
 import type { HarmonicEdge } from "../types";
 
 /**
@@ -9,10 +10,13 @@ import type { HarmonicEdge } from "../types";
  * -> C), exposed from any tonic-function chord (quality-agnostic — Cmaj7
  * counts, not just the plain C triad) — it's a relationship between *keys*,
  * so it's most meaningful anchored at the current tonal center rather than
- * attached to every diatonic chord.
+ * attached to every diatonic chord. Excludes a chord whose root merely
+ * coincides with the tonic while it's actually a recognized dominant (e.g.
+ * C7 in C major, which is V7/IV, not "the tonic") — see
+ * ../relationships/secondaryDominant's isRecognizedDominant.
  */
 export function relativeRelationships(source: Chord, context: Key): HarmonicEdge[] {
-  if (!isTonic(source, context)) return [];
+  if (!isTonic(source, context) || isRecognizedDominant(source, context)) return [];
 
   const relative = relativeKey(context);
   const target = buildChord(relative.tonic, relative.mode === "major" ? "major" : "minor");

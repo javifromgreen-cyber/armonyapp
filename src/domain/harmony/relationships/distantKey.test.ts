@@ -24,4 +24,8 @@ describe("distantKeyRelationships", () => {
   it("anchored only at the tonic", () => {
     expect(distantKeyRelationships(parseChordSymbol("G"), cMajor)).toEqual([]);
   });
+
+  it("negative: C7's root coincides with the tonic, but C7 is V7/IV, not the tonic", () => {
+    expect(distantKeyRelationships(parseChordSymbol("C7"), cMajor)).toEqual([]);
+  });
 });

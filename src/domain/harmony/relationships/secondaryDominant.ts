@@ -22,7 +22,7 @@ export function dominantOf(root: Note): Chord {
  */
 const TONICIZABLE_DEGREES = [2, 3, 4, 5, 6];
 
-interface SecondaryDominantTarget {
+export interface SecondaryDominantTarget {
   degree: number;
   /** The secondary dominant itself, e.g. A7 for V7/ii. */
   chord: Chord;
@@ -39,8 +39,11 @@ interface SecondaryDominantTarget {
  * structure, not a coincidence of one particular key), so tonicizing degree 3
  * would otherwise silently duplicate ../diatonicSeventh's bVII7 under a
  * different, misleading label. See docs/music-engine.md.
+ *
+ * Exported (not just used internally) so ../contextualRole can look up which
+ * degree a recognized secondary-dominant chord targets.
  */
-function secondaryDominantTargets(context: Key): SecondaryDominantTarget[] {
+export function secondaryDominantTargets(context: Key): SecondaryDominantTarget[] {
   const diatonic = diatonicChords(context);
   const diatonicSevenths = diatonicSeventhChords(context);
 
@@ -77,6 +80,22 @@ export function recognizedDominantSeventhChords(context: Key): Chord[] {
 }
 
 /**
+ * Whether `chord` is exactly one of this context's recognized dominants (the
+ * primary functional dominant or a single-level secondary dominant) —
+ * exported so every "anchored at the tonic" relationship family can decline
+ * to fire when the source's ROOT happens to coincide with the tonic but the
+ * chord itself is actually a dominant of some *other* degree. Without this
+ * guard, e.g. C7 in C major (root C, same as the tonic, but really V7/IV)
+ * would be misread as "browsing secondary dominants from the tonic" — see
+ * docs/music-engine.md.
+ */
+export function isRecognizedDominant(chord: Chord, context: Key): boolean {
+  return recognizedDominantSeventhChords(context).some((candidate) =>
+    chordsEqual(candidate, chord),
+  );
+}
+
+/**
  * Zoom 2: simple (single-level) secondary dominants — the dominant 7th chord
  * of each other diatonic degree, e.g. in C major: A7 (V7/ii), B7 (V7/iii), C7
  * (V7/IV), D7 (V7/V), E7 (V7/vi). Mode-agnostic: works the same way for
@@ -88,8 +107,10 @@ export function secondaryDominantRelationships(source: Chord, context: Key): Har
 
   // Only exposed as outgoing edges from the tonic (browsing "what secondary
   // dominants exist in this key") and from each secondary dominant itself
-  // (resolution back to the tonicized degree).
-  if (sourceDegree === 1) {
+  // (resolution back to the tonicized degree). A chord whose root happens to
+  // equal the tonic but which IS itself one of `targets` (e.g. C7 in C major)
+  // is NOT "at the tonic" for this purpose — it only ever resolves.
+  if (sourceDegree === 1 && !targets.some(({ chord }) => chordsEqual(chord, source))) {
     return targets.map(({ degree, chord }) => ({
       source,
       target: chord,

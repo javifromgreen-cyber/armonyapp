@@ -36,7 +36,9 @@ fixed; see "Documented assumptions" in `docs/music-engine.md` for the resulting 
 rule, the diminished-7th double-flat spelling, and the natural-minor-vs-harmonic-minor scope note.
 
 ## Phase 3 — Harmonic graph engine + Zoom 1–4 + tests
-- [x] harmony module (function classification, functional-minor overlay, 14 relationship families)
+- [x] harmony module (function classification, functional-minor overlay, 14 relationship-family
+      generator functions producing 15 distinct `RelationshipType` tags — `functionalDominantRelationships`
+      alone emits both `functionalDominant` and `leadingToneDiminished`)
 - [x] graph module (query API: `relationshipsFrom`, `relationshipsAtDepth`, `relationshipsBetween`)
 - [x] Zoom 1–4 classification (fixed per family, documented in `music-engine.md`)
 - [x] Tests per relationship type and zoom level, incl. negative/exclusion cases and a second
@@ -55,11 +57,33 @@ checked exact chord identity instead of root. UI work (Phase 4) intentionally no
 report delivered alongside this commit for full architecture, relationship-type, and Zoom-rule
 detail; per explicit instruction this phase stops here for review before Phase 4 begins.
 
+**Correctness pass 2026-08-11 (user review):** found root-only classification going one step too
+far — a chord whose ROOT happens to equal the tonic (e.g. C7 in C major) was being treated as "at
+the tonic" by 6 different files, when its actual identity (V7/IV) says otherwise.
+`secondaryDominantRelationships` had a self-referential case of this (C7 querying itself produced
+a 5-way fan-out including a C7->C7 self-loop instead of resolving to F); the same hazard existed in
+`relative`/`borrowed`/`nearbyKey`/`distantKey`/`functionalDominant`(relationship), all gated on
+root-only `isTonic()`; and `substitutionRelationships` mislabeled C7 as tonic-function via
+`classifyFunction` (root-only) and offered it Em/Am as substitutes. Fixed by adding a
+`!isRecognizedDominant(source, context)` guard to the six anchor checks, and by introducing
+`src/domain/harmony/contextualRole.ts` — a new, explicitly fourth concept (chord identity /
+diatonic-root family / **contextual role** / relationship-to-another-chord) that lets a chord's
+quality and any already-detected specific relationship override the plain root family, falling
+back to it only when nothing more specific applies. Also fixed: two mislabeled test titles calling
+A7 "V7/vi" (it's V7/ii) — the underlying code/metadata were already correct in both cases, but
+added explicit degree+resolution-target tests for every C-major secondary dominant so that class of
+mistake can't recur unnoticed. Tests: 183 → 222. Ran `music-theory-review` again on the fixes; it
+found one more instance of the same test-title mislabeling and nothing else. `test`/`typecheck`/
+`lint`/`build` all pass. Still stopped before Phase 4, per instruction.
+
 ## Phase 4 — Core harmonic map UI
 - [ ] Preview deployment set up (see `architecture.md` "Preview deployment") so the map can be
       reviewed visually/interactively as it's built
 - [ ] Custom deterministic SVG map renderer (not Canvas/force-physics — see `architecture.md`),
       current chord + relevant neighbors at the active Zoom, progressive expansion
+- [ ] One node per unique chord identity, even when multiple relationship types connect to it
+      (see `architecture.md` "Harmonic map: one node per chord") — combine as edge metadata/badges,
+      never duplicate nodes
 - [ ] Select vs recenter vs add-to-progression as distinct actions
 - [ ] Contextual side panel (chord info, relationship explanation)
 - [ ] Zoom control gated by entitlements (Free = 1–2)

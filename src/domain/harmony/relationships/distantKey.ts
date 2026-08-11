@@ -2,6 +2,7 @@ import type { Key } from "../../keys/key";
 import { transposeNote } from "../../intervals/transpose";
 import { buildChord, type Chord } from "../../chords/chord";
 import { isTonic } from "../harmonicFunction";
+import { isRecognizedDominant } from "./secondaryDominant";
 import type { HarmonicEdge } from "../types";
 
 /**
@@ -13,7 +14,7 @@ import type { HarmonicEdge } from "../types";
  * chord).
  */
 export function distantKeyRelationships(source: Chord, context: Key): HarmonicEdge[] {
-  if (!isTonic(source, context)) return [];
+  if (!isTonic(source, context) || isRecognizedDominant(source, context)) return [];
 
   const distantTonic = transposeNote(context.tonic, 6);
   const target = buildChord(distantTonic, context.mode === "major" ? "major" : "minor");

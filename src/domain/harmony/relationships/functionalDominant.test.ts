@@ -38,4 +38,8 @@ describe("functionalDominantRelationships — the E7 -> Am case", () => {
   it("negative: not anchored at other minor-key diatonic chords", () => {
     expect(functionalDominantRelationships(parseChordSymbol("Dm"), aMinor)).toEqual([]);
   });
+
+  it("negative: A7's root coincides with the tonic, but A7 is V7/iv, not the tonic itself", () => {
+    expect(functionalDominantRelationships(parseChordSymbol("A7"), aMinor)).toEqual([]);
+  });
 });

@@ -25,6 +25,10 @@ describe("borrowedRelationships — major key borrows from parallel minor", () =
   it("anchored only at the tonic", () => {
     expect(borrowedRelationships(parseChordSymbol("G"), cMajor)).toEqual([]);
   });
+
+  it("negative: C7's root coincides with the tonic, but C7 is V7/IV, not the tonic", () => {
+    expect(borrowedRelationships(parseChordSymbol("C7"), cMajor)).toEqual([]);
+  });
 });
 
 describe("borrowedRelationships — minor key borrows from parallel major (Picardy)", () => {
@@ -33,6 +37,17 @@ describe("borrowedRelationships — minor key borrows from parallel major (Picar
     expect(edges).toHaveLength(1);
     expect(chordSymbol(edges[0].target)).toBe("A");
     expect(edges[0].harmonicDepth).toBe(2);
+  });
+
+  it("negative: querying FROM the Picardy chord itself produces no self-loop", () => {
+    // A major (the Picardy third) has the same root as A minor's tonic, and
+    // it's the only entry in the minor-context borrowed set — without a
+    // self-target guard this would produce a nonsensical A-major -> A-major edge.
+    expect(borrowedRelationships(parseChordSymbol("A"), aMinor)).toEqual([]);
+  });
+
+  it("negative: A7's root coincides with the tonic, but A7 is V7/iv, not the tonic", () => {
+    expect(borrowedRelationships(parseChordSymbol("A7"), aMinor)).toEqual([]);
   });
 });
 

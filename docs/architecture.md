@@ -94,6 +94,24 @@ setup cost, PR/branch previews out of the box. No environment variables beyond `
 placeholders are needed until Supabase/Stripe integration lands (Phases 10+), so this can be wired
 up early without blocking on backend work.
 
+## Harmonic map: one node per chord, even with multiple relationships (recorded ahead of Phase 4)
+
+The domain layer intentionally allows a single target chord to be reachable via more than one
+`HarmonicEdge` — e.g. in C major, `C -> Am` is simultaneously `diatonic`, `relative`, and
+`substitution` (see `docs/music-engine.md`'s de-duplication policy for which overlaps are
+deliberate vs. bugs). `relationshipsBetween()` returns all of them on purpose; that musical
+information must not be discarded.
+
+**Phase 4 requirement:** the visual graph must render exactly ONE node per unique chord (by
+enharmonic-invariant identity — root pitch class + quality, i.e. `chordIdentityKey` from
+`src/domain/harmony/chordIdentity.ts`), never one node per relationship. When a source chord
+connects to a target through multiple relationship types, that's ONE edge/connection in the UI,
+carrying all of the applicable relationship types as combined metadata (e.g. badges, a
+multi-line explanation) — not multiple parallel edges or duplicate nodes for the same chord. The
+graph query layer already groups this correctly (`relationshipsBetween(a, b, context)` returns the
+full array of relationships between exactly two chords); the map UI's rendering model must not
+flatten that back into one-node-per-edge.
+
 ## Deviations from spec
 
 - **No separate top-level `/styles` directory.** Tailwind's entry point and dark-first CSS

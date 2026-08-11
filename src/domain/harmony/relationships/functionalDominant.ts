@@ -3,6 +3,7 @@ import { buildChord, type Chord } from "../../chords/chord";
 import { chordsEqual } from "../chordIdentity";
 import { isTonic } from "../harmonicFunction";
 import { functionalDominant, functionalLeadingToneDiminished } from "../functionalMinor";
+import { isRecognizedDominant } from "./secondaryDominant";
 import type { HarmonicEdge, ZoomLevel } from "../types";
 
 /**
@@ -26,7 +27,7 @@ export function functionalDominantRelationships(
   const depth: ZoomLevel = 1;
   const edges: HarmonicEdge[] = [];
 
-  if (isTonic(source, context)) {
+  if (isTonic(source, context) && !isRecognizedDominant(source, context)) {
     edges.push({
       source,
       target: dominant,

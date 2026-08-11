@@ -44,4 +44,17 @@ describe("substitutionRelationships — C major", () => {
       expect(edge.harmonicDepth).toBe(2);
     }
   });
+
+  it("negative: C7 is not tonic-function (it's V7/IV), so it gets no substitutes even though its root is C", () => {
+    expect(substitutionRelationships(parseChordSymbol("C7"), cMajor)).toEqual([]);
+  });
+
+  it("Cmaj7 and C6 are still genuinely tonic-function and get the same substitutes as C", () => {
+    expect(
+      substitutionRelationships(parseChordSymbol("Cmaj7"), cMajor).map((e) => chordSymbol(e.target)).sort(),
+    ).toEqual(["Am", "Em"].sort());
+    expect(
+      substitutionRelationships(parseChordSymbol("C6"), cMajor).map((e) => chordSymbol(e.target)).sort(),
+    ).toEqual(["Am", "Em"].sort());
+  });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseChordSymbol, chordSymbol } from "../chords/chord";
 import { parseNoteName } from "../notes/note";
 import type { Key } from "../keys/key";
+import type { RelationshipType } from "../harmony/types";
 import { relationshipsFrom, relationshipsAtDepth, relationshipsBetween } from "./harmonicGraph";
 
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
@@ -63,7 +64,7 @@ describe("relationshipsAtDepth — \"what becomes available when Zoom 3 unlocks\
 });
 
 describe("relationshipsBetween — \"what connects Cmaj7 and A7?\"", () => {
-  it("A7 is reachable from the tonic as V7/vi (secondary dominant)", () => {
+  it("A7 is reachable from the tonic as V7/ii (secondary dominant)", () => {
     const edges = relationshipsBetween(parseChordSymbol("C"), parseChordSymbol("A7"), cMajor);
     expect(edges.length).toBeGreaterThan(0);
     expect(edges.every((e) => e.relationshipType === "secondaryDominant")).toBe(true);
@@ -181,6 +182,51 @@ describe("cross-key verification — the coincidence exclusions generalize beyon
       .filter((e) => e.relationshipType === "nearbyKey")
       .map((e) => chordSymbol(e.target));
     expect(targets.sort()).toEqual(["A", "Dm", "F", "F#m"].sort());
+  });
+});
+
+describe("querying from a chord whose root coincides with the tonic but isn't the tonic (C7)", () => {
+  // Regression: C7's root is C (same as C major's tonic), but C7 IS V7/IV.
+  // Families that work generically from any chord's root/quality (diatonic,
+  // diatonicSeventh, chromaticMediant, commonTone) are unaffected and still
+  // fire normally — this only pins down the families that specifically
+  // anchor "at the tonic" or key off root-based function, which must NOT
+  // treat C7 as if it were sitting at the tonic.
+  const edges = relationshipsFrom(parseChordSymbol("C7"), cMajor, 4);
+  const types = new Set(edges.map((e) => e.relationshipType));
+
+  it("never produces a self-loop back to C7", () => {
+    expect(edges.some((e) => chordSymbol(e.target) === "C7")).toBe(false);
+  });
+
+  it("secondaryDominant resolves to exactly F (V7/IV), not a 5-way fan-out", () => {
+    const secondaryDominant = edges.filter((e) => e.relationshipType === "secondaryDominant");
+    expect(secondaryDominant).toHaveLength(1);
+    expect(chordSymbol(secondaryDominant[0].target)).toBe("F");
+  });
+
+  it("tritoneSubstitution still applies (C7 -> Gb7, the conventional bII7 of F)", () => {
+    const tritoneSub = edges.filter((e) => e.relationshipType === "tritoneSubstitution");
+    expect(tritoneSub).toHaveLength(1);
+    expect(chordSymbol(tritoneSub[0].target)).toBe("Gb7");
+  });
+
+  it("the tonic-anchored families do not fire: relative, functionalDominant, leadingToneDiminished, borrowed, nearbyKey, distantKey", () => {
+    const anchoredTypes: RelationshipType[] = [
+      "relative",
+      "functionalDominant",
+      "leadingToneDiminished",
+      "borrowed",
+      "nearbyKey",
+      "distantKey",
+    ];
+    for (const type of anchoredTypes) {
+      expect(types.has(type)).toBe(false);
+    }
+  });
+
+  it("substitution does not fire (C7 is not tonic-function)", () => {
+    expect(types.has("substitution")).toBe(false);
   });
 });
 

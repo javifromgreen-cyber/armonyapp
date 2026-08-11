@@ -25,6 +25,10 @@ describe("nearbyKeyRelationships — C major from C", () => {
   it("anchored only at the tonic", () => {
     expect(nearbyKeyRelationships(parseChordSymbol("G"), cMajor)).toEqual([]);
   });
+
+  it("negative: C7's root coincides with the tonic, but C7 is V7/IV, not the tonic", () => {
+    expect(nearbyKeyRelationships(parseChordSymbol("C7"), cMajor)).toEqual([]);
+  });
 });
 
 describe("nearbyKeyRelationships — A minor from Am", () => {
@@ -33,5 +37,9 @@ describe("nearbyKeyRelationships — A minor from Am", () => {
       chordSymbol(e.target),
     );
     expect(targets.sort()).toEqual(["Bb", "Bm", "D", "Gm"].sort());
+  });
+
+  it("negative: A7's root coincides with the tonic, but A7 is V7/iv, not the tonic", () => {
+    expect(nearbyKeyRelationships(parseChordSymbol("A7"), aMinor)).toEqual([]);
   });
 });
