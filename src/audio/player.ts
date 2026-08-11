@@ -1,7 +1,8 @@
 import * as Tone from "tone";
 import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
-import { neutralVoicing, type PlayablePitch } from "./voicing";
+import { neutralVoicing } from "./voicing";
+import type { PlayablePitch } from "@/domain/instruments/playablePitch";
 import { buildProgressionSchedule } from "./scheduling";
 
 /**
@@ -56,15 +57,27 @@ function pitchesToFrequencies(pitches: PlayablePitch[]): number[] {
 /**
  * One-off chord preview ("Hear chord", Phase 6 §4) — purely auditory, never
  * touches application/progression state. Uses the default neutral voicing;
- * a future "Hear this voicing" (guitar/piano/bass) can call
- * `playPitches` directly with its own computed `PlayablePitch[]` instead.
+ * "Hear this voicing" (Phase 7 §13) uses `hearPitches` below instead, with
+ * its own computed `PlayablePitch[]` rather than `neutralVoicing`.
  */
 export async function hearChord(chord: Chord): Promise<void> {
   await ensureAudioReady();
   playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
 }
 
-/** Low-level playback primitive future instrument-specific voicings (Phases 7-9) can call directly, bypassing `neutralVoicing`. */
+/**
+ * Plays an EXPLICIT set of pitches exactly as given (Phase 7 §13's "Hear
+ * this voicing" — the displayed piano voicing, not a regenerated generic
+ * chord). The seam any future instrument-specific voicing (guitar/bass)
+ * hands its own `PlayablePitch[]` to as well, reusing this same engine
+ * rather than duplicating it.
+ */
+export async function hearPitches(pitches: PlayablePitch[], durationSeconds = 1.4): Promise<void> {
+  await ensureAudioReady();
+  playPitches(pitchesToFrequencies(pitches), durationSeconds);
+}
+
+/** Low-level playback primitive — assumes the AudioContext is already running; prefer `hearChord`/`hearPitches` from a click handler instead of calling this directly. */
 export function playPitches(frequenciesHz: number[], durationSeconds: number, time?: number): void {
   getSynth().triggerAttackRelease(frequenciesHz, durationSeconds, time);
 }

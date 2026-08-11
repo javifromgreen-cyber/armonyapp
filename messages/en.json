@@ -81,6 +81,21 @@
     "audio": {
       "initError": "Couldn't start audio playback. Try again, or check your browser's sound settings.",
       "dismiss": "Dismiss"
+    },
+    "piano": {
+      "title": "Piano",
+      "keyboardAriaLabel": "Piano keyboard showing {notes}",
+      "previousVoicing": "Previous voicing",
+      "nextVoicing": "Next voicing",
+      "rootPosition": "Root position",
+      "inversion1": "1st inversion",
+      "inversion2": "2nd inversion",
+      "inversion3": "3rd inversion",
+      "openVoicing": "Open voicing",
+      "proBadge": "Pro",
+      "voicingCounter": "{current} of {total}",
+      "suggestedFingering": "Suggested fingering",
+      "hearThisVoicing": "Hear this voicing"
     }
   },
   "harmony": {

@@ -81,6 +81,21 @@
     "audio": {
       "initError": "No se pudo iniciar la reproducción de audio. Inténtalo de nuevo o revisa la configuración de sonido de tu navegador.",
       "dismiss": "Descartar"
+    },
+    "piano": {
+      "title": "Piano",
+      "keyboardAriaLabel": "Teclado de piano mostrando {notes}",
+      "previousVoicing": "Disposición anterior",
+      "nextVoicing": "Siguiente disposición",
+      "rootPosition": "Posición fundamental",
+      "inversion1": "Primera inversión",
+      "inversion2": "Segunda inversión",
+      "inversion3": "Tercera inversión",
+      "openVoicing": "Disposición abierta",
+      "proBadge": "Pro",
+      "voicingCounter": "{current} de {total}",
+      "suggestedFingering": "Digitación sugerida",
+      "hearThisVoicing": "Escuchar esta disposición"
     }
   },
   "harmony": {

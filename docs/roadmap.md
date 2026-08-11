@@ -262,7 +262,47 @@ run. Ran `product-scope-review` (verdict: aligned — Hear/Play stay auditory-on
 transport, no gating introduced) and `release-check` before considering this done.
 
 ## Phase 7 — Piano representation
-- [ ] Keyboard UI, root position + inversions/voicings, Free/Pro catalogue split
+- [x] Keyboard UI, root position + inversions/voicings, Free/Pro catalogue split
+
+Architecture: `src/domain/instruments/playablePitch.ts` (new shared concept — a chord tone at a
+REAL octave, carrying the spelled `Note`, plus MIDI/frequency math; `src/audio`'s neutral voicing
+now builds on this too, replacing its own former `pitch.ts`) and `src/domain/instruments/piano/`
+(`voicing.ts` — `PianoVoicing` generation; `keyboardLayout.ts` — pure white/black key geometry).
+React layer: `src/components/chordPanel/piano/{PianoKeyboard,PianoVoicingPanel}.tsx`, integrated
+directly into the existing `ChordContextPanel` (no separate piano page) — a PIANO section renders
+right below chord identity, with a keyboard, a Previous/Next voicing navigator, suggested
+fingering, and a "Hear this voicing" action distinct from "Hear chord". `activeInstrument`
+architecture note: rather than showing a single-option instrument selector before Guitar/Bass
+exist (Phase 7 §3's "choose the cleaner UX"), the panel simply has a "PIANO" section heading now;
+adding Guitar/Bash later is a matter of the same panel gaining sibling sections/tabs, not a
+rewrite.
+
+Voicing catalogue (documented in full in `docs/music-engine.md`'s new "Phase 7 — piano
+representation" section): triads get all 3 inversions (Free); 7th/6th-family chords get all 4
+inversions (root+1st Free, 2nd+3rd Pro); 9th-family chords get root+1st inversion (Free) plus one
+deterministic Pro "open" voicing (top tone raised an octave) rather than continuing to rotate.
+Inversion identity is derived from the bass tone by construction, never hand-labeled. Suggested
+right-hand fingering (1-3-5 / 1-2-3-5) is offered only for the two close-position shapes reliable
+enough to suggest; 5-tone and open-spacing voicings correctly omit it. Register placement reuses
+the same closest-ascending-step algorithm as Phase 6's neutral playback, verified to stay
+centrally registered regardless of root letter (spot-checked with Bmaj7-family and Dbmaj7).
+
+Verified 2026-08-11: `npm run test` (366 tests, 38 files — up from 320; new coverage:
+`playablePitch.test.ts`, `piano/voicing.test.ts` incl. the product-spec's exact C major/Cmaj7/G7/
+Bm7b5/Dbmaj7/F#dim7/C9/Cm9 examples, and `piano/keyboardLayout.test.ts`), `typecheck`, `lint`,
+`build` all pass (build also confirms no SSR regression from the `src/audio` refactor). Manually
+exercised in a real browser (dev server + Playwright): selected Cmaj7 — root position showed C4 E4
+G4 B4 exactly; stepped to 1st inversion — keyboard updated to E4 G4 B4 C5 exactly, root marker
+followed the C key regardless of its position in the voicing; 2nd inversion correctly showed a
+"Pro" badge and matching fingering; "Hear this voicing" and "Hear chord" both fired without
+affecting the explored chord, selection, or progression (still empty throughout); selected G7 at
+Zoom 2 and confirmed its own root-position notes; verified Spanish (Posición fundamental/Primera
+inversión/Digitación sugerida/Escuchar esta disposición) and mobile (piano renders correctly
+inside the mobile Chord tab, keyboard stays legibly sized). Zero console/page errors across every
+run. Ran `music-theory-review` (no correctness issues; one documented-not-a-bug observation about
+voicing-to-voicing register jumps, now recorded in `music-engine.md`), `product-scope-review`
+(verdict: aligned — stays representation, not a theory course; three-action rule intact) and
+`release-check` before considering this done.
 
 ## Phase 8 — Guitar representation and voicing engine
 - [ ] Fretboard/chord diagram, TAB, finger numbers

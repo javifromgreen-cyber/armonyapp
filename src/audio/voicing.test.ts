@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseChordSymbol } from "@/domain/chords";
 import { neutralVoicing, DEFAULT_ROOT_OCTAVE } from "./voicing";
-import { midiFromPitchClassAndOctave } from "./pitch";
+import { midiFromPitchClassAndOctave } from "@/domain/instruments/playablePitch";
 
 describe("neutralVoicing", () => {
   it("Cmaj7 voices as a close-position stack ascending from the root octave", () => {

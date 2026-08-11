@@ -151,9 +151,11 @@ export function ExplorerApp() {
       sourceChord={state.exploredChord}
       context={state.context}
       zoom={state.zoom}
+      isDesktop={isDesktop}
       onExploreFrom={handleExplore}
       onAddToProgression={handleAddToProgression}
       onHearChord={playback.hearChord}
+      onHearVoicing={(voicing) => playback.hearVoicing(voicing.pitches)}
     />
   );
 

@@ -20,15 +20,22 @@ each.
 - **graph** — builds the harmonic graph (nodes = chord-in-context, edges = typed relationships)
   and classifies each relationship into Zoom 1–4 per the rules in product-spec §8. Graph
   generation must be driven by the `harmony` module's explicit rules — never hard-coded per node.
+- **instruments** — `playablePitch.ts`: the shared `PlayablePitch` type (a chord tone at a REAL
+  octave, carrying the spelled `Note` — not just a pitch class) and MIDI/frequency math, used by
+  every instrument representation and by `src/audio`'s neutral playback voicing (Phase 7 moved
+  this here from `src/audio/pitch.ts` once a second consumer — piano — needed it).
 - **instruments/guitar** — fretboard model, voicing generation, and a playability ranking
   function (fret span, stretch, finger count, string usage, chord-tone coverage, duplicate notes).
 - **instruments/bass** — fretboard model, chord-tone position finder, arpeggio/pattern generator.
-- **instruments/piano** — keyboard model, inversion generation, voicing generation.
+- **instruments/piano** — `voicing.ts`: root/inversion voicing generation (Phase 7) —
+  `PianoVoicing` per chord, register placement, Free/Pro catalogue tagging, suggested fingering.
+  `keyboardLayout.ts`: pure white/black key geometry for an arbitrary MIDI range, no DOM/SVG.
 - **entitlements** — pure `plan -> Entitlements` mapping (no persistence, no network).
 
 Note: `src/audio` (Phase 6, playback) lives OUTSIDE `src/domain` — it depends on Tone.js/Web
-Audio, which the domain layer's framework-free rule forbids. Its scheduling/voicing math
-(`src/audio/{pitch,scheduling,voicing}.ts`) is still pure and framework-free by the same
+Audio, which the domain layer's framework-free rule forbids. Its scheduling math
+(`src/audio/scheduling.ts`) and neutral voicing (`src/audio/voicing.ts`, which now builds on
+`src/domain/instruments/playablePitch.ts`) are still pure and framework-free by the same
 discipline as the modules above; only `src/audio/player.ts` touches Tone.js itself, kept as thin
 as possible so the musically-meaningful logic stays unit-testable without any audio API.
 
@@ -235,9 +242,37 @@ Fixes, all covered by regression tests:
   it. Guitar/piano/bass-specific voicing-to-audio playback (Phases 7-9) will generate their own
   `PlayablePitch[]`/MIDI arrays and hand them to the same low-level player functions, not this
   generator.
-- **Pitch math uses standard equal temperament** (`src/audio/pitch.ts`): MIDI 60 = C4 = middle C,
-  MIDI 69 = A4 = 440Hz, `frequency = 440 * 2^((midi-69)/12)`. Playback deliberately computes raw
+- **Pitch math uses standard equal temperament** (`src/domain/instruments/playablePitch.ts`, moved
+  here from `src/audio/pitch.ts` in Phase 7 once piano needed the same math): MIDI 60 = C4 = middle
+  C, MIDI 69 = A4 = 440Hz, `frequency = 440 * 2^((midi-69)/12)`. Playback deliberately computes raw
   frequencies itself rather than relying on Tone.js's note-name string parser, since the domain
   layer's enharmonic spelling can legitimately produce double-flat/double-sharp note names (e.g.
   the diminished-7th spelling documented above) that a note-name parser may not accept — a
   frequency number sidesteps that entirely.
+
+## Documented assumptions (Phase 7 — piano representation)
+
+- **Voicing catalogue per chord** (`src/domain/instruments/piano/voicing.ts`): 3-tone chords
+  (triad-family) get all 3 rotations (root/1st/2nd inversion), all Free. 4-tone chords
+  (7th/6th-family) get all 4 rotations; root+1st Free, 2nd+3rd Pro. 5-tone chords (9th-family) get
+  only root and 1st inversion as rotations (both Free) plus one deterministic Pro "open" voicing —
+  the root position's pitch set with its top tone raised exactly one octave — rather than
+  mechanically continuing the rotation cycle, since a "3rd/4th inversion" of a 9th chord is rarely
+  musically discussed and gets genuinely awkward in close position. This is an explicit v1
+  simplification (product-spec Phase 7 §8/§15), not an oversight; a future phase could add more
+  structural voicing types (shell voicings, drop voicings) without changing this module's shape.
+- **Inversion identity is derived, never hand-labeled**: rotation N always places
+  `chordNotes(chord)[N]` in the bass, so `PianoVoicing.inversion` is guaranteed consistent with
+  "which formula tone is lowest" by construction — see `voicing.test.ts`'s explicit bass-note
+  assertions.
+- **Suggested right-hand fingering** is only offered for CLOSE-position voicings with exactly 3
+  tones (1-3-5) or exactly 4 tones (1-2-3-5) — the two shapes reliable enough to suggest without
+  knowing the specific intervals present. 5-tone and "open"-spacing voicings omit fingering
+  entirely rather than guess, per the explicit instruction to treat this as "suggested" and never
+  invent an authoritative answer where multiple fingerings are equally valid.
+- **Consecutive voicings in the navigator are not guaranteed to be octave-contiguous.** Each
+  voicing is computed independently by `stackAscending` starting fresh at the base octave, so e.g.
+  Am7's root position (A4 C5 E5 G5) and its 1st inversion (C4 E4 G4 A4) don't share a register —
+  navigating can jump a full octave. This is a known v1 characteristic, not a bug: automatic
+  voice-leading between voicings is explicitly deferred (product-spec Phase 7 §19), and the model
+  retains full octave information so that future work remains possible without redesign.

@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   hearChord as hearChordAudio,
+  hearPitches as hearPitchesAudio,
   playProgression as playProgressionAudio,
   stopProgression as stopProgressionAudio,
   AudioInitError,
 } from "@/audio/player";
 import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
+import type { PlayablePitch } from "@/domain/instruments";
 
 export type AudioErrorKind = "init";
 
@@ -18,6 +20,8 @@ export interface PlaybackController {
   playingItemId: string | null;
   error: AudioErrorKind | null;
   hearChord: (chord: Chord) => void;
+  /** Plays an exact set of pitches (Phase 7 §13's "Hear this voicing") — never a regenerated generic chord. */
+  hearVoicing: (pitches: PlayablePitch[]) => void;
   playProgression: (progression: Progression) => void;
   stop: () => void;
   dismissError: () => void;
@@ -51,6 +55,12 @@ export function usePlaybackController(): PlaybackController {
     });
   }, []);
 
+  const hearVoicing = useCallback((pitches: PlayablePitch[]) => {
+    hearPitchesAudio(pitches).catch((cause: unknown) => {
+      if (cause instanceof AudioInitError) setError("init");
+    });
+  }, []);
+
   const playProgression = useCallback((progression: Progression) => {
     if (progression.items.length === 0) return; // defense in depth — the Play control is disabled for this case already
     setError(null);
@@ -69,5 +79,14 @@ export function usePlaybackController(): PlaybackController {
 
   const dismissError = useCallback(() => setError(null), []);
 
-  return { isPlaying, playingItemId, error, hearChord, playProgression, stop, dismissError };
+  return {
+    isPlaying,
+    playingItemId,
+    error,
+    hearChord,
+    hearVoicing,
+    playProgression,
+    stop,
+    dismissError,
+  };
 }

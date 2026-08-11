@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 import { chordsEqual, type Explanation, type ZoomLevel } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
+import type { PianoVoicing } from "@/domain/instruments/piano";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
 import { functionDisplayInfo } from "./functionDisplay";
+import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
 
 export interface ChordContextPanelProps {
   chord: Chord;
@@ -14,11 +16,14 @@ export interface ChordContextPanelProps {
   context: Key;
   /** The map's currently active Zoom — relationships shown here must never go deeper than what's on the map (see chordDisplayInfo.ts). */
   zoom: ZoomLevel;
+  isDesktop: boolean;
   onExploreFrom: (chord: Chord) => void;
   /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
   onAddToProgression: (chord: Chord) => void;
   /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
   onHearChord: (chord: Chord) => void;
+  /** Plays EXACTLY the pitches of the currently displayed piano voicing (Phase 7 §13) — distinct from `onHearChord`'s generic neutral preview. */
+  onHearVoicing: (voicing: PianoVoicing) => void;
 }
 
 function explanationText(
@@ -41,9 +46,11 @@ export function ChordContextPanel({
   sourceChord,
   context,
   zoom,
+  isDesktop,
   onExploreFrom,
   onAddToProgression,
   onHearChord,
+  onHearVoicing,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
@@ -110,6 +117,13 @@ export function ChordContextPanel({
           )}
         </section>
       )}
+
+      <PianoVoicingPanel
+        key={info.symbol}
+        chord={chord}
+        isDesktop={isDesktop}
+        onHearVoicing={onHearVoicing}
+      />
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
         <button
