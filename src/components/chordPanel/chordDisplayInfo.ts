@@ -11,6 +11,7 @@ import {
   chordsEqual,
   type ContextualRole,
   type HarmonicEdge,
+  type ZoomLevel,
 } from "@/domain/harmony";
 import { relationshipsBetween } from "@/domain/graph";
 
@@ -32,10 +33,23 @@ export interface ChordDisplayInfo {
   relationshipsFromSource: HarmonicEdge[];
 }
 
+/**
+ * `activeDepth` is the currently active harmonic Zoom — the same value the
+ * map itself queries with (`HarmonicMap`'s `relationshipsFrom(..., zoom)`).
+ * The panel must never show a relationship deeper than what's actually
+ * visible on the map (e.g. a Zoom-2 "Substitute chord" leaking into the
+ * panel while the map is at Zoom 1 — see docs/roadmap.md Phase 4.2). Once
+ * the entitlement system caps the zoom a user can reach
+ * (`maxAllowedHarmonicDepth`, Phase 11), that cap is enforced by clamping
+ * `activeDepth` itself before it ever reaches this function — so this stays
+ * a single, always-correct `min(activeHarmonicDepth, maxAllowedHarmonicDepth)`
+ * without this function needing to know about entitlements at all.
+ */
 export function getChordDisplayInfo(
   chord: Chord,
   sourceChord: Chord,
   context: Key,
+  activeDepth: ZoomLevel,
 ): ChordDisplayInfo {
   const isSource = chordsEqual(chord, sourceChord);
 
@@ -47,6 +61,6 @@ export function getChordDisplayInfo(
     contextualRole: contextualRole(chord, context),
     relationshipsFromSource: isSource
       ? []
-      : relationshipsBetween(sourceChord, chord, context, 4),
+      : relationshipsBetween(sourceChord, chord, context, activeDepth),
   };
 }

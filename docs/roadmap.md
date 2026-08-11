@@ -150,6 +150,23 @@ mode dropdown option, and the tonic/tonic-function distinction in both languages
 `product-scope-review` (verdict: aligned — presentation-only changes, no new edges/relationships
 fabricated, three-action rule and loop integrity untouched).
 
+**Phase 4.2 correctness fix 2026-08-11 (user review):** the contextual panel's "relationship to
+source" list ignored the active harmonic depth — `chordDisplayInfo.ts` queried
+`relationshipsBetween(..., 4)` unconditionally, so a Zoom-2 relationship (e.g. "Substitute chord")
+could appear in the panel while the map itself was at Zoom 1 and correctly hiding it (map and panel
+disagreeing on what's "visible"). Fixed by threading the active Zoom through
+`getChordDisplayInfo(chord, sourceChord, context, activeDepth)` → `ChordContextPanel` (new `zoom`
+prop) → `ExplorerApp` (`state.zoom`), so the panel now queries relationships with the same depth
+cap the map uses. Documented the entitlement-compatibility intent directly in `chordDisplayInfo.ts`:
+once Phase 11 caps the Zoom a user can reach, that cap only needs to clamp `state.zoom` itself
+before it's dispatched — `activeDepth` flowing through this function unchanged already gives
+`min(activeHarmonicDepth, maxAllowedHarmonicDepth)` without this function knowing about
+entitlements. Added regression tests (`chordDisplayInfo.test.ts`) covering the Cmaj7→Am case at
+Zoom 1 (diatonic + relative only, no substitution) and Zoom 2 (all three), plus a depth-invariant
+check across all four Zoom levels. Verified live in browser: Zoom 1 badge "+1" / panel shows
+Diatonic + Relative minor only; Zoom 2 badge "+2" / panel adds Substitute chord. `npm run test` (267
+tests), `typecheck`, `lint`, `build` all pass.
+
 ## Phase 5 — Progression builder
 - [ ] Add/remove/reorder chords, durations, BPM, time signature
 - [ ] Transposition of full progression

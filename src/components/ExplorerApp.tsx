@@ -74,6 +74,7 @@ export function ExplorerApp() {
             chord={state.selectedChord}
             sourceChord={state.exploredChord}
             context={state.context}
+            zoom={state.zoom}
             onExploreFrom={handleExplore}
           />
         </MobilePanelShell>

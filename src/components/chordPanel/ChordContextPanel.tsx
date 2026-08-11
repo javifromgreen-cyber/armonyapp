@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { chordsEqual, type Explanation } from "@/domain/harmony";
+import { chordsEqual, type Explanation, type ZoomLevel } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
@@ -12,6 +12,8 @@ export interface ChordContextPanelProps {
   chord: Chord;
   sourceChord: Chord;
   context: Key;
+  /** The map's currently active Zoom — relationships shown here must never go deeper than what's on the map (see chordDisplayInfo.ts). */
+  zoom: ZoomLevel;
   onExploreFrom: (chord: Chord) => void;
 }
 
@@ -34,6 +36,7 @@ export function ChordContextPanel({
   chord,
   sourceChord,
   context,
+  zoom,
   onExploreFrom,
 }: ChordContextPanelProps) {
   const t = useTranslations();
@@ -41,8 +44,8 @@ export function ChordContextPanel({
   const tFunction = useTranslations("harmony.function");
 
   const info = useMemo(
-    () => getChordDisplayInfo(chord, sourceChord, context),
-    [chord, sourceChord, context],
+    () => getChordDisplayInfo(chord, sourceChord, context, zoom),
+    [chord, sourceChord, context, zoom],
   );
   const functionDisplay = useMemo(() => functionDisplayInfo(chord, context), [chord, context]);
 
