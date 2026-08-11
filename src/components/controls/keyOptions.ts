@@ -1,12 +1,13 @@
 import { type Note, noteName } from "@/domain/notes";
 import { transposeNote } from "@/domain/intervals";
-import { relativeKey, type Key } from "@/domain/keys";
+import { relativeKey, type Key, type KeyMode } from "@/domain/keys";
 
 export interface KeyOption {
   key: Key;
-  /** e.g. "C" or "Am" — the tonic's spelled name plus "m" for minor. */
-  label: string;
   id: string;
+  /** The tonic's spelled name only (e.g. "C", "F#") — callers combine this with a localized mode word ("Major"/"Minor") rather than a hardcoded "C"/"Am" abbreviation, so the selector never shows an ambiguous bare letter. */
+  tonicName: string;
+  mode: KeyMode;
 }
 
 /**
@@ -20,8 +21,7 @@ export function keyOptionId(key: Key): string {
 }
 
 function toOption(key: Key): KeyOption {
-  const id = keyOptionId(key);
-  return { key, label: id, id };
+  return { key, id: keyOptionId(key), tonicName: noteName(key.tonic), mode: key.mode };
 }
 
 /**

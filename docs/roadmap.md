@@ -111,6 +111,45 @@ Preview deployment: this environment has no Vercel/deploy credentials or CLI aut
 in). Did not improvise credentials. See the Phase 4 completion report for exact external setup
 steps.
 
+**Phase 4.1 UX/polish pass 2026-08-11 (user review):** 7 targeted fixes on top of the approved
+Phase 4 visual direction — no redesign:
+1. Map visual prominence: `layout.ts`'s SVG viewBox is now sized dynamically from the rings
+   actually populated at the current Zoom (was a fixed 700×700 sized for Zoom 4's worst case),
+   plus larger node radii (`SOURCE_NODE_RADIUS`/`NEIGHBOR_NODE_RADIUS`, now exported and shared
+   with `HarmonicMap.tsx` so the viewBox margin can never drift from what's actually drawn) — the
+   map now fills its available space at every Zoom level instead of sitting small in a
+   mostly-empty box at Zoom 1.
+2. Key selector shows full "C Major"/"A Minor" (new `app.key.major`/`minor` i18n keys), never a
+   bare tonic letter.
+3. Contextual panel now shows a scale-degree roman numeral plus a refined tonic/tonic-function
+   distinction (new `harmony.function.tonicFunction` i18n key; new presentation-only
+   `chordPanel/functionDisplay.ts`, no domain-engine changes) — e.g. "I · Tonic" for C vs
+   "vi · Tonic function" for Am in C major; predominant/dominant get no such qualifier regardless
+   of degree, per spec. Roman numerals are shown only for the plain diatonic family
+   (`contextualRole.kind` of tonic/predominant/dominant), never for an already-overridden role
+   (secondary dominant, borrowed, etc.) — this specifically avoids relabeling a chord like C7 in C
+   major as "I" just because it shares the tonic's root (see `contextualRole.ts`'s documented
+   hazard); covered by `functionDisplay.test.ts`.
+4. Multiple-relationship badge changed from a bare count to "+N" (N = additional relationships
+   beyond the primary one).
+5. Relationship discoverability at deeper Zoom levels: edges now show a small badge (the existing
+   per-category glyph — ◆/V/B/◇/·) at their midpoint, and a native `<title>` tooltip with the full
+   relationship description on hover/focus — no permanent legend added. Selected-relationship edge
+   highlighting strengthened (width 3/opacity 1 vs 1.25/0.35, up from 2/0.85 vs 1.5/0.4).
+6. Free mode duplication removed: the separate toolbar button is gone; `KeySelector`'s `onChange`
+   now accepts `Key | null` and its own "Free mode" dropdown option is the only way to enter free
+   mode (still shows the same honest empty state — no faked harmonic inference). Selector header
+   relabeled "Harmonic context" / "Contexto armónico" to match.
+7. Mobile node/map scale improved as a direct consequence of item 1's dynamic viewBox.
+
+Verified 2026-08-11: `npm run test` (264 tests, 30 files — up from 254; new coverage:
+`functionDisplay.test.ts` including an explicit anti-regression case for the C7-sharing-tonic-root
+hazard), `typecheck`, `lint`, `build` all pass. Re-verified live in a browser (dev server +
+Playwright): desktop and mobile, English and Spanish, Zoom 1 and Zoom 3, the consolidated Free
+mode dropdown option, and the tonic/tonic-function distinction in both languages. Ran
+`product-scope-review` (verdict: aligned — presentation-only changes, no new edges/relationships
+fabricated, three-action rule and loop integrity untouched).
+
 ## Phase 5 — Progression builder
 - [ ] Add/remove/reorder chords, durations, BPM, time signature
 - [ ] Transposition of full progression

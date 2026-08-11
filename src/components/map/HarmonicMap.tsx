@@ -7,13 +7,10 @@ import { chordsEqual, type Explanation } from "@/domain/harmony";
 import { relationshipsFrom, groupRelationshipsByTarget } from "@/domain/graph";
 import type { Key } from "@/domain/keys";
 import type { ZoomLevel } from "@/domain/harmony";
-import { computeRadialLayout } from "./layout";
+import { computeRadialLayout, SOURCE_NODE_RADIUS, NEIGHBOR_NODE_RADIUS } from "./layout";
 import { relationshipVisual } from "./relationshipVisuals";
 import { MapNode } from "./MapNode";
 import { MapEdge } from "./MapEdge";
-
-const SOURCE_RADIUS = 40;
-const NODE_RADIUS = 27;
 
 export interface HarmonicMapProps {
   context: Key;
@@ -58,22 +55,27 @@ export function HarmonicMap({
       className="h-full w-full"
     >
       <g>
-        {layout.nodes.map((positioned) => (
-          <MapEdge
-            key={chordSymbol(positioned.node.chord)}
-            from={layout.center}
-            to={{ x: positioned.x, y: positioned.y }}
-            dashArray={relationshipVisual(positioned.node.primaryRelationship.relationshipType).dashArray}
-            colorVar={relationshipVisual(positioned.node.primaryRelationship.relationshipType).colorVar}
-            isHighlighted={chordsEqual(positioned.node.chord, selectedChord)}
-          />
-        ))}
+        {layout.nodes.map((positioned) => {
+          const visual = relationshipVisual(positioned.node.primaryRelationship.relationshipType);
+          return (
+            <MapEdge
+              key={chordSymbol(positioned.node.chord)}
+              from={layout.center}
+              to={{ x: positioned.x, y: positioned.y }}
+              dashArray={visual.dashArray}
+              colorVar={visual.colorVar}
+              badge={visual.badge}
+              title={explanationText(t, positioned.node.primaryRelationship.explanation)}
+              isHighlighted={chordsEqual(positioned.node.chord, selectedChord)}
+            />
+          );
+        })}
       </g>
 
       <MapNode
         x={layout.center.x}
         y={layout.center.y}
-        radius={SOURCE_RADIUS}
+        radius={SOURCE_NODE_RADIUS}
         label={sourceLabel}
         variant="source"
         isSelected={sourceSelected}
@@ -95,7 +97,7 @@ export function HarmonicMap({
             key={label}
             x={positioned.x}
             y={positioned.y}
-            radius={NODE_RADIUS}
+            radius={NEIGHBOR_NODE_RADIUS}
             label={label}
             variant="neighbor"
             isSelected={chordsEqual(positioned.node.chord, selectedChord)}

@@ -15,7 +15,6 @@ const DEFAULT_CONTEXT: Key = { tonic: { letter: "C", accidental: 0 }, mode: "maj
 const DEFAULT_CHORD: Chord = parseChordSymbol("Cmaj7");
 
 export function ExplorerApp() {
-  const t = useTranslations("app");
   const [state, dispatch] = useReducer(
     explorerReducer,
     undefined,
@@ -37,7 +36,11 @@ export function ExplorerApp() {
     dispatch({ type: "SET_ZOOM", zoom });
   }
 
-  function handleKeyChange(context: Key) {
+  function handleKeyChange(context: Key | null) {
+    if (context === null) {
+      setIsFreeMode(true);
+      return;
+    }
     setIsFreeMode(false);
     dispatch({ type: "SET_CONTEXT", context });
   }
@@ -48,18 +51,6 @@ export function ExplorerApp() {
         <div className="flex flex-wrap items-end gap-4 border-b border-border px-4 py-3 sm:px-6">
           <KeySelector value={isFreeMode ? null : state.context} onChange={handleKeyChange} />
           <ZoomControl zoom={state.zoom} onChange={handleZoomChange} />
-          <button
-            type="button"
-            onClick={() => setIsFreeMode(true)}
-            className={[
-              "ml-auto rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-              isFreeMode
-                ? "border-accent text-accent"
-                : "border-border text-foreground-muted hover:text-foreground",
-            ].join(" ")}
-          >
-            {t("key.freeModeOption")}
-          </button>
         </div>
 
         <div className="flex flex-1 items-center justify-center overflow-hidden p-4">

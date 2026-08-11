@@ -19,7 +19,9 @@
   },
   "app": {
     "key": {
-      "label": "Key",
+      "label": "Harmonic context",
+      "major": "Major",
+      "minor": "Minor",
       "freeModeOption": "Free mode"
     },
     "freeMode": {
@@ -59,6 +61,7 @@
   "harmony": {
     "function": {
       "tonic": "Tonic",
+      "tonicFunction": "Tonic function",
       "predominant": "Predominant",
       "dominant": "Dominant",
       "secondaryDominant": "Secondary dominant",

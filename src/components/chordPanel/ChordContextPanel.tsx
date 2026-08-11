@@ -6,6 +6,7 @@ import { chordsEqual, type Explanation } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
+import { functionDisplayInfo } from "./functionDisplay";
 
 export interface ChordContextPanelProps {
   chord: Chord;
@@ -43,6 +44,7 @@ export function ChordContextPanel({
     () => getChordDisplayInfo(chord, sourceChord, context),
     [chord, sourceChord, context],
   );
+  const functionDisplay = useMemo(() => functionDisplayInfo(chord, context), [chord, context]);
 
   const isSource = chordsEqual(chord, sourceChord);
   const [primaryRelationship, ...additionalRelationships] = info.relationshipsFromSource;
@@ -51,8 +53,13 @@ export function ChordContextPanel({
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">{info.symbol}</h2>
-        {info.contextualRole && (
-          <p className="mt-1 text-sm text-foreground-muted">{tFunction(info.contextualRole.kind)}</p>
+        {functionDisplay && (
+          <p className="mt-1 text-sm text-foreground-muted">
+            {functionDisplay.romanNumeral && (
+              <span className="font-medium text-foreground">{functionDisplay.romanNumeral} · </span>
+            )}
+            {tFunction(functionDisplay.labelKey)}
+          </p>
         )}
       </div>
 

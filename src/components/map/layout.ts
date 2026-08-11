@@ -17,11 +17,14 @@ export interface RadialLayout {
   nodes: PositionedNode[];
 }
 
-const VIEWBOX_SIZE = 700;
-const CENTER = VIEWBOX_SIZE / 2;
+/** Rendered node radii — shared with HarmonicMap.tsx so the layout's viewBox margin always matches what's actually drawn. */
+export const SOURCE_NODE_RADIUS = 54;
+export const NEIGHBOR_NODE_RADIUS = 34;
 
 /** Ring radius per Zoom depth — deeper harmonic depth sits further out, visually reinforcing that Zoom IS depth, not just node count. */
-const RING_RADIUS: Record<ZoomLevel, number> = { 1: 110, 2: 175, 3: 235, 4: 290 };
+const RING_RADIUS: Record<ZoomLevel, number> = { 1: 140, 2: 215, 3: 285, 4: 350 };
+
+const VIEWBOX_MARGIN = 24;
 
 /**
  * Deterministic radial layout: the source chord is implicitly at the center
@@ -31,6 +34,11 @@ const RING_RADIUS: Record<ZoomLevel, number> = { 1: 110, 2: 175, 3: 235, 4: 290 
  * query always produces the same layout regardless of edge-generation order
  * — required for the map to feel stable rather than jittery when relationships
  * are recomputed (e.g. after a Zoom change that doesn't affect this ring).
+ *
+ * The viewBox is sized to whatever is actually populated (not a fixed
+ * worst-case box for Zoom 4) — at Zoom 1 that's just the inner ring, so the
+ * map fills its available screen space instead of sitting small in the
+ * middle of a mostly-empty box reserved for rings that aren't shown yet.
  */
 export function computeRadialLayout(nodes: MapGraphNode[]): RadialLayout {
   const byDepth = new Map<ZoomLevel, MapGraphNode[]>();
@@ -43,8 +51,15 @@ export function computeRadialLayout(nodes: MapGraphNode[]): RadialLayout {
     }
   }
 
-  const positioned: PositionedNode[] = [];
   const depths = [...byDepth.keys()].sort((a, b) => a - b);
+  const maxRadiusUsed = depths.reduce((max, depth) => Math.max(max, RING_RADIUS[depth]), 0);
+
+  const halfSize =
+    Math.max(maxRadiusUsed + NEIGHBOR_NODE_RADIUS, SOURCE_NODE_RADIUS) + VIEWBOX_MARGIN;
+  const size = halfSize * 2;
+  const center = { x: halfSize, y: halfSize };
+
+  const positioned: PositionedNode[] = [];
 
   for (const depth of depths) {
     const ring = byDepth.get(depth)!;
@@ -63,13 +78,13 @@ export function computeRadialLayout(nodes: MapGraphNode[]): RadialLayout {
       const angleRad = (angleDeg * Math.PI) / 180;
       positioned.push({
         node,
-        x: CENTER + radius * Math.cos(angleRad),
-        y: CENTER + radius * Math.sin(angleRad),
+        x: center.x + radius * Math.cos(angleRad),
+        y: center.y + radius * Math.sin(angleRad),
         angleDeg,
         radius,
       });
     });
   }
 
-  return { size: VIEWBOX_SIZE, center: { x: CENTER, y: CENTER }, nodes: positioned };
+  return { size, center, nodes: positioned };
 }

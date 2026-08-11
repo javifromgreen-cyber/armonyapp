@@ -10,27 +10,27 @@ describe("listKeyOptions", () => {
   });
 
   it("includes the conventional 12 major key spellings (no double sharps/flats)", () => {
-    const majorLabels = listKeyOptions()
+    const majorTonicNames = listKeyOptions()
       .filter((o) => o.key.mode === "major")
-      .map((o) => o.label)
+      .map((o) => o.tonicName)
       .sort();
-    expect(majorLabels).toEqual(
+    expect(majorTonicNames).toEqual(
       ["A", "B", "C", "D", "E", "F", "F#", "G", "Ab", "Bb", "Db", "Eb"].sort(),
     );
   });
 
   it("includes C major and A minor (the Phase 4 default state)", () => {
-    const labels = listKeyOptions().map((o) => o.label);
-    expect(labels).toContain("C");
-    expect(labels).toContain("Am");
+    const ids = listKeyOptions().map((o) => o.id);
+    expect(ids).toContain("C");
+    expect(ids).toContain("Am");
   });
 
   it("relative minors are derived from relativeKey, not independently hardcoded — spot check", () => {
     const options = listKeyOptions();
-    const cMajor = options.find((o) => o.label === "C")!;
-    const gMajor = options.find((o) => o.label === "G")!;
-    expect(options.some((o) => o.label === "Am")).toBe(true); // relative of C
-    expect(options.some((o) => o.label === "Em")).toBe(true); // relative of G
+    const cMajor = options.find((o) => o.id === "C")!;
+    const gMajor = options.find((o) => o.id === "G")!;
+    expect(options.some((o) => o.id === "Am")).toBe(true); // relative of C
+    expect(options.some((o) => o.id === "Em")).toBe(true); // relative of G
     expect(cMajor).toBeDefined();
     expect(gMajor).toBeDefined();
   });
@@ -48,6 +48,6 @@ describe("listKeyOptions", () => {
     const options = listKeyOptions();
     const match = options.find((o) => o.id === keyOptionId(freshCMajor));
     expect(match).toBeDefined();
-    expect(match!.label).toBe("C");
+    expect(match!.tonicName).toBe("C");
   });
 });

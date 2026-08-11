@@ -19,7 +19,9 @@
   },
   "app": {
     "key": {
-      "label": "Tonalidad",
+      "label": "Contexto armónico",
+      "major": "Mayor",
+      "minor": "Menor",
       "freeModeOption": "Modo libre"
     },
     "freeMode": {
@@ -59,6 +61,7 @@
   "harmony": {
     "function": {
       "tonic": "Tónica",
+      "tonicFunction": "Función de tónica",
       "predominant": "Predominante",
       "dominant": "Dominante",
       "secondaryDominant": "Dominante secundaria",

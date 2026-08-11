@@ -100,15 +100,15 @@ export function MapNode({
       </text>
 
       {!!relationshipCount && relationshipCount > 1 && (
-        <g transform={`translate(${radius - 4} ${-radius + 4})`}>
-          <circle r={9} style={{ fill: "var(--color-accent)" }} />
+        <g transform={`translate(${radius - 2} ${-radius + 2})`}>
+          <circle r={11} style={{ fill: "var(--color-accent)" }} />
           <text
             textAnchor="middle"
             dominantBaseline="central"
             className="pointer-events-none select-none font-semibold"
-            style={{ fill: "var(--color-accent-foreground)", fontSize: 10 }}
+            style={{ fill: "var(--color-accent-foreground)", fontSize: 9 }}
           >
-            {relationshipCount}
+            {`+${relationshipCount - 1}`}
           </text>
         </g>
       )}
