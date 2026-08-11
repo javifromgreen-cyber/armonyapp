@@ -18,8 +18,87 @@
     }
   },
   "app": {
-    "shell": {
-      "comingSoon": "El mapa armónico llegará en la próxima fase de desarrollo."
+    "key": {
+      "label": "Tonalidad",
+      "freeModeOption": "Modo libre"
+    },
+    "freeMode": {
+      "title": "Modo libre",
+      "description": "La exploración armónica sin una tonalidad fija todavía no está implementada. Elige una tonalidad arriba para explorar."
+    },
+    "zoom": {
+      "label": "Profundidad armónica",
+      "level1": "Zoom 1",
+      "level2": "Zoom 2",
+      "level3": "Zoom 3",
+      "level4": "Zoom 4",
+      "description1": "Entorno armónico inmediato",
+      "description2": "Armonía común ampliada",
+      "description3": "Armonía avanzada",
+      "description4": "Exploración armónica profunda"
+    },
+    "map": {
+      "exploreFrom": "Explorar desde aquí",
+      "exploringFrom": "Explorando desde {chord}",
+      "moreRelationships": "+{count} más",
+      "sourceLabel": "{chord}, acorde actual",
+      "nodeLabel": "{chord}, {relationship}",
+      "selectHint": "Selecciona un acorde para ver sus detalles"
+    },
+    "panel": {
+      "notes": "Notas",
+      "intervalFormula": "Fórmula de intervalos",
+      "contextualRole": "Rol contextual",
+      "relationshipToSource": "Relación con {chord}",
+      "addToProgression": "Añadir a la progresión",
+      "comingSoon": "Disponible en una fase posterior",
+      "selectPrompt": "Selecciona un acorde en el mapa para ver sus detalles.",
+      "additionalRelationships": "También relacionado como:"
+    }
+  },
+  "harmony": {
+    "function": {
+      "tonic": "Tónica",
+      "predominant": "Predominante",
+      "dominant": "Dominante",
+      "secondaryDominant": "Dominante secundaria",
+      "functionalDominant": "Dominante funcional",
+      "leadingToneDiminished": "Disminuido de sensible",
+      "borrowed": "Acorde prestado"
+    },
+    "relationship": {
+      "diatonic": "Acorde diatónico ({function, select, tonic {función de tónica} predominant {función predominante} dominant {función de dominante} other {}})",
+      "relative": "Relativa {mode, select, major {mayor} other {menor}}",
+      "functionalDominant": "Dominante funcional — conduce con fuerza a la tónica",
+      "functionalDominantResolve": "Resuelve en la tónica",
+      "leadingToneDiminished": "Disminuido de sensible — conduce a la tónica",
+      "leadingToneDiminishedResolve": "Resuelve en la tónica",
+      "diatonicSeventh": "Acorde de séptima diatónico",
+      "secondaryDominant": "Dominante secundaria del grado {targetDegree}",
+      "secondaryDominantResolve": "Resuelve en el grado {targetDegree}",
+      "secondaryDominantChain": "Dominante secundaria encadenada",
+      "borrowed": {
+        "iv": "iv prestado (de la menor paralela)",
+        "bVI": "bVI prestado (de la menor paralela)",
+        "bVII": "bVII prestado (de la menor paralela)",
+        "bIII": "bIII prestado (de la menor paralela)",
+        "bII": "bII prestado, napolitana (de la menor paralela)",
+        "iiDim": "ii° prestado (de la menor paralela)",
+        "picardy": "Tercera picarda (tónica mayor prestada)"
+      },
+      "substitution": "Acorde sustituto ({function, select, tonic {función de tónica} predominant {función predominante} dominant {función de dominante} other {}})",
+      "tritoneSubstitution": "Sustitución de tritono",
+      "passingDiminished": "Disminuido de paso",
+      "passingDiminishedResolve": "Resuelve aquí",
+      "chromaticMediant": "Mediante cromática",
+      "nearbyKey": {
+        "dominantOfDominant": "Dominante de la dominante",
+        "subdominantOfSubdominant": "Subdominante de la subdominante",
+        "relativeOfDominantOfDominant": "Relativa de la dominante de la dominante",
+        "relativeOfSubdominantOfSubdominant": "Relativa de la subdominante de la subdominante"
+      },
+      "commonTone": "Relación de tono común",
+      "distantKey": "Tonalidad distante (a un tritono)"
     }
   }
 }

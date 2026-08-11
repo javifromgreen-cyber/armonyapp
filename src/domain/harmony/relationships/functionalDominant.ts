@@ -55,7 +55,7 @@ export function functionalDominantRelationships(
       relationshipType: "functionalDominant",
       harmonicDepth: depth,
       strength: 0.95,
-      explanation: { key: "harmony.relationship.functionalDominant.resolve" },
+      explanation: { key: "harmony.relationship.functionalDominantResolve" },
       context,
     });
   }
@@ -67,7 +67,7 @@ export function functionalDominantRelationships(
       relationshipType: "leadingToneDiminished",
       harmonicDepth: depth,
       strength: 0.85,
-      explanation: { key: "harmony.relationship.leadingToneDiminished.resolve" },
+      explanation: { key: "harmony.relationship.leadingToneDiminishedResolve" },
       context,
     });
   }

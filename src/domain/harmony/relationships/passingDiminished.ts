@@ -74,7 +74,7 @@ export function passingDiminishedRelationships(
           relationshipType: "passingDiminished",
           harmonicDepth: 3,
           strength: 0.4,
-          explanation: { key: "harmony.relationship.passingDiminished.resolve" },
+          explanation: { key: "harmony.relationship.passingDiminishedResolve" },
           context,
         });
       }

@@ -138,7 +138,7 @@ export function secondaryDominantRelationships(source: Chord, context: Key): Har
       harmonicDepth: 2,
       strength: 0.85,
       explanation: {
-        key: "harmony.relationship.secondaryDominant.resolve",
+        key: "harmony.relationship.secondaryDominantResolve",
         params: { targetDegree: degree },
       },
       context,

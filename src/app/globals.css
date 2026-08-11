@@ -22,6 +22,8 @@
   --dominant: #ff8a5c;
   --predominant: #5ccfff;
   --tonic: #7c8cff;
+  --borrowed: #d9b25c;
+  --chromatic: #c98cf0;
 }
 
 .light {
@@ -41,6 +43,8 @@
   --dominant: #d9622f;
   --predominant: #1f8fb8;
   --tonic: #4c5fe0;
+  --borrowed: #9c7a1f;
+  --chromatic: #9548c9;
 }
 
 @theme inline {
@@ -55,6 +59,8 @@
   --color-dominant: var(--dominant);
   --color-predominant: var(--predominant);
   --color-tonic: var(--tonic);
+  --color-borrowed: var(--borrowed);
+  --color-chromatic: var(--chromatic);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

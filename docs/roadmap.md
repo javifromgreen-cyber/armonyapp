@@ -77,16 +77,39 @@ found one more instance of the same test-title mislabeling and nothing else. `te
 `lint`/`build` all pass. Still stopped before Phase 4, per instruction.
 
 ## Phase 4 — Core harmonic map UI
-- [ ] Preview deployment set up (see `architecture.md` "Preview deployment") so the map can be
-      reviewed visually/interactively as it's built
-- [ ] Custom deterministic SVG map renderer (not Canvas/force-physics — see `architecture.md`),
+- [ ] Preview deployment — **blocked on external setup**, see verification note below
+- [x] Custom deterministic SVG map renderer (not Canvas/force-physics — see `architecture.md`),
       current chord + relevant neighbors at the active Zoom, progressive expansion
-- [ ] One node per unique chord identity, even when multiple relationship types connect to it
+- [x] One node per unique chord identity, even when multiple relationship types connect to it
       (see `architecture.md` "Harmonic map: one node per chord") — combine as edge metadata/badges,
       never duplicate nodes
-- [ ] Select vs recenter vs add-to-progression as distinct actions
-- [ ] Contextual side panel (chord info, relationship explanation)
-- [ ] Zoom control gated by entitlements (Free = 1–2)
+- [x] Select vs recenter as distinct actions; "add to progression" is a visible, honestly-disabled
+      placeholder (real logic is Phase 5 — not implemented here, per instruction)
+- [x] Contextual side panel (chord identity, notes, interval formula, contextual role,
+      relationship-to-source)
+- [~] Zoom control — all 4 levels usable now (per instruction, for Phase 4 dev/testing);
+      architecturally ready for gating (`maxAllowedZoom` prop, disabled-state styling already
+      wired) but entitlements are not enforced yet — that's Phase 11, not this phase
+
+Verified 2026-08-11: `npm run test` (254 tests, 27 files — up from 222; new coverage: map-graph
+de-duplication, radial layout determinism, the explorer select/explore/zoom/context reducer, key
+option generation, and chord-panel display info), `typecheck`, `lint`, `build` all pass. Manually
+exercised in a real browser (dev server + Playwright): desktop and mobile (fresh-load collapsed
+bottom sheet + expand), keyboard tab-order with correct `aria-label`s per node, Spanish locale,
+select-vs-explore-recenter (confirmed the map does NOT recenter on selection and DOES on "Explore
+from here"), Zoom depth change, and the Free-mode honest empty state. Caught and fixed one real
+bug during that verification: `next-intl` rejects message keys with an embedded `.` (dots mean
+nesting in their system), which broke every `*.resolve`-suffixed domain explanation key
+(`harmony.relationship.functionalDominant.resolve` etc.) — renamed to camelCase
+(`functionalDominantResolve`) across 4 domain files and both message files; documented the
+constraint in `harmony/types.ts`'s `Explanation` doc comment so future relationship families don't
+reintroduce it. Ran `product-scope-review` (verdict: aligned, no violations) and `release-check`
+before considering this done.
+
+Preview deployment: this environment has no Vercel/deploy credentials or CLI auth (checked: no
+`.vercel` project link, no deploy-related env vars, `vercel` CLI installs via npx but isn't logged
+in). Did not improvise credentials. See the Phase 4 completion report for exact external setup
+steps.
 
 ## Phase 5 — Progression builder
 - [ ] Add/remove/reorder chords, durations, BPM, time signature

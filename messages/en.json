@@ -18,8 +18,87 @@
     }
   },
   "app": {
-    "shell": {
-      "comingSoon": "The harmonic map is coming in the next build phase."
+    "key": {
+      "label": "Key",
+      "freeModeOption": "Free mode"
+    },
+    "freeMode": {
+      "title": "Free mode",
+      "description": "Harmonic exploration without a locked key isn't implemented yet. Pick a key above to explore."
+    },
+    "zoom": {
+      "label": "Harmonic depth",
+      "level1": "Zoom 1",
+      "level2": "Zoom 2",
+      "level3": "Zoom 3",
+      "level4": "Zoom 4",
+      "description1": "Immediate harmonic environment",
+      "description2": "Expanded common harmony",
+      "description3": "Advanced harmony",
+      "description4": "Deep harmonic exploration"
+    },
+    "map": {
+      "exploreFrom": "Explore from here",
+      "exploringFrom": "Exploring from {chord}",
+      "moreRelationships": "+{count} more",
+      "sourceLabel": "{chord}, current chord",
+      "nodeLabel": "{chord}, {relationship}",
+      "selectHint": "Select a chord to see its details"
+    },
+    "panel": {
+      "notes": "Notes",
+      "intervalFormula": "Interval formula",
+      "contextualRole": "Contextual role",
+      "relationshipToSource": "Relationship to {chord}",
+      "addToProgression": "Add to progression",
+      "comingSoon": "Coming in a later phase",
+      "selectPrompt": "Select a chord on the map to see its details.",
+      "additionalRelationships": "Also related as:"
+    }
+  },
+  "harmony": {
+    "function": {
+      "tonic": "Tonic",
+      "predominant": "Predominant",
+      "dominant": "Dominant",
+      "secondaryDominant": "Secondary dominant",
+      "functionalDominant": "Functional dominant",
+      "leadingToneDiminished": "Leading-tone diminished",
+      "borrowed": "Borrowed chord"
+    },
+    "relationship": {
+      "diatonic": "Diatonic chord ({function, select, tonic {tonic function} predominant {predominant function} dominant {dominant function} other {}})",
+      "relative": "Relative {mode, select, major {major} other {minor}}",
+      "functionalDominant": "Functional dominant — leads strongly to the tonic",
+      "functionalDominantResolve": "Resolves to the tonic",
+      "leadingToneDiminished": "Leading-tone diminished — leads to the tonic",
+      "leadingToneDiminishedResolve": "Resolves to the tonic",
+      "diatonicSeventh": "Diatonic 7th chord",
+      "secondaryDominant": "Secondary dominant of scale degree {targetDegree}",
+      "secondaryDominantResolve": "Resolves to scale degree {targetDegree}",
+      "secondaryDominantChain": "Extended (chained) secondary dominant",
+      "borrowed": {
+        "iv": "Borrowed iv (from the parallel minor)",
+        "bVI": "Borrowed bVI (from the parallel minor)",
+        "bVII": "Borrowed bVII (from the parallel minor)",
+        "bIII": "Borrowed bIII (from the parallel minor)",
+        "bII": "Borrowed bII, the Neapolitan (from the parallel minor)",
+        "iiDim": "Borrowed ii° (from the parallel minor)",
+        "picardy": "Picardy third (borrowed major tonic)"
+      },
+      "substitution": "Substitute chord ({function, select, tonic {tonic function} predominant {predominant function} dominant {dominant function} other {}})",
+      "tritoneSubstitution": "Tritone substitution",
+      "passingDiminished": "Passing diminished chord",
+      "passingDiminishedResolve": "Resolves here",
+      "chromaticMediant": "Chromatic mediant",
+      "nearbyKey": {
+        "dominantOfDominant": "Dominant of the dominant key",
+        "subdominantOfSubdominant": "Subdominant of the subdominant key",
+        "relativeOfDominantOfDominant": "Relative of the dominant-of-dominant key",
+        "relativeOfSubdominantOfSubdominant": "Relative of the subdominant-of-subdominant key"
+      },
+      "commonTone": "Common-tone relationship",
+      "distantKey": "Distant key (a tritone away)"
     }
   }
 }

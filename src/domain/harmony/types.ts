@@ -29,10 +29,17 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 
 /**
  * A machine-readable, i18n-safe explanation: `key` resolves against the
- * `harmony.relationship.*` message namespace (added when the UI is built);
- * `params` carries interpolation data. The domain layer never emits English
- * prose — see CLAUDE.md's "no hard-coded UI copy" rule, which applies here too
- * since this layer is shared, framework-free, and must stay translatable.
+ * `harmony.relationship.*` message namespace (`messages/en.json` /
+ * `messages/es.json`); `params` carries interpolation data. The domain layer
+ * never emits English prose — see CLAUDE.md's "no hard-coded UI copy" rule,
+ * which applies here too since this layer is shared, framework-free, and
+ * must stay translatable.
+ *
+ * Key segments after the fixed `harmony.relationship.` prefix must not
+ * contain their own `.` — next-intl treats every dot as nesting, so a key
+ * like `harmony.relationship.foo.resolve` collides with a sibling plain
+ * string key `foo` in the same messages object. Use `fooResolve` (camelCase)
+ * instead of `foo.resolve` for a variant of an existing key.
  */
 export interface Explanation {
   key: string;
