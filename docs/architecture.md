@@ -1,0 +1,88 @@
+# Architecture
+
+## Stack decision
+
+| Concern | Choice | Why |
+|---|---|---|
+| Framework | Next.js (App Router) + React + TypeScript (strict) | Single project serves the marketing site and `/app`; file-based routing fits the public/app split; server components keep marketing pages fast and SEO-friendly while the app is client-heavy. |
+| Styling | Tailwind CSS | Fast iteration for a solo developer, easy dark-first theming via CSS variables + Tailwind tokens, no runtime CSS-in-JS cost. |
+| Auth + DB | Supabase (Postgres + Auth + Row Level Security) | Managed Postgres, built-in email/password + email verification + password reset + Google OAuth, RLS gives per-user data isolation without a bespoke API layer, generous free tier, low ops burden for a solo dev. |
+| Billing | Stripe (Checkout + Webhooks) | Spec mandates it; handles PCI scope entirely; Checkout covers both the annual subscription and the lifetime one-time payment. |
+| Audio | Tone.js (built on Web Audio API) | Scheduling, synths and transport primitives out of the box; avoids hand-rolling audio-clock math for progression playback. |
+| Harmonic map rendering | Custom SVG/canvas renderer (no generic graph library) | The map is not a generic force-directed graph — layout must express harmonic depth (Zoom 1–4) and relationship type, which a general-purpose graph library (react-flow, cytoscape) would fight against. A small custom renderer keeps the "every edge has musical meaning" rule enforceable and keeps the bundle light. Revisit only if custom rendering becomes a maintenance burden. |
+| i18n | `next-intl` | Native App Router support, namespaced JSON message files, type-safe message keys, no hard-coded copy in components. |
+| Testing | Vitest (unit/domain) + Playwright (e2e, added in Phase 15) | Vitest is fast and TS-native for the music engine; Playwright is the standard for the e2e flows listed in the spec. |
+| Package manager | npm | Default, zero extra tooling. |
+
+## Repository layout
+
+```
+/docs                      product-spec.md, architecture.md, roadmap.md, music-engine.md
+/.claude/skills            music-theory-review, product-scope-review, release-check
+/src
+  /domain                  framework-free TypeScript, the "music engine" — no React, no Next imports
+    /notes                 pitch classes, note naming, enharmonic spelling
+    /intervals              interval math
+    /chords                 chord formulas, construction, parsing, chord catalogue
+    /keys                   keys, scales, scale degrees
+    /harmony                harmonic functions, relationships, substitutions, transposition
+    /graph                  harmonic graph generation, Zoom 1-4 classification
+    /instruments
+      /guitar                fretboard model, voicing generation + ranking
+      /bass                  fretboard model, patterns/arpeggios
+      /piano                 keyboard model, voicings/inversions
+    /entitlements            plan -> feature flags, pure functions, no Stripe/Supabase imports
+  /app                      Next.js App Router: marketing routes + /app (the product) routes
+  /components               presentational + composed UI components (React), consume /domain only through hooks/adapters
+  /server                   Supabase server clients, Stripe webhook handlers, route handlers
+  /lib                      cross-cutting utilities (not music domain, not UI)
+  /messages                 en.json / es.json translation namespaces (next-intl)
+  /styles                   Tailwind entry, design tokens
+/supabase
+  /migrations               SQL migrations
+  seed.sql
+```
+
+The `/domain` boundary is the most important architectural rule in this codebase: it must never
+import React, Next.js, or Supabase/Stripe clients. UI and persistence adapt to the domain, not the
+other way around. This is what keeps "music theory correctness" independently testable and keeps
+components from accumulating hidden harmonic rules.
+
+## Entitlements
+
+A single module (`src/domain/entitlements`) maps a plan (`free | pro`) to a typed capability
+object:
+
+```ts
+interface Entitlements {
+  maxHarmonicZoom: 1 | 2 | 3 | 4;
+  maxCloudProjects: number | null; // null = unlimited
+  voicingCatalogue: "basic" | "full";
+  canExportMidi: boolean;
+  canExportPdf: boolean;
+}
+```
+
+Server-side, the user's plan is derived from the `subscriptions`/`entitlements` table (updated only
+by verified Stripe webhooks), never from client state. UI reads entitlements through a single hook
+(`useEntitlements()`) that wraps this table — no `user.plan === "pro"` checks scattered through
+components.
+
+## Data model (initial, Supabase/Postgres)
+
+- `profiles` — id (references `auth.users`), display_name, primary_instrument, main_goal,
+  locale, marketing_consent, created_at.
+- `entitlements` — user_id, plan (`free` | `pro_annual` | `pro_lifetime`), status, current_period_end
+  (nullable, null for lifetime), stripe_customer_id, stripe_subscription_id, updated_at.
+- `projects` — id, user_id, name, key_context (nullable = free mode), bpm, time_signature,
+  instrument, created_at, updated_at.
+- `progression_chords` — id, project_id, chord_symbol, duration_beats, position, created_at.
+- `stripe_webhook_events` — event_id (unique, for idempotency), type, processed_at.
+
+RLS: every table except `stripe_webhook_events` is scoped `user_id = auth.uid()`. Webhook table is
+service-role only.
+
+## Deviations from spec
+
+None yet. This section is updated whenever an implementation decision diverges from
+`product-spec.md`, with rationale.
