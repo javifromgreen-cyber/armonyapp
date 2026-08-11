@@ -9,7 +9,7 @@
 | Auth + DB | Supabase (Postgres + Auth + Row Level Security) | Managed Postgres, built-in email/password + email verification + password reset + Google OAuth, RLS gives per-user data isolation without a bespoke API layer, generous free tier, low ops burden for a solo dev. |
 | Billing | Stripe (Checkout + Webhooks) | Spec mandates it; handles PCI scope entirely; Checkout covers both the annual subscription and the lifetime one-time payment. |
 | Audio | Tone.js (built on Web Audio API) | Scheduling, synths and transport primitives out of the box; avoids hand-rolling audio-clock math for progression playback. |
-| Harmonic map rendering | Custom SVG/canvas renderer (no generic graph library) | The map is not a generic force-directed graph — layout must express harmonic depth (Zoom 1–4) and relationship type, which a general-purpose graph library (react-flow, cytoscape) would fight against. A small custom renderer keeps the "every edge has musical meaning" rule enforceable and keeps the bundle light. Revisit only if custom rendering becomes a maintenance burden. |
+| Harmonic map rendering | Custom deterministic SVG renderer (no Canvas/force-physics, no generic graph library) | The map is not a generic force-directed graph — layout must express harmonic depth (Zoom 1–4) and relationship type, which a general-purpose graph library (react-flow, cytoscape) would fight against. A small custom renderer keeps the "every edge has musical meaning" rule enforceable and keeps the bundle light. **v1 decision (recorded ahead of Phase 4, not yet implemented):** plain SVG with deterministic (non-physics) layout — the visible map shows a local harmonic neighborhood (current chord + its relevant edges at the active Zoom level), never a large simultaneous node set, so a physics/force-directed simulation is unnecessary complexity. SVG also gets DOM-native accessibility (focus, ARIA, keyboard nav) essentially for free, which a Canvas renderer would have to reimplement by hand. Revisit only if this becomes a real rendering-performance bottleneck. |
 | i18n | `next-intl` | Native App Router support, namespaced JSON message files, type-safe message keys, no hard-coded copy in components. |
 | Testing | Vitest (unit/domain) + Playwright (e2e, added in Phase 15) | Vitest is fast and TS-native for the music engine; Playwright is the standard for the e2e flows listed in the spec. |
 | Package manager | npm | Default, zero extra tooling. |
@@ -83,6 +83,16 @@ components.
 
 RLS: every table except `stripe_webhook_events` is scoped `user_id = auth.uid()`. Webhook table is
 service-role only.
+
+## Preview deployment (recorded ahead of Phase 4, not yet set up)
+
+Before or at the start of Phase 4 (the first phase with meaningful visual UI — the harmonic map),
+set up a browser-accessible preview deployment so the product can be reviewed visually and
+interactively as it's built, rather than only through terminal test output. A managed static/edge
+host (e.g. Vercel, matching Next.js) is the natural fit given the stack in the table above — low
+setup cost, PR/branch previews out of the box. No environment variables beyond `NEXT_PUBLIC_*`
+placeholders are needed until Supabase/Stripe integration lands (Phases 10+), so this can be wired
+up early without blocking on backend work.
 
 ## Deviations from spec
 

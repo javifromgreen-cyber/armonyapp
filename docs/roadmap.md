@@ -56,7 +56,10 @@ report delivered alongside this commit for full architecture, relationship-type,
 detail; per explicit instruction this phase stops here for review before Phase 4 begins.
 
 ## Phase 4 — Core harmonic map UI
-- [ ] Custom map renderer (current chord + relevant neighbors, progressive expansion)
+- [ ] Preview deployment set up (see `architecture.md` "Preview deployment") so the map can be
+      reviewed visually/interactively as it's built
+- [ ] Custom deterministic SVG map renderer (not Canvas/force-physics — see `architecture.md`),
+      current chord + relevant neighbors at the active Zoom, progressive expansion
 - [ ] Select vs recenter vs add-to-progression as distinct actions
 - [ ] Contextual side panel (chord info, relationship explanation)
 - [ ] Zoom control gated by entitlements (Free = 1–2)
