@@ -26,6 +26,12 @@ each.
 - **instruments/piano** — keyboard model, inversion generation, voicing generation.
 - **entitlements** — pure `plan -> Entitlements` mapping (no persistence, no network).
 
+Note: `src/audio` (Phase 6, playback) lives OUTSIDE `src/domain` — it depends on Tone.js/Web
+Audio, which the domain layer's framework-free rule forbids. Its scheduling/voicing math
+(`src/audio/{pitch,scheduling,voicing}.ts`) is still pure and framework-free by the same
+discipline as the modules above; only `src/audio/player.ts` touches Tone.js itself, kept as thin
+as possible so the musically-meaningful logic stays unit-testable without any audio API.
+
 ## Testing bar
 
 Every module above ships with Vitest unit tests before UI is built against it. Minimum cases
@@ -210,3 +216,28 @@ Fixes, all covered by regression tests:
   tonic/predominant/dominant kind before computing substitutes, and additionally excludes
   same-ROOT targets (not just exact chord identity) — "Cmaj7 substitutes for C" isn't a meaningful
   substitution, just the same root with an extension.
+
+## Documented assumptions (Phase 6 — audio)
+
+- **Beat convention: `ProgressionItem.durationBeats` is always a count of quarter-note beats at
+  the progression's BPM, independent of `timeSignature`.** One beat is always `60 / bpm` seconds.
+  4/4, 3/4, and 6/8 do not change this math — `timeSignature` is a structural/notational label
+  only for v1 (useful later for bar-grouping in a visual/notation feature), not a reinterpretation
+  of what "one beat" lasts. In particular, 6/8 does NOT get compound-meter treatment (a beat is
+  never read as a dotted quarter here) — that's an explicit v1 simplification, not an oversight;
+  revisit only if a feature actually needs bar-relative or compound-meter timing. See
+  `src/audio/scheduling.ts`.
+- **Neutral playback voicing is a compact close-position stack, not an instrument-accurate
+  voicing.** `src/audio/voicing.ts`'s `neutralVoicing` places the chord's root at a fixed default
+  octave (4, i.e. around middle C) and stacks each subsequent formula tone at the smallest
+  ascending step above the previous tone — this keeps every chord compact (never muddy-low, never
+  needlessly spread) without knowing anything about how a guitar/piano/bass would actually finger
+  it. Guitar/piano/bass-specific voicing-to-audio playback (Phases 7-9) will generate their own
+  `PlayablePitch[]`/MIDI arrays and hand them to the same low-level player functions, not this
+  generator.
+- **Pitch math uses standard equal temperament** (`src/audio/pitch.ts`): MIDI 60 = C4 = middle C,
+  MIDI 69 = A4 = 440Hz, `frequency = 440 * 2^((midi-69)/12)`. Playback deliberately computes raw
+  frequencies itself rather than relying on Tone.js's note-name string parser, since the domain
+  layer's enharmonic spelling can legitimately produce double-flat/double-sharp note names (e.g.
+  the diminished-7th spelling documented above) that a note-name parser may not accept — a
+  frequency number sidesteps that entirely.

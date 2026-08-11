@@ -53,6 +53,7 @@
       "contextualRole": "Rol contextual",
       "relationshipToSource": "Relación con {chord}",
       "addToProgression": "Añadir a la progresión",
+      "hearChord": "Escuchar acorde",
       "selectPrompt": "Selecciona un acorde en el mapa para ver sus detalles.",
       "additionalRelationships": "También relacionado como:"
     },
@@ -73,7 +74,13 @@
       "chordTab": "Acorde",
       "progressionTab": "Progresión ({count})",
       "playButton": "Reproducir",
-      "playDisabledHint": "La reproducción llega en una fase posterior"
+      "stopButton": "Detener",
+      "playDisabledHint": "Añade un acorde a la progresión para reproducirla",
+      "nowPlaying": "Sonando ahora: {chord}"
+    },
+    "audio": {
+      "initError": "No se pudo iniciar la reproducción de audio. Inténtalo de nuevo o revisa la configuración de sonido de tu navegador.",
+      "dismiss": "Descartar"
     }
   },
   "harmony": {

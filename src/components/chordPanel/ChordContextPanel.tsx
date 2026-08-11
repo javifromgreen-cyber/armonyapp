@@ -17,6 +17,8 @@ export interface ChordContextPanelProps {
   onExploreFrom: (chord: Chord) => void;
   /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
   onAddToProgression: (chord: Chord) => void;
+  /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
+  onHearChord: (chord: Chord) => void;
 }
 
 function explanationText(
@@ -41,6 +43,7 @@ export function ChordContextPanel({
   zoom,
   onExploreFrom,
   onAddToProgression,
+  onHearChord,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
@@ -109,6 +112,13 @@ export function ChordContextPanel({
       )}
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
+        <button
+          type="button"
+          onClick={() => onHearChord(chord)}
+          className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+        >
+          {tPanel("hearChord")}
+        </button>
         {!isSource && (
           <button
             type="button"

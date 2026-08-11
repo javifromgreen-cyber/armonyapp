@@ -12,7 +12,12 @@ import { ChordContextPanel } from "./chordPanel/ChordContextPanel";
 import { ZoomControl } from "./controls/ZoomControl";
 import { KeySelector } from "./controls/KeySelector";
 import { ProgressionEditor } from "./progression/ProgressionEditor";
-import { progressionReducer, initialProgressionState } from "./progression/progressionReducer";
+import {
+  progressionReducer,
+  initialProgressionState,
+  type ProgressionAction,
+} from "./progression/progressionReducer";
+import { usePlaybackController } from "./audio/usePlaybackController";
 
 const DEFAULT_CONTEXT: Key = { tonic: { letter: "C", accidental: 0 }, mode: "major" };
 const DEFAULT_CHORD: Chord = parseChordSymbol("Cmaj7");
@@ -67,6 +72,16 @@ export function ExplorerApp() {
   const [isPanelOpenOnMobile, setIsPanelOpenOnMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chord");
   const isDesktop = useIsDesktop();
+  const playback = usePlaybackController();
+
+  // Any progression edit while playing invalidates what's currently
+  // sounding (Phase 6 §8/§9) — stopping is the simplest reliable choice the
+  // brief explicitly allows, applied uniformly through this single wrapper
+  // rather than repeated in every handler below.
+  function dispatchProgression(action: ProgressionAction) {
+    if (playback.isPlaying) playback.stop();
+    progressionDispatch(action);
+  }
 
   function handleSelect(chord: Chord) {
     dispatch({ type: "SELECT", chord });
@@ -99,35 +114,35 @@ export function ExplorerApp() {
   // reducer, so there is no code path from selecting/exploring a chord to
   // mutating the progression.
   function handleAddToProgression(chord: Chord) {
-    progressionDispatch({ type: "ADD", item: createProgressionItem(chord) });
+    dispatchProgression({ type: "ADD", item: createProgressionItem(chord) });
   }
 
   function handleRemoveFromProgression(id: string) {
-    progressionDispatch({ type: "REMOVE", id });
+    dispatchProgression({ type: "REMOVE", id });
   }
 
   function handleReorderProgression(fromIndex: number, toIndex: number) {
-    progressionDispatch({ type: "REORDER", fromIndex, toIndex });
+    dispatchProgression({ type: "REORDER", fromIndex, toIndex });
   }
 
   function handleSetDuration(id: string, durationBeats: number) {
-    progressionDispatch({ type: "SET_DURATION", id, durationBeats });
+    dispatchProgression({ type: "SET_DURATION", id, durationBeats });
   }
 
   function handleSetBpm(bpm: number) {
-    progressionDispatch({ type: "SET_BPM", bpm });
+    dispatchProgression({ type: "SET_BPM", bpm });
   }
 
   function handleSetTimeSignature(timeSignature: TimeSignature) {
-    progressionDispatch({ type: "SET_TIME_SIGNATURE", timeSignature });
+    dispatchProgression({ type: "SET_TIME_SIGNATURE", timeSignature });
   }
 
   function handleClearProgression() {
-    progressionDispatch({ type: "CLEAR" });
+    dispatchProgression({ type: "CLEAR" });
   }
 
   function handleTransposeProgression(semitones: number) {
-    progressionDispatch({ type: "TRANSPOSE", semitones });
+    dispatchProgression({ type: "TRANSPOSE", semitones });
   }
 
   const chordPanel = !isFreeMode && (
@@ -138,6 +153,7 @@ export function ExplorerApp() {
       zoom={state.zoom}
       onExploreFrom={handleExplore}
       onAddToProgression={handleAddToProgression}
+      onHearChord={playback.hearChord}
     />
   );
 
@@ -151,6 +167,10 @@ export function ExplorerApp() {
       onSetTimeSignature={handleSetTimeSignature}
       onClear={handleClearProgression}
       onTranspose={handleTransposeProgression}
+      isPlaying={playback.isPlaying}
+      playingItemId={playback.playingItemId}
+      onPlay={() => playback.playProgression(progression)}
+      onStop={playback.stop}
     />
   );
 
@@ -162,6 +182,8 @@ export function ExplorerApp() {
             <KeySelector value={isFreeMode ? null : state.context} onChange={handleKeyChange} />
             <ZoomControl zoom={state.zoom} onChange={handleZoomChange} />
           </div>
+
+          {playback.error && <AudioErrorBanner onDismiss={playback.dismissError} />}
 
           <div className="flex flex-1 items-center justify-center overflow-hidden p-4">
             {isFreeMode ? (
@@ -196,6 +218,23 @@ export function ExplorerApp() {
 
       {/* Desktop-only persistent progression strip, full width (product-spec.md §6) — on mobile the same editor lives in the tabbed bottom sheet above instead. */}
       {isDesktop && <div className="border-t border-border">{progressionEditor}</div>}
+    </div>
+  );
+}
+
+/** A concise, translated fallback when audio fails to start (Phase 6 §15) — never a raw Web Audio/Tone.js error. */
+function AudioErrorBanner({ onDismiss }: { onDismiss: () => void }) {
+  const t = useTranslations("app.audio");
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-border bg-surface-raised px-4 py-2 text-sm text-foreground-muted sm:px-6">
+      <span>{t("initError")}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="shrink-0 text-xs font-medium text-foreground-muted underline-offset-2 hover:text-foreground hover:underline"
+      >
+        {t("dismiss")}
+      </button>
     </div>
   );
 }

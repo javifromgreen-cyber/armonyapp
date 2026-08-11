@@ -211,9 +211,55 @@ mobile tabbed sheet) is ever mounted at a time — also resolved a `react-hooks/
 lint error the first `useEffect`-based attempt at the same hook had triggered.
 
 ## Phase 6 — Audio
-- [ ] Tone.js setup, neutral harmonic playback
-- [ ] Instrument/voicing playback
-- [ ] Progression playback with transport
+- [x] Tone.js setup, neutral harmonic playback ("Hear chord" in the selected-chord panel — pure
+      auditory preview, never touches selection/exploration/progression state)
+- [~] Instrument/voicing playback — architecture ready (`playPitches`/`PlayablePitch[]` is a
+      low-level primitive any future guitar/piano/bass voicing can call directly), but the actual
+      instrument-specific voicings themselves are Phases 7-9, not built here
+- [x] Progression playback with transport — Play/Stop via `Tone.Transport` (never `setTimeout`
+      chains), honours chord order/durationBeats/BPM; currently-sounding chord highlighted on its
+      card
+
+Architecture: `src/audio/{pitch,scheduling,voicing}.ts` are pure and framework-free (no Tone.js
+import) so the musically-meaningful logic is unit-tested without any audio API; `src/audio/player.ts`
+is the only file touching Tone.js, kept as thin as possible. `src/components/audio/usePlaybackController.ts`
+is the React-facing seam (isPlaying/playingItemId/error UI state only, no scheduling logic).
+
+Documented V1 conventions (see `docs/music-engine.md`'s new "Phase 6 — audio" section):
+- **Beat timing**: `durationBeats` is always a count of quarter-note beats at the progression's
+  BPM, independent of `timeSignature` — 4/4, 3/4, 6/8 don't change the math; time signature is a
+  structural label only for v1 (no compound-meter reinterpretation of 6/8).
+- **Neutral voicing**: a compact close-position stack (root at octave 4, each subsequent tone at
+  the smallest ascending step above the previous one) — not instrument-accurate, just a musically
+  sensible default.
+- **Pitch math**: raw frequency computed from MIDI (`440 * 2^((midi-69)/12)`), never Tone.js's
+  note-name string parser — sidesteps any risk from the domain layer's legitimate double-flat/
+  double-sharp spellings.
+- **Progression-changes-while-playing**: any progression edit (add/remove/reorder/duration/BPM/
+  time-signature/clear/transpose) stops playback automatically, applied through one wrapper
+  (`dispatchProgression` in `ExplorerApp.tsx`) rather than repeated per-handler — the simpler
+  reliable choice the brief explicitly allowed over live-retiming.
+- **AudioContext**: only ever started/resumed from inside a genuine click handler (`Tone.start()`
+  in `ensureAudioReady`), never on mount; init failures surface as a translatable
+  `AudioInitError`/dismissible banner, never a raw Tone.js/Web Audio error.
+
+Verified 2026-08-11: `npm run test` (320 tests, 36 files — up from 296; new coverage:
+`src/audio/{pitch,voicing,scheduling}.test.ts` covering MIDI/frequency conversion, close-position
+voicing correctness incl. the octave-bump case, the product-spec worked example Cmaj7(4) A7(4)
+Dm7(2) G7(2) schedule, BPM-proportional timing, and the "time signature doesn't change beat
+duration" invariant), `typecheck`, `lint`, `build` all pass (build also confirms Tone.js imports
+cleanly under SSR). Manually exercised in a real browser (dev server + Playwright, real click
+events so the browser's audio-gesture requirement is genuinely satisfied): selected Cmaj7 then Am
+and used Hear chord on each — confirmed the map stayed on Cmaj7/zoom unchanged and the progression
+stayed empty both times; built Cmaj7→A7→Dm7→G7 (the exact product-spec worked example) at Zoom 2,
+set two different durations, played it and watched the highlighted card move from Cmaj7 to A7 as
+scheduled; Stop mid-playback correctly returned to the Play state; toggling Play/Stop repeatedly
+caused no overlapping playback or errors; changing BPM mid-playback correctly stopped it (the
+documented V1 behaviour). Also verified Spanish (Escuchar acorde/Reproducir/Detener) and mobile
+(Play/Stop remained reachable and the map stayed visible above the collapsed progression dock
+during playback — it never auto-expanded to cover the map). Zero console/page errors across every
+run. Ran `product-scope-review` (verdict: aligned — Hear/Play stay auditory-only, no DAW-style
+transport, no gating introduced) and `release-check` before considering this done.
 
 ## Phase 7 — Piano representation
 - [ ] Keyboard UI, root position + inversions/voicings, Free/Pro catalogue split

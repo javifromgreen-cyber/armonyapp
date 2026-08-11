@@ -20,6 +20,11 @@ export interface ProgressionEditorProps {
   onSetTimeSignature: (timeSignature: TimeSignature) => void;
   onClear: () => void;
   onTranspose: (semitones: number) => void;
+  isPlaying: boolean;
+  /** The progression item currently sounding — highlights its card (Phase 6 §7). */
+  playingItemId: string | null;
+  onPlay: () => void;
+  onStop: () => void;
 }
 
 /**
@@ -38,6 +43,10 @@ export function ProgressionEditor({
   onSetTimeSignature,
   onClear,
   onTranspose,
+  isPlaying,
+  playingItemId,
+  onPlay,
+  onStop,
 }: ProgressionEditorProps) {
   const t = useTranslations("app.progression");
   const hasItems = progression.items.length > 0;
@@ -52,6 +61,7 @@ export function ProgressionEditor({
               item={item}
               index={index}
               count={progression.items.length}
+              isPlaying={isPlaying && playingItemId === item.id}
               onRemove={() => onRemove(item.id)}
               onDurationChange={(durationBeats) => onSetDuration(item.id, durationBeats)}
               onMoveEarlier={() => onReorder(index, index - 1)}
@@ -105,12 +115,20 @@ export function ProgressionEditor({
 
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          title={t("playDisabledHint")}
-          className="cursor-not-allowed rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground-muted opacity-60"
+          onClick={isPlaying ? onStop : onPlay}
+          disabled={!hasItems}
+          aria-disabled={!hasItems}
+          title={hasItems ? undefined : t("playDisabledHint")}
+          className={[
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            !hasItems
+              ? "cursor-not-allowed border-border text-foreground-muted opacity-60"
+              : isPlaying
+                ? "border-accent bg-accent text-accent-foreground"
+                : "border-accent text-accent hover:bg-accent hover:text-accent-foreground",
+          ].join(" ")}
         >
-          {t("playButton")}
+          {isPlaying ? t("stopButton") : t("playButton")}
         </button>
 
         {hasItems && (

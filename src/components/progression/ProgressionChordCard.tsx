@@ -8,6 +8,8 @@ export interface ProgressionChordCardProps {
   item: ProgressionItem;
   index: number;
   count: number;
+  /** True while this exact item is the one currently sounding during progression playback (Phase 6 §7). */
+  isPlaying: boolean;
   onRemove: () => void;
   onDurationChange: (durationBeats: number) => void;
   onMoveEarlier: () => void;
@@ -24,6 +26,7 @@ export function ProgressionChordCard({
   item,
   index,
   count,
+  isPlaying,
   onRemove,
   onDurationChange,
   onMoveEarlier,
@@ -33,7 +36,13 @@ export function ProgressionChordCard({
   const symbol = chordSymbol(item.chord);
 
   return (
-    <div className="flex shrink-0 flex-col items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2">
+    <div
+      className={[
+        "flex shrink-0 flex-col items-center gap-1.5 rounded-xl border px-3 py-2 transition-colors",
+        isPlaying ? "border-accent bg-accent/10" : "border-border bg-surface-raised",
+      ].join(" ")}
+    >
+      {isPlaying && <span className="sr-only">{t("nowPlaying", { chord: symbol })}</span>}
       <div className="flex items-center gap-1.5">
         <button
           type="button"

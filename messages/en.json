@@ -53,6 +53,7 @@
       "contextualRole": "Contextual role",
       "relationshipToSource": "Relationship to {chord}",
       "addToProgression": "Add to progression",
+      "hearChord": "Hear chord",
       "selectPrompt": "Select a chord on the map to see its details.",
       "additionalRelationships": "Also related as:"
     },
@@ -73,7 +74,13 @@
       "chordTab": "Chord",
       "progressionTab": "Progression ({count})",
       "playButton": "Play",
-      "playDisabledHint": "Playback arrives in a later phase"
+      "stopButton": "Stop",
+      "playDisabledHint": "Add a chord to the progression to play it",
+      "nowPlaying": "Now playing: {chord}"
+    },
+    "audio": {
+      "initError": "Couldn't start audio playback. Try again, or check your browser's sound settings.",
+      "dismiss": "Dismiss"
     }
   },
   "harmony": {
