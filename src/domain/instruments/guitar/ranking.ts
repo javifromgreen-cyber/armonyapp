@@ -17,6 +17,15 @@ import type { EvaluatedVoicing } from "./playability";
  *     "awkward string skipping": a muted string trapped between two sounding
  *     strings is hard to damp cleanly mid-strum and reads as an accident,
  *     not a real chord shape a guitarist would choose
+ *   + root position (bass note is the chord's own root), a modest +8 —
+ *     Phase 8.1 §2: a deliberate tie-breaker, not a hard requirement. It's
+ *     sized to flip the ranking only between otherwise-comparable
+ *     candidates (e.g. the same shape with the low string muted vs. left
+ *     ringing open, a few points apart), never to drag a genuinely awkward
+ *     root-position shape above a clearly better inversion — the fretSpan
+ *     (x6) and fingerCount (x3) penalties still dominate for real
+ *     playability gaps. Inversions remain fully valid and often win on
+ *     their own merits (openness, low fret, fewer fingers).
  *
  * Tuning note: an earlier version weighted fingerCount at x5 and
  * mutedInteriorCount at x4 with sounding strings at x1. For F major, that
@@ -35,12 +44,14 @@ export function scoreVoicing(
   evaluated: EvaluatedVoicing,
   rootPresent: boolean,
   distinctToneCount: number,
+  isRootPosition: boolean,
 ): number {
   let score = 100;
   score += evaluated.openStringCount * 4;
   score += rootPresent ? 15 : 0;
   score += distinctToneCount * 3;
   score += evaluated.soundingStringCount * 2;
+  score += isRootPosition ? 8 : 0;
   score -= evaluated.fretSpan * 6;
   score -= evaluated.fingerCount * 3;
   score -= evaluated.baseFret * 2;

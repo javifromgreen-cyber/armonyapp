@@ -403,6 +403,56 @@ is a shape-preference nuance, not a wrong-notes bug — and is exactly the kind 
 "prefer textbook root-position when curated data doesn't already cover it" refinement could improve
 without any architecture change.
 
+**Phase 8.1 ranking refinement 2026-08-12 (user review):** the Phase 8 "known limitation" above was
+exactly what this pass fixed — a focused improvement to *which* correct/playable voicings surface
+first, no architecture change. Four changes, all in `src/domain/instruments/guitar/`:
+1. **Root-position tie-breaker** (`ranking.ts`): `scoreVoicing` gained a 4th parameter,
+   `isRootPosition`, worth a modest `+8`. Sized to flip ordering only between otherwise-comparable
+   candidates (the fretSpan×6/fingerCount×3 penalties still dominate for real playability gaps) —
+   inversions remain fully valid and often still win on their own merits.
+2. **Curated-shape set expanded from 8 to 10** (`curatedShapes.ts`): added Cmaj7 (`x32000`) and F
+   major (`133211`), the two chords named in live verification as having a generated-catalogue
+   default that didn't match what a guitarist would expect as "the" shape. Curated shapes always
+   rank first and bypass scoring entirely, so this guarantees correctness for these two rather than
+   relying on ranking-weight tuning alone.
+3. **Diversity pass** (new `diversity.ts`): after ranking, a deterministic near-duplicate filter
+   (`diversityFilter`) keeps the best-ranked representative of each cluster and drops near-copies —
+   two voicings are a near-duplicate when they share the same inversion, a base fret within 2 of
+   each other, and a fret pattern differing on at most 1 of the 6 strings. Compares fret patterns,
+   never pitch-class sets, so genuinely different shapes that happen to sound the same notes are
+   never collapsed. Curated shapes are passed in as `alreadyKept` so a generated near-copy of a
+   curated shape never wastes a catalogue slot.
+4. Root-position preference and diversity filtering apply to every chord's generated catalogue, not
+   just the two curated additions — spot-checked C, G, Am, G7, Bm7b5, Dbmaj7, C9.
+
+Verified 2026-08-12: `npm run test` (493 tests, 41 files — up from 474; new coverage: `diversity.ts`'s
+own unit tests plus a new "Phase 8.1 ranking refinement" describe block in `voicing.test.ts` covering
+the x32000/133211 regression cases with exact fret-pattern and barre-metadata assertions, root-position
+presence within the first 2 voicings, near-duplicate-free catalogues across the full chord list, and
+Free-stays-2/Pro-stays-broader), `typecheck`, `lint`, `build` all pass, zero regressions in the
+previously-passing 474. Ran `music-theory-review` (verdict: no correctness issues — the two curated
+additions were hand-verified against the chord formula, and neither the ranking bonus nor the
+diversity filter can select a harmonically incomplete or physically invalid candidate, since both run
+strictly after `evaluateCandidate`/`meetsCompleteness`). Ran `product-scope-review` (verdict:
+aligned — domain-only change, no UI/map/Free-Pro-mechanism changes). Ran `release-check` (all four
+gates pass).
+
+Manually verified live in a browser (dev server + Playwright): Cmaj7's first voicing is now x32000
+("Open position / Root position / 1 of 5"), second voicing is 032000 ("1st inversion" — a genuinely
+different, useful alternative with all six strings ringing); F's first voicing is now the full
+133211 barre ("Movable shape / Root position / 1 of 5") with correct diagram (one wide barre bar
+labeled "1", individual finger dots "2"/"3", root marker), fingering (`1 3 4 2 1 1`), and TAB
+(`1 1 2 3 3 1`, high string first) all in agreement. Spot-checked C, G, Am, G7, and Bm7b5 — all
+unaffected or improved (Bm7b5's first voicing is now also root position as a side effect of the
+general tie-breaker). Zero console errors.
+
+Trade-off, noted rather than hidden: G7's most iconic 6-string open shape (`320001`) is not among
+G7's 2 Free voicings (it's Pro) — the algorithm's Free picks favor more compact, slightly less
+"textbook" partial voicings that score comparably well. This wasn't a named regression target and
+isn't a wrong-notes defect; it's the same class of shape-preference nuance documented above for
+Cmaj7, left as-is per the instruction to keep this pass focused and not chase every chord's
+"most iconic" shape individually.
+
 ## Phase 9 — Bass representation
 - [ ] Bass fretboard, chord tones, one pattern (Free) vs multiple (Pro)
 

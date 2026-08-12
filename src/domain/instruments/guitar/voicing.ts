@@ -5,6 +5,7 @@ import { curatedFretsFor } from "./curatedShapes";
 import { standardSearchWindows, generateCandidatesInWindow } from "./candidates";
 import { evaluateCandidate, type EvaluatedVoicing } from "./playability";
 import { scoreVoicing } from "./ranking";
+import { diversityFilter } from "./diversity";
 import type { GuitarStringSound, GuitarVoicing, VoicingCatalogue } from "./types";
 
 /** Free ≈ 2 useful voicings (Phase 8 §10); the rest of the surfaced catalogue is Pro (Phase 8 §11). */
@@ -57,17 +58,21 @@ function inversionOf(tones: ChordTone[], strings: GuitarStringSound[]): number {
 interface CandidateEntry {
   evaluated: EvaluatedVoicing;
   origin: "curated" | "generated";
+  inversion: number;
 }
 
 /**
  * Every playable guitar voicing offered for `chord` (Phase 8 §4/§10/§11):
- * a small hand-verified curated open shape when one exists (Phase 8 §25),
- * plus algorithmically generated shapes from the open/E-shape/A-shape
- * search windows — filtered for physical playability (`playability.ts`)
- * and chord-tone completeness, deduplicated by exact fret pattern, ranked
- * (`ranking.ts`), and split root+1st-inversion-style into Free (first
- * `MAX_FREE_VOICINGS`) vs Pro (the rest). Returns an empty array — never a
- * fabricated shape — when nothing playable is found (Phase 8 §24).
+ * a small hand-verified curated shape when one exists (Phase 8 §25, Phase
+ * 8.1 §5), plus algorithmically generated shapes from the open/E-shape/
+ * A-shape search windows — filtered for physical playability
+ * (`playability.ts`) and chord-tone completeness, deduplicated by exact
+ * fret pattern, ranked (`ranking.ts`, with a modest root-position
+ * tie-breaker per Phase 8.1 §2), passed through a near-duplicate diversity
+ * filter (Phase 8.1 §6/§7 — `diversity.ts`), and split
+ * root+1st-inversion-style into Free (first `MAX_FREE_VOICINGS`) vs Pro
+ * (the rest). Returns an empty array — never a fabricated shape — when
+ * nothing playable is found (Phase 8 §24).
  */
 export function guitarVoicingsFor(chord: Chord): GuitarVoicing[] {
   const tones = chordToneTable(chord);
@@ -82,7 +87,7 @@ export function guitarVoicingsFor(chord: Chord): GuitarVoicing[] {
       frets: curatedFrets.map((f) => (f === "x" ? "mute" : f)),
     });
     if (evaluated && meetsCompleteness(tones, evaluated)) {
-      entries.push({ evaluated, origin: "curated" });
+      entries.push({ evaluated, origin: "curated", inversion: inversionOf(tones, evaluated.strings) });
       seenSignatures.add(shapeSignature(evaluated.strings));
     }
   }
@@ -95,7 +100,7 @@ export function guitarVoicingsFor(chord: Chord): GuitarVoicing[] {
       const signature = shapeSignature(evaluated.strings);
       if (seenSignatures.has(signature)) continue;
       seenSignatures.add(signature);
-      generated.push({ evaluated, origin: "generated" });
+      generated.push({ evaluated, origin: "generated", inversion: inversionOf(tones, evaluated.strings) });
     }
   }
 
@@ -103,11 +108,20 @@ export function guitarVoicingsFor(chord: Chord): GuitarVoicing[] {
     .map((entry) => {
       const rootPresent = soundingPitchClasses(entry.evaluated.strings).has(rootPitchClass);
       const distinctTones = soundingPitchClasses(entry.evaluated.strings).size;
-      return { entry, rootPresent, score: scoreVoicing(entry.evaluated, rootPresent, distinctTones) };
+      const isRootPosition = entry.inversion === 0;
+      return { entry, score: scoreVoicing(entry.evaluated, rootPresent, distinctTones, isRootPosition) };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.entry);
 
-  entries.push(...scoredGenerated.map((s) => s.entry));
+  const diverseGenerated = diversityFilter(
+    scoredGenerated,
+    (e) => e.evaluated,
+    (e) => e.inversion,
+    entries, // curated shapes already kept — suppress generated near-duplicates of them too
+  );
+
+  entries.push(...diverseGenerated);
 
   return entries.slice(0, MAX_TOTAL_VOICINGS).map((entry, index) => {
     const rootPresent = soundingPitchClasses(entry.evaluated.strings).has(rootPitchClass);
@@ -119,7 +133,7 @@ export function guitarVoicingsFor(chord: Chord): GuitarVoicing[] {
       fretSpan: entry.evaluated.fretSpan,
       baseFret: entry.evaluated.baseFret,
       barre: entry.evaluated.barre,
-      inversion: inversionOf(tones, entry.evaluated.strings),
+      inversion: entry.inversion,
       rootPresent,
       origin: entry.origin,
       catalogue,

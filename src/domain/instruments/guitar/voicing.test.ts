@@ -140,32 +140,111 @@ describe("guitarVoicingsFor — curated shapes take priority when available", ()
     expect(frets).toEqual(["x", 3, 2, 0, 1, 0]);
   });
 
-  it("F major (no curated shape) still returns a realistic barre-based voicing", () => {
+  it("F major's first voicing is the curated full-barre open shape (133211), root position", () => {
     const voicings = guitarVoicingsFor(parseChordSymbol("F"));
     const [first] = voicings;
-    expect(first.origin).toBe("generated");
-    expect(first.fretSpan).toBeLessThanOrEqual(4);
+    expect(first.origin).toBe("curated");
+    const frets = first.strings.map((s) =>
+      s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+    );
+    expect(frets).toEqual([1, 3, 3, 2, 1, 1]);
+    expect(first.inversion).toBe(0); // root position — F is the bass note
+    expect(first.rootPresent).toBe(true);
+    expect(first.barre).toEqual({ finger: 1, fret: 1, strings: [6, 5, 4, 3, 2, 1] });
+  });
+});
 
-    // Regression guard (Phase 8 §35 live-browser verification): ranking
-    // weights that under-penalize skipped/muted interior strings can rank a
-    // sparse, unrecognizable fragment (e.g. only the A string open plus the
-    // top two strings fretted, with the D and G strings muted in between)
-    // above a real F shape. The top voicing must actually sound all three
-    // triad tones and must not trap a muted string between two sounding
-    // ones.
-    const sounding = first.strings.filter((s) => s.pitch);
-    expect(sounding.length).toBeGreaterThanOrEqual(3);
-    const soundingPitchClasses = new Set(sounding.map((s) => noteToPitchClass(s.pitch!.note)));
-    expect(soundingPitchClasses.size).toBe(3); // root, 3rd, 5th — the full triad
+describe("guitarVoicingsFor — Phase 8.1 ranking refinement", () => {
+  it("Cmaj7's catalogue includes the standard open x32000 in root position", () => {
+    const voicings = guitarVoicingsFor(parseChordSymbol("Cmaj7"));
+    const x32000 = voicings.find((v) => {
+      const frets = v.strings.map((s) =>
+        s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+      );
+      return frets.join(",") === "x,3,2,0,0,0";
+    });
+    expect(x32000).toBeDefined();
+    expect(x32000!.inversion).toBe(0);
+    expect(x32000!.rootPresent).toBe(true);
+    // The whole point of Phase 8.1: this common, root-position shape must
+    // be genuinely surfaced, not buried past the Free/Pro split's usefulness.
+    expect(x32000!.catalogue).toBe("free");
+  });
 
-    const soundingIndexes = first.strings
-      .map((s, index) => (s.pitch ? index : -1))
-      .filter((index) => index !== -1);
-    const [lowIndex, highIndex] = [Math.min(...soundingIndexes), Math.max(...soundingIndexes)];
-    const interiorMuted = first.strings
-      .slice(lowIndex, highIndex + 1)
-      .filter((s) => s.state.status === "muted").length;
-    expect(interiorMuted).toBe(0);
+  it("F major's barre metadata, fingering, and TAB are all internally consistent", () => {
+    const [first] = guitarVoicingsFor(parseChordSymbol("F"));
+    expect(first.barre?.strings.sort((a, b) => b - a)).toEqual([6, 5, 4, 3, 2, 1]);
+
+    // Barre-fretted strings share finger 1; every other fretted string has
+    // its own independent finger, never re-using the barre's finger number.
+    const barreFret = first.barre!.fret;
+    for (const s of first.strings) {
+      if (s.state.status !== "fretted") continue;
+      if (s.state.fret === barreFret) {
+        expect(s.state.finger).toBe(1);
+      } else {
+        expect(s.state.finger).not.toBe(1);
+      }
+    }
+
+    const lines = tabLinesFor(first);
+    expect(lines.map((l) => l.symbol)).toEqual(["1", "1", "2", "3", "3", "1"]);
+  });
+
+  it("root position is preferred over a comparable inversion when candidates are otherwise close", () => {
+    // G7's generated catalogue (no curated shape) should surface a root-position
+    // voicing at or near the top rather than only ever preferring inversions.
+    const voicings = guitarVoicingsFor(parseChordSymbol("G7"));
+    const rootPositionIndex = voicings.findIndex((v) => v.inversion === 0);
+    expect(rootPositionIndex).toBeGreaterThanOrEqual(0);
+    expect(rootPositionIndex).toBeLessThanOrEqual(1); // one of the first two
+  });
+
+  it("inversions remain available in the catalogue — root-position preference is a tie-breaker, not exclusion", () => {
+    for (const symbol of ["Cmaj7", "G7", "Bm7b5"]) {
+      const voicings = guitarVoicingsFor(parseChordSymbol(symbol));
+      const inversions = new Set(voicings.map((v) => v.inversion));
+      expect(inversions.size).toBeGreaterThan(1);
+    }
+  });
+
+  it("the diversity pass leaves no two near-duplicate voicings in the same catalogue", () => {
+    for (const symbol of CHORD_LIST) {
+      const voicings = guitarVoicingsFor(parseChordSymbol(symbol));
+      for (let i = 0; i < voicings.length; i++) {
+        for (let j = i + 1; j < voicings.length; j++) {
+          const a = voicings[i];
+          const b = voicings[j];
+          if (a.inversion !== b.inversion) continue;
+          if (Math.abs(a.baseFret - b.baseFret) > 2) continue;
+          let distance = 0;
+          for (let k = 0; k < 6; k++) {
+            const sa = a.strings[k].state;
+            const sb = b.strings[k].state;
+            const va = sa.status === "fretted" ? `f${sa.fret}` : sa.status;
+            const vb = sb.status === "fretted" ? `f${sb.fret}` : sb.status;
+            if (va !== vb) distance++;
+          }
+          expect(distance).toBeGreaterThan(1);
+        }
+      }
+    }
+  });
+
+  it("different fretboard regions survive the diversity pass for a chord with many candidates", () => {
+    const voicings = guitarVoicingsFor(parseChordSymbol("Bm7b5"));
+    const baseFrets = new Set(voicings.map((v) => v.baseFret));
+    expect(baseFrets.size).toBeGreaterThan(1);
+  });
+
+  it("Free stays at (at most) 2 voicings, Pro carries the rest of a broader catalogue", () => {
+    for (const symbol of ["Cmaj7", "F", "G7", "Bm7b5"]) {
+      const voicings = guitarVoicingsFor(parseChordSymbol(symbol));
+      const free = voicings.filter((v) => v.catalogue === "free");
+      const pro = voicings.filter((v) => v.catalogue === "pro");
+      expect(free.length).toBeLessThanOrEqual(2);
+      expect(pro.length).toBeGreaterThan(0); // these chords have enough good candidates
+    }
   });
 });
 

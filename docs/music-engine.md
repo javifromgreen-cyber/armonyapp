@@ -310,28 +310,54 @@ Fixes, all covered by regression tests:
   that fails its required set is discarded, never fabricated with a missing tone silently accepted.
 - **Deterministic ranking, explicitly documented weights, no LLM** (`ranking.ts`): score starts at
   100 and adds `openStringCount*4 + (rootPresent?15:0) + distinctToneCount*3 +
-  soundingStringCount*2`, then subtracts `fretSpan*6 + fingerCount*3 + baseFret*2 +
-  mutedInteriorCount*10`. The `soundingStringCount*2` and `mutedInteriorCount*10` weights implement
-  product-spec §26's "balanced distribution" (positive) and "awkward string skipping" (negative)
-  factors — these were originally under-weighted (`*1` and `*4` respectively, with `fingerCount` at
-  `*5`), which let a sparse, gap-riddled 3-string F fragment outrank the standard 6-string F barre
-  even though the fragment was individually correct and playable. Live browser verification (Phase
-  8 §35) caught this because it's a ranking-quality bug, not a wrong-notes bug — no unit test
-  written against a single candidate in isolation could have found it, since every candidate
-  involved passed `evaluateCandidate` correctly. Curated shapes are unaffected by any ranking
-  change, since they're always placed first regardless of score.
+  soundingStringCount*2 + (isRootPosition?8:0)`, then subtracts `fretSpan*6 + fingerCount*3 +
+  baseFret*2 + mutedInteriorCount*10`. The `soundingStringCount*2` and `mutedInteriorCount*10`
+  weights implement product-spec §26's "balanced distribution" (positive) and "awkward string
+  skipping" (negative) factors — these were originally under-weighted (`*1` and `*4`
+  respectively, with `fingerCount` at `*5`), which let a sparse, gap-riddled 3-string F fragment
+  outrank the standard 6-string F barre even though the fragment was individually correct and
+  playable. Live browser verification (Phase 8 §35) caught this because it's a ranking-quality
+  bug, not a wrong-notes bug — no unit test written against a single candidate in isolation could
+  have found it, since every candidate involved passed `evaluateCandidate` correctly. The
+  `isRootPosition` term (Phase 8.1 §2) is a deliberate, modest tie-breaker — sized to flip the
+  order only between otherwise-comparable candidates, never to drag a genuinely awkward
+  root-position shape above a clearly better inversion — added after live verification showed a
+  generated catalogue could rank a 1st-inversion voicing above an equally-playable root-position
+  one for no reason a guitarist would endorse. Inversions remain fully valid and often still win
+  on their own merits. Curated shapes are unaffected by any ranking change, since they're always
+  placed first regardless of score.
 - **Curated (hand-verified) shapes vs. algorithmic generation, sharing one output model**
-  (`curatedShapes.ts`): exactly the 8 chords product-spec §25 names as examples (C A G E D Am Em
-  Dm) use a small hand-verified table of canonical open shapes, cross-checked against
-  `chordToneTable` in tests. Every other root/quality is purely algorithmic. Both paths produce the
-  identical `GuitarVoicing` shape, so no caller needs to know or care which origin a voicing came
-  from.
+  (`curatedShapes.ts`): originally the 8 chords product-spec §25 names as examples (C A G E D Am
+  Em Dm), each a canonical OPEN shape. Phase 8.1 §5 added two more after live verification showed
+  the *generated* catalogue defaulting to a real but less-representative shape for two very common
+  chords: Cmaj7 (`x32000`, root position — the generated catalogue's top pick left the low E
+  ringing open, giving a 1st-inversion voicing instead) and F major (`133211`, root position, full
+  barre — the generated catalogue's ranking favored smaller partial shapes over the shape every
+  guitarist calls "the F chord"). All 10 are cross-checked against `chordToneTable` in tests
+  (`curatedShapes.test.ts`) for correct chord tones AND correct root-in-bass. Every other
+  root/quality is purely algorithmic. Both paths produce the identical `GuitarVoicing` shape, so no
+  caller needs to know or care which origin a voicing came from. This set is deliberately kept
+  small — it exists only where a single shape is so standard that anything else would read as a
+  surprising default, not as a general substitute for the ranking system.
 - **Free/Pro split**: the first 2 voicings by final rank are Free (curated shape always first when
   one exists), the rest — up to a total cap of 5 — are Pro. Mirrors Phase 7.1's "first N Free, rest
   Pro" rule. Pro voicings stay inspectable in the dev build (no enforcement) until Phase 11.
 - **Deduplication is exact-fret-signature only**, not fuzzy/near-duplicate matching — two
   candidates are the same voicing if and only if every string's fret/mute/open state matches
-  exactly. This is deliberately simple and predictable rather than a similarity heuristic.
+  exactly. This is deliberately simple and predictable rather than a similarity heuristic. This
+  stage runs before ranking and is distinct from the diversity pass below, which runs after ranking
+  and catches near-identical-but-not-exact shapes that exact dedup by design lets through.
+- **Catalogue diversity pass** (Phase 8.1 §6/§7, new `diversity.ts`): after ranking (and after
+  exact-signature dedup), a deterministic greedy filter keeps the best-ranked representative of
+  each "near-duplicate cluster" and drops the rest, so the surfaced catalogue doesn't fill up with
+  several shapes that differ only trivially. Two voicings are a near-duplicate of each other when
+  ALL of: same inversion (same bass-tone role), base fret within 2 frets of each other (same neck
+  region), and a fret pattern differing on at most 1 of the 6 strings. This compares fret patterns,
+  never sounding pitch-class sets — two voicings that happen to sound the same notes via genuinely
+  different shapes/positions/string sets are never collapsed; the goal is catalogue usefulness, not
+  theoretical pitch-class uniqueness. No clustering/ML — `diversityFilter` is a single linear pass
+  over the already-sorted candidate list. Curated shapes are passed in as already-kept so a
+  generated near-copy of a curated shape can never waste a catalogue slot.
 - **No suitable voicing found is a real, honest empty state** (`guitarVoicingsFor` returns `[]`),
   never a fabricated shape with missing or wrong tones — the UI shows a translated
   "No suitable voicing found" message rather than guessing.
@@ -340,9 +366,13 @@ Fixes, all covered by regression tests:
   "Nfr" position label and starts the visible window at the voicing's own base fret — matching the
   real chord-diagram convention where a diagram switches from "the open-position nut" to "a movable
   position marker" once a shape is clearly up the neck.
-- **Known shape-preference nuance, not a correctness bug**: because ranking rewards full/balanced
-  string coverage, some non-curated maj7-family chords surface a 1st-inversion voicing that rings
-  every string (e.g. Cmaj7's top-ranked shape leaves the low E open, giving E-C-G-B-E rather than
-  the more commonly-taught x32000 with the low E muted) instead of the most "textbook" shape. Every
-  such voicing is musically correct, complete, and genuinely playable — this is a preference nuance
-  worth revisiting only if it proves confusing in practice, not a wrong-notes defect.
+- **Known shape-preference nuance, not a correctness bug** (updated Phase 8.1): the Cmaj7 case
+  originally noted here — the generated catalogue's top pick left the low E ringing open instead of
+  using the standard x32000 — was fixed in Phase 8.1 by curating x32000 directly (see above) rather
+  than by tuning weights alone, since curated shapes bypass ranking entirely and give the strongest
+  correctness guarantee. The general nuance still applies to OTHER non-curated chords: e.g. G7's
+  most iconic open shape (`320001`) currently lands in Pro rather than Free, because the ranking's
+  Free picks favor more compact partial voicings that score comparably well. Every such voicing is
+  musically correct, complete, and genuinely playable — this is a preference nuance worth revisiting
+  chord-by-chord (via further curation, per the same pattern) only if it proves confusing in
+  practice, not a wrong-notes defect.
