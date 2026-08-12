@@ -34,9 +34,9 @@ describe("pianoVoicingsFor — triads (C major)", () => {
     expect(namesOf(c, "inversion2")).toEqual(["G", "C", "E"]);
   });
 
-  it("all 3 triad inversions are Free", () => {
+  it("root and 1st inversion are Free; 2nd inversion is Pro", () => {
     const voicings = pianoVoicingsFor(c);
-    expect(voicings.every((v) => v.catalogue === "free")).toBe(true);
+    expect(voicings.map((v) => v.catalogue)).toEqual(["free", "free", "pro"]);
   });
 
   it("root position sits in a comfortable central register (C4 E4 G4)", () => {

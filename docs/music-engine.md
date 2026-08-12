@@ -252,15 +252,18 @@ Fixes, all covered by regression tests:
 
 ## Documented assumptions (Phase 7 — piano representation)
 
-- **Voicing catalogue per chord** (`src/domain/instruments/piano/voicing.ts`): 3-tone chords
-  (triad-family) get all 3 rotations (root/1st/2nd inversion), all Free. 4-tone chords
-  (7th/6th-family) get all 4 rotations; root+1st Free, 2nd+3rd Pro. 5-tone chords (9th-family) get
-  only root and 1st inversion as rotations (both Free) plus one deterministic Pro "open" voicing —
-  the root position's pitch set with its top tone raised exactly one octave — rather than
-  mechanically continuing the rotation cycle, since a "3rd/4th inversion" of a 9th chord is rarely
-  musically discussed and gets genuinely awkward in close position. This is an explicit v1
-  simplification (product-spec Phase 7 §8/§15), not an oversight; a future phase could add more
-  structural voicing types (shell voicings, drop voicings) without changing this module's shape.
+- **Voicing catalogue per chord** (`src/domain/instruments/piano/voicing.ts`): root position and
+  1st inversion are Free for every chord size, uniformly (Phase 7.1 correction — triads originally
+  gave all 3 inversions Free; aligned to the same "root+1st Free" rule as every other chord size).
+  3-tone chords (triad-family) get a 2nd inversion, Pro. 4-tone chords (7th/6th-family) get 2nd and
+  3rd inversion, both Pro. 5-tone chords (9th-family) get only root and 1st inversion as rotations
+  (both Free) plus one deterministic Pro "open" voicing — the root position's pitch set with its
+  top tone raised exactly one octave — rather than mechanically continuing the rotation cycle,
+  since a "3rd/4th inversion" of a 9th chord is rarely musically discussed and gets genuinely
+  awkward in close position. This is an explicit v1 simplification (product-spec Phase 7 §8/§15),
+  not an oversight; a future phase could add more structural voicing types (shell voicings, drop
+  voicings) without changing this module's shape. Pro voicings stay inspectable in the dev build
+  (no enforcement) until Phase 11 wires up real entitlements.
 - **Inversion identity is derived, never hand-labeled**: rotation N always places
   `chordNotes(chord)[N]` in the bass, so `PianoVoicing.inversion` is guaranteed consistent with
   "which formula tone is lowest" by construction — see `voicing.test.ts`'s explicit bass-note

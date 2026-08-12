@@ -29,17 +29,14 @@ function suggestedFingering(toneCount: number, spacing: "close" | "open"): Finge
 }
 
 /**
- * Root position and 1st inversion are always Free (product-spec Free plan
- * §19's "basic instrument representations"); a triad's small 3-voicing
- * catalogue is small enough that gating its 2nd inversion behind Pro would
- * be unhelpfully stingy, so triads get all 3. Everything else (2nd/3rd
- * inversion of a 4-tone chord, the "open" voicing of a 5-tone chord) is Pro
- * — see Phase 7 §7/§8.
+ * Root position and 1st inversion are Free (product-spec Free plan §19's
+ * "basic instrument representations") for every chord size, uniformly;
+ * everything past that — a triad's 2nd inversion, a 7th chord's 2nd/3rd
+ * inversion, a 9th chord's "open" voicing — is Pro. See Phase 7.1's
+ * Free/Pro correction (docs/roadmap.md).
  */
-function catalogueFor(toneCount: number, rotation: number): VoicingCatalogue {
-  if (rotation <= 1) return "free";
-  if (toneCount === 3 && rotation === 2) return "free";
-  return "pro";
+function catalogueFor(rotation: number): VoicingCatalogue {
+  return rotation <= 1 ? "free" : "pro";
 }
 
 /**
@@ -47,7 +44,7 @@ function catalogueFor(toneCount: number, rotation: number): VoicingCatalogue {
  * documented here and in docs/music-engine.md:
  *
  * - **3-tone chords** (major/minor/diminished/augmented/sus2/sus4): root,
- *   1st, and 2nd inversion — all 3 rotations, all Free.
+ *   1st, and 2nd inversion — all 3 rotations; root+1st Free, 2nd Pro.
  * - **4-tone chords** (7th/6th-family): root, 1st, 2nd, and 3rd inversion —
  *   all 4 rotations; root+1st Free, 2nd+3rd Pro.
  * - **5-tone chords** (9th-family): only root and 1st inversion are
@@ -79,7 +76,7 @@ export function pianoVoicingsFor(chord: Chord): PianoVoicing[] {
       pitches,
       inversion: rotation,
       spacing: "close",
-      catalogue: catalogueFor(toneCount, rotation),
+      catalogue: catalogueFor(rotation),
       fingering: suggestedFingering(toneCount, "close"),
     });
   }

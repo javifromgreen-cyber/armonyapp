@@ -304,6 +304,17 @@ voicing-to-voicing register jumps, now recorded in `music-engine.md`), `product-
 (verdict: aligned — stays representation, not a theory course; three-action rule intact) and
 `release-check` before considering this done.
 
+**Phase 7.1 Free/Pro correction 2026-08-12 (user review):** triads originally gave all 3
+inversions (root/1st/2nd) to Free, inconsistent with the rest of the catalogue. Fixed
+`catalogueFor()` in `src/domain/instruments/piano/voicing.ts` to a single uniform rule — root
+position and 1st inversion are Free for every chord size; everything past that is Pro — so a
+triad's 2nd inversion now correctly requires Pro, matching the already-correct 7th-chord
+(root+1st Free, 2nd+3rd Pro) and 9th-chord (root+1st Free, open voicing Pro) behavior, which were
+left unchanged. Pro voicings remain inspectable in the dev build (no entitlement enforcement until
+Phase 11), per instruction. Updated the one affected test
+(`voicing.test.ts`'s triad-catalogue assertion) and `docs/music-engine.md`'s Phase 7 voicing
+catalogue note. `npm run test` (366 tests), `typecheck`, `lint`, `build` all pass.
+
 ## Phase 8 — Guitar representation and voicing engine
 - [ ] Fretboard/chord diagram, TAB, finger numbers
 - [ ] Voicing generation + playability ranking, automated tests
