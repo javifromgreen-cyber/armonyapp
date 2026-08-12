@@ -381,3 +381,78 @@ Fixes, all covered by regression tests:
   never a wrong-notes defect — and the fix pattern is now established: identify via live/product
   review, add one hand-verified curated entry, verify with `curatedShapes.test.ts` +
   `voicing.test.ts`. Applied chord-by-chord as issues surface, not preemptively.
+
+## Documented assumptions (Phase 9 — bass representation)
+
+- **Standard 4-string tuning only, string 4 = low E to string 1 = high G**
+  (`src/domain/instruments/bass/tuning.ts`): E1 A1 D2 G2 — a genuinely separate tuning table from
+  Guitar's (different pitches, different string count), even though the string-numbering
+  convention ("higher number = lower/thicker string") is kept consistent across instruments for
+  the user's mental model. 5/6-string and alternate/drop tunings are explicitly out of scope this
+  phase.
+- **A `BassPattern` is a SEQUENCE through time, not a chord shape** — the single conceptual
+  difference from Guitar (Phase 9 §1). `BassPattern.steps` is ordered and that order is musically
+  significant (which tone comes first/last matters); nothing in the domain layer ever re-sorts
+  steps by pitch or treats them as a simultaneous set.
+- **Pattern generation is a small deterministic recipe family, not a combinatorial search**
+  (`patternGeneration.ts`), unlike Guitar's candidate search: exactly 4 pattern types —
+  `basicArpeggio` (root, ascending through the chord's own formula tones, closing on the octave
+  root for a plain triad since it has no 7th/extension to land on — Phase 9 §9's "C major: 1 → 3 →
+  5 → 8"; chords with a 7th/6th/9th already end on a tone that states the chord's quality, so no
+  octave is appended there — "Cmaj7: 1 → 3 → 5 → 7"), `alternativePosition` (the identical
+  ascending idea anchored at the OTHER standard root string), `rootFifthOctave` (root → 5th-family
+  tone → octave, the harmonic skeleton, skipping the 3rd/7th/extensions), and `descendingArpeggio`
+  (the exact reverse of `basicArpeggio`'s own notes — a deliberate V1 simplification, not an
+  independently-routed descending line, so the two can never disagree). `basicArpeggio` and
+  `alternativePosition` are always Free, in that order, when both exist; `rootFifthOctave` and
+  `descendingArpeggio` are Pro.
+- **The two standard root anchors are E-string and A-string** (Phase 9 §13): every pattern is
+  anchored at the root's lowest fret on string 4 or string 3 — never a single fixed string for
+  every chord, and never an arbitrary neck-wide search.
+- **Ascending-search tie-break uses physical FRET distance, not string-number distance** — the
+  single most important playability fix of this phase. `findNextAscending` picks the smallest
+  ascending pitch step first; when two candidates land on the exact identical pitch (very common
+  on a 4-string instrument, since strings tuned a 4th apart frequently reach the same note a few
+  frets apart), the original version broke the tie by preferring the SAME string as the previous
+  note — which could mean a large same-string slide (e.g. fret 3 → fret 7) when a much smaller
+  adjacent-string move (fret 3 → fret 2 on the next string) reached the identical pitch. Fixed to
+  tie-break on physical fret distance from the previous note first (string-number proximity is
+  only the final fallback) — this is what actually captures "smallest real hand movement," since a
+  one-fret move to the next string is a smaller physical motion than a four-fret slide on one
+  string even though both land on the same note. Verified this turns generated patterns into
+  compact, adjacent-string "walking" routes rather than same-string slides.
+- **Bass-specific playability, not reused Guitar ergonomics** (`playability.ts`): `MAX_FRET_SPAN =
+  5` (deliberately evaluated on its own terms, not inherited from Guitar's identical-looking
+  constant, since bass frets are physically wider apart). Suggested fingering uses a documented
+  "1-2-4" system (index-middle-pinky, skipping the ring finger) for any pattern whose base fret is
+  below 5, and standard one-finger-per-fret (1-2-3-4) from the 5th fret up — bass frets that low are
+  wide enough that bridging all four fingers across them is a genuine overstretch for most hands,
+  which the guitar convention doesn't need to account for. A relative fret 4+ beyond the base fret
+  gets no suggested finger at all (Phase 9 §15's "if uncertain, omit"). Fingering is a property of
+  the physical fret, computed once on the forward/ascending step order, so reversing a pattern for
+  `descendingArpeggio` never needs to recompute it.
+- **Local fretboard window and diagram orientation**: the visualization is deliberately HORIZONTAL
+  (frets left-to-right, strings top-to-bottom: G/D/A/E, matching the TAB block directly below it) —
+  unlike Guitar's vertical chord diagram. An earlier vertical version (frets down, mirroring
+  Guitar's chord-diagram convention) made a multi-fret bass pattern awkwardly tall since patterns
+  routinely span more frets than a single guitar chord shape does, pushing content below the fold.
+  The local window covers the current pattern's own fret range plus a small amount of padding (1
+  fret on desktop, 0 on mobile) so nearby chord tones are visible without approaching a full-neck
+  view.
+- **Root vs. current-pattern vs. available-chord-tone visual language** (Phase 9 §6/§34): every
+  chord-tone-bearing fret in the local window (`fretboardMap.ts`'s `localChordToneMap`, independent
+  of any specific pattern) renders as a small, subtle, interval-labeled outline marker; the CURRENT
+  pattern's own notes render as large, filled, numbered markers (1, 2, 3, …, matching play order).
+  Root gets an additional outline ring in BOTH layers, on top of (not instead of) its own
+  marker/number — an earlier version replaced a root step's number with the ring, which silently
+  hid the sequence position of a triad's closing octave step (also root-pitch-class); fixed so the
+  ring augments rather than replaces the step number.
+- **Playback timing reuses the progression's own BPM** (Phase 9 §24), never a second unrelated
+  tempo state: each pattern step is one beat (`60 / bpm` seconds between onsets), sounding for 85%
+  of that beat so notes stay cleanly separated rather than blurring together — the same "sounding
+  ratio" idea the progression player already uses for its own note releases. "Hear this pattern"
+  reuses Phase 6/8's `hearPitches(pitches, { strumDelaySeconds, durationSeconds, voice })` with
+  `strumDelaySeconds` set to the beat duration — architecturally the exact same primitive Guitar's
+  strum uses, just with a much larger delay and a second-string tag (`voice: "bass"`) selecting a
+  lightweight second Tone.js synth (sine oscillator, slightly slower attack, no samples/effects) —
+  never a new playback engine.

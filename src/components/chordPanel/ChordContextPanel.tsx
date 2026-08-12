@@ -11,6 +11,7 @@ import { getChordDisplayInfo } from "./chordDisplayInfo";
 import { functionDisplayInfo } from "./functionDisplay";
 import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
 import { GuitarVoicingPanel } from "./guitar/GuitarVoicingPanel";
+import { BassPatternPanel } from "./bass/BassPatternPanel";
 import { InstrumentSelector } from "./InstrumentSelector";
 import type { Instrument } from "./instrument";
 
@@ -23,17 +24,21 @@ export interface ChordContextPanelProps {
   isDesktop: boolean;
   activeInstrument: Instrument;
   onInstrumentChange: (instrument: Instrument) => void;
+  /** The progression's current BPM (Phase 9 §24) — reused as-is for bass pattern step timing rather than introducing a second, unrelated tempo state. */
+  bpm: number;
   onExploreFrom: (chord: Chord) => void;
   /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
   onAddToProgression: (chord: Chord) => void;
   /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
   onHearChord: (chord: Chord) => void;
-  /** Plays EXACTLY the pitches of the currently displayed instrument voicing (Phase 7 §13 / Phase 8 §19) — distinct from `onHearChord`'s generic neutral preview. */
+  /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23) — distinct from `onHearChord`'s generic neutral preview. */
   onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => void;
 }
 
 /** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
 const GUITAR_STRUM_DELAY_SECONDS = 0.02;
+/** How much of each bass pattern step's duration actually sounds (Phase 9 §24) — leaves a clean gap before the next note, mirroring the progression player's own ~8%-early-release convention rather than letting notes bleed together. */
+const BASS_STEP_SOUNDING_RATIO = 0.85;
 
 function explanationText(
   t: ReturnType<typeof useTranslations>,
@@ -58,6 +63,7 @@ export function ChordContextPanel({
   isDesktop,
   activeInstrument,
   onInstrumentChange,
+  bpm,
   onExploreFrom,
   onAddToProgression,
   onHearChord,
@@ -136,14 +142,15 @@ export function ChordContextPanel({
         <InstrumentSelector value={activeInstrument} onChange={onInstrumentChange} />
       </div>
 
-      {activeInstrument === "piano" ? (
+      {activeInstrument === "piano" && (
         <PianoVoicingPanel
           key={`piano-${info.symbol}`}
           chord={chord}
           isDesktop={isDesktop}
           onHearVoicing={(voicing) => onHearPitches(voicing.pitches)}
         />
-      ) : (
+      )}
+      {activeInstrument === "guitar" && (
         <GuitarVoicingPanel
           key={`guitar-${info.symbol}`}
           chord={chord}
@@ -153,6 +160,24 @@ export function ChordContextPanel({
               { strumDelaySeconds: GUITAR_STRUM_DELAY_SECONDS },
             )
           }
+        />
+      )}
+      {activeInstrument === "bass" && (
+        <BassPatternPanel
+          key={`bass-${info.symbol}`}
+          chord={chord}
+          isDesktop={isDesktop}
+          onHearPattern={(pattern) => {
+            const stepSeconds = 60 / bpm;
+            onHearPitches(
+              pattern.steps.map((s) => s.pitch),
+              {
+                strumDelaySeconds: stepSeconds,
+                durationSeconds: stepSeconds * BASS_STEP_SOUNDING_RATIO,
+                voice: "bass",
+              },
+            );
+          }}
         />
       )}
 

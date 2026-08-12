@@ -156,6 +156,7 @@ export function ExplorerApp() {
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
       onInstrumentChange={setActiveInstrument}
+      bpm={progression.bpm}
       onExploreFrom={handleExplore}
       onAddToProgression={handleAddToProgression}
       onHearChord={playback.hearChord}

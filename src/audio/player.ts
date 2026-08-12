@@ -35,6 +35,28 @@ function getSynth(): Tone.PolySynth<Tone.Synth> {
   return synth;
 }
 
+let bassSynth: Tone.PolySynth<Tone.Synth> | null = null;
+
+/**
+ * A lightweight, lower-register-friendly voice for "Hear this pattern"
+ * (Phase 9 §25) — still the same Tone.js `PolySynth` synthesis approach as
+ * the main synth (no sample libraries, no amp sim, no effects chain), just
+ * a sine oscillator (rounder, cleaner low end than the main triangle wave)
+ * with a slightly slower attack/longer release for a smoother, less
+ * plucky-sounding note. This is a genuinely separate synth instance (not a
+ * parameter tweak on the shared one) so it never alters how Piano/Guitar
+ * chords sound.
+ */
+function getBassSynth(): Tone.PolySynth<Tone.Synth> {
+  if (!bassSynth) {
+    bassSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.015, decay: 0.2, sustain: 0.4, release: 0.3 },
+    }).toDestination();
+  }
+  return bassSynth;
+}
+
 /**
  * Resumes/creates the shared AudioContext. Browsers require this to happen
  * synchronously within a genuine user gesture (Phase 6 §3) — every exported
@@ -68,33 +90,40 @@ export async function hearChord(chord: Chord): Promise<void> {
 export interface HearPitchesOptions {
   durationSeconds?: number;
   /**
-   * Seconds between each successive pitch's onset (Phase 8 §20's "subtle
-   * guitar-like onset staggering") — 0 (the default) triggers every pitch
-   * simultaneously, matching Phase 7's piano "Hear this voicing" exactly.
-   * `pitches` should be ordered low to high for a natural downstrum.
+   * Seconds between each successive pitch's onset — 0 (the default)
+   * triggers every pitch simultaneously, matching Phase 7's piano "Hear
+   * this voicing" exactly. A small value (Phase 8 §20) gives a light
+   * guitar-like strum stagger; a value tied to the current BPM (Phase 9
+   * §24) turns this into genuine sequential bass-pattern playback — same
+   * primitive, different timing, never a second playback engine.
+   * `pitches` should be ordered the way they're meant to be heard.
    */
   strumDelaySeconds?: number;
+  /** "default" (the shared triangle-wave synth) or "bass" (Phase 9 §25's lower-register-friendly voice) — omit for "default". */
+  voice?: "default" | "bass";
 }
 
 /**
  * Plays an EXPLICIT set of pitches exactly as given (Phase 7 §13 / Phase 8
- * §19's "Hear this voicing" — the displayed piano/guitar voicing, not a
- * regenerated generic chord). The seam any instrument-specific voicing
- * hands its own `PlayablePitch[]` to, reusing this same engine rather than
- * duplicating it. A non-zero `strumDelaySeconds` staggers onsets low-to-high
- * for a light strum feel — still the exact pitches, just not simultaneous.
+ * §19's "Hear this voicing" / Phase 9 §23's "Hear this pattern" — the
+ * displayed piano/guitar voicing or bass pattern, not a regenerated
+ * generic chord). The seam any instrument-specific voicing/pattern hands
+ * its own `PlayablePitch[]` to, reusing this same engine rather than
+ * duplicating it. A non-zero `strumDelaySeconds` staggers onsets — small
+ * for a light guitar strum, one beat's worth for a bass pattern played
+ * strictly in sequence — still the exact pitches, just not simultaneous.
  */
 export async function hearPitches(pitches: PlayablePitch[], options?: HearPitchesOptions): Promise<void> {
   await ensureAudioReady();
   const durationSeconds = options?.durationSeconds ?? 1.4;
   const strumDelaySeconds = options?.strumDelaySeconds ?? 0;
+  const synthInstance = options?.voice === "bass" ? getBassSynth() : getSynth();
 
   if (strumDelaySeconds <= 0) {
-    playPitches(pitchesToFrequencies(pitches), durationSeconds);
+    synthInstance.triggerAttackRelease(pitchesToFrequencies(pitches), durationSeconds);
     return;
   }
 
-  const synthInstance = getSynth();
   const now = Tone.now();
   pitches.forEach((pitch, index) => {
     synthInstance.triggerAttackRelease(pitch.frequencyHz, durationSeconds, now + index * strumDelaySeconds);
@@ -162,4 +191,5 @@ export function stopProgression(): void {
   transport.stop();
   transport.cancel(); // clears every scheduled event
   synth?.releaseAll();
+  bassSynth?.releaseAll();
 }

@@ -477,7 +477,96 @@ regressions in the previously-passing 493. Ran `music-theory-review` (verdict: n
 through the existing validated curated-shape pipeline).
 
 ## Phase 9 — Bass representation
-- [ ] Bass fretboard, chord tones, one pattern (Free) vs multiple (Pro)
+- [x] Bass fretboard, chord tones, one pattern (Free) vs multiple (Pro)
+
+Architecture: `src/domain/instruments/bass/` (framework-free, standard 4-string tuning only —
+Phase 9 §3: E1 A1 D2 G2). Conceptually different from Guitar by design (Phase 9 §1): Guitar shows
+concrete playable chord SHAPES, Bass shows how to NAVIGATE through/over a chord — a
+`BassPattern.steps` array is a SEQUENCE through time, never a simultaneous block chord. Pipeline:
+`chordTones.ts` (same "reuse the chord engine, never re-derive harmony" pattern as Guitar) →
+`patternGeneration.ts` (`rootAnchors` — the two standard bass home positions, root on the E string
+and root on the A string, Phase 9 §13 — plus `buildAscendingSteps`/`buildRootFifthOctaveSteps`, a
+`findNextAscending` search that walks the local position choosing the smallest ascending pitch
+step, tie-broken by PHYSICAL FRET DISTANCE from the previous note — not string-number distance —
+since two strings tuned a 4th apart often reach the identical pitch, and the smallest actual hand
+movement is what matters, not which string) → `playability.ts` (fret-span rejection +
+1-2-4-vs-1-2-3-4 fingering, bass-specific because bass frets are wider than guitar's) →
+`ranking.ts`/`diversity.ts` (mirroring Guitar's deterministic-scoring/near-duplicate philosophy at
+a much smaller scale, since patterns are recipe-generated, not searched) → `bassPatterns.ts`
+(orchestrator: exactly 4 pattern types — `basicArpeggio` and `alternativePosition` always Free in
+that order when both exist, per Phase 9 §9's worked example; `rootFifthOctave` and
+`descendingArpeggio` Pro). `fretboardMap.ts`'s `localChordToneMap` independently lists every
+chord-tone-bearing fret in the local window across all 4 strings — the data source for the
+fretboard's "available chord tones" layer, kept visually distinct from the current pattern's own
+notes (Phase 9 §6). `tab.ts` derives sequential TAB directly from `BassPattern.steps` (one column
+per STEP, not per fret position — Phase 9 §21/§22). React layer:
+`src/components/chordPanel/bass/{BassFretboard,BassPatternPanel}.tsx`, integrated into the existing
+`ChordContextPanel` exactly like Piano/Guitar (a BASS section, no separate page). The instrument
+selector now offers Piano/Guitar/Bass; switching is still a plain `useState` with no reducer
+dispatch, so it cannot touch chord/map/progression state by construction (verified live via an
+automated round-trip check, not just code review). "Hear this pattern" reuses Phase 6/8's
+`hearPitches(pitches, { strumDelaySeconds, durationSeconds, voice })` with `strumDelaySeconds` set
+to one beat (`60/bpm`, reusing the progression's own BPM rather than introducing a second tempo
+state — Phase 9 §24) and a new `voice: "bass"` option selecting a second, still-lightweight Tone.js
+synth (sine oscillator, rounder/cleaner low end, no samples/effects — Phase 9 §25) — no new
+playback engine.
+
+Verified 2026-08-12: `npm run test` (601 tests, 47 files — up from 500; new coverage: 101
+bass-domain tests across `tuning`/`patternGeneration`/`playability`/`diversity`/`fretboardMap`/
+`bassPatterns.test.ts` covering the full representative chord list from Phase 9 §38 — C G F Am Em
+Dm Cmaj7 G7 Am7 Bm7b5 F#dim7 Dbmaj7 C9 Cm9 Csus4 Caug, plus the full 17-quality V1 catalogue and
+negative/rejection cases for oversized fret spans), `typecheck`, `lint`, `build` all pass. Ran
+`music-theory-review` (extended per Phase 9 §39: chord-tone correctness, interval labeling,
+whether patterns communicate chord quality, Free-pattern usefulness, low-position stretch realism,
+sequence-direction sense, and extended-chord tone retention — all confirmed correct by hand and by
+test, including bb7 surviving diminished7 and the full 9th-family identity surviving Cm9). Ran
+`product-scope-review` (verdict: aligned — not a lesson/course/groove-generator/walking-bass-
+generator/DAW/static-dictionary; still inside EXPLORE→UNDERSTAND→PLAY→COMPOSE). Ran `release-check`
+(all four gates pass, zero regressions in the previous 500 tests).
+
+Manually exercised in a real browser (dev server + Playwright, English + Spanish + a 390px mobile
+viewport): switched Piano→Guitar→Bass and confirmed the selected chord's `aria-label` was
+byte-identical before and after; selected C and confirmed root/3rd/5th/octave positions with a
+matching TAB; used "Hear this pattern"; stepped through all 4 patterns for C confirming Free #1
+("Basic arpeggio"), Free #2 ("Alternative position", a different root string), and Pro #3
+("Ascending arpeggio" — the root-5th-octave skeleton, with a Pro badge); selected Am, Cmaj7, G7,
+and Bm7b5 directly from the map (Zoom 4) and confirmed each pattern's interval sequence/fingering/
+TAB were internally consistent (Bm7b5 correctly showed `1 → b3 → b5 → b7`); switched Bass→Piano→Bass
+and confirmed the chord was unchanged; verified Spanish (Bajo/Arpegio básico/Digitación sugerida/
+Escuchar este patrón/Abierta) and mobile legibility. Zero console errors throughout. C9 and Dbmaj7
+aren't reachable from C major's harmonic map at any Zoom level (not diatonic/secondary/borrowed in
+that key — correctly so, matching the same Phase 8 precedent) — both are covered instead by the
+automated domain test suite, which includes them explicitly.
+
+**Bugs found and fixed during this build, before any user review:**
+1. **Ergonomics bug in `findNextAscending`'s tie-break**: when two candidate positions for the next
+   ascending tone landed on the exact same pitch (common on a 4-string instrument — e.g. the A
+   string's 7th fret and the D string's 2nd fret are both E2), the original tie-break preferred
+   whichever candidate was on the SAME string as the previous note, which could mean a big
+   same-string slide (e.g. fret 3 → fret 7) when a much smaller adjacent-string move (fret 3 → fret
+   2 on the next string) reached the identical pitch. Fixed by tie-breaking on physical FRET
+   DISTANCE from the previous note first, string-number proximity only as a final fallback —
+   verified this turns C major's basic arpeggio from a 3-3-7-7-ish same-string slide into a compact
+   walking pattern across adjacent strings (3→2→0(open)→5), which is what real bass technique
+   prefers.
+2. **Fretboard diagram aspect ratio**: the first implementation drew the local fretboard the same
+   way Guitar draws a chord diagram — frets running vertically, strings horizontal — which is fine
+   for a guitar chord's few frets but made a multi-fret bass PATTERN awkwardly tall (7+ fret rows),
+   pushing the TAB block below the fold and requiring scrolling inside the panel. Redesigned to a
+   horizontal layout (frets left-to-right, strings top-to-bottom matching the TAB block directly
+   below it) — this is also a genuinely better fit for a "pattern/position" visualization
+   specifically, distinct from a "single chord shape" visualization.
+3. **Marker legibility**: an intermediate version gave every root-pitch-class step (including a
+   triad's closing OCTAVE step) an inner-dot marker with no visible number, silently dropping the
+   sequence-order label for that step. Fixed so every step always shows its play-order number, with
+   root notes additionally getting an outline ring — root stays "strongly distinguished" (Phase 9
+   §34) without erasing the sequence Phase 9 §6 requires.
+
+Known limitation, documented rather than hidden: `descendingArpeggio` is defined as the exact
+reverse of `basicArpeggio`'s own notes (Phase 9 §11's family list), not an independently-routed
+descending line — this is a deliberate V1 simplification (guarantees the two can never disagree)
+rather than a bug; a future pass could give it its own physically-optimized descent if that proves
+valuable in practice.
 
 ## Phase 10 — Authentication and project persistence
 - [ ] Supabase auth: email/password, verification, reset; Google OAuth

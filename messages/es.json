@@ -122,10 +122,36 @@
       "voicingCounter": "{current} de {total}",
       "proBadge": "Pro"
     },
+    "bass": {
+      "title": "Bajo",
+      "fretboardAriaLabel": "Diapasón de bajo mostrando {notes}",
+      "chordTone": "Nota del acorde: {interval}",
+      "patternStep": "Paso {order}: {interval}",
+      "root": "Fundamental",
+      "basicArpeggio": "Arpegio básico",
+      "ascendingArpeggio": "Arpegio ascendente",
+      "descendingArpeggio": "Arpegio descendente",
+      "alternativePosition": "Posición alternativa",
+      "suggestedFingering": "Digitación sugerida",
+      "pattern": "Patrón",
+      "hearThisPattern": "Escuchar este patrón",
+      "previousPattern": "Patrón anterior",
+      "nextPattern": "Patrón siguiente",
+      "fret": "Traste",
+      "fretPosition": "Posición al traste {fret}",
+      "openPositionShort": "Abierta",
+      "openString": "Cuerda al aire",
+      "mutedString": "Cuerda silenciada",
+      "noSuitablePattern": "No se encontró un patrón adecuado",
+      "patternCounter": "{current} de {total}",
+      "tab": "TAB",
+      "proBadge": "Pro"
+    },
     "instrument": {
       "label": "Instrumento",
       "piano": "Piano",
-      "guitar": "Guitarra"
+      "guitar": "Guitarra",
+      "bass": "Bajo"
     }
   },
   "harmony": {
