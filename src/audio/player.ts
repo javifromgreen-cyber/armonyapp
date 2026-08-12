@@ -65,16 +65,40 @@ export async function hearChord(chord: Chord): Promise<void> {
   playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
 }
 
+export interface HearPitchesOptions {
+  durationSeconds?: number;
+  /**
+   * Seconds between each successive pitch's onset (Phase 8 §20's "subtle
+   * guitar-like onset staggering") — 0 (the default) triggers every pitch
+   * simultaneously, matching Phase 7's piano "Hear this voicing" exactly.
+   * `pitches` should be ordered low to high for a natural downstrum.
+   */
+  strumDelaySeconds?: number;
+}
+
 /**
- * Plays an EXPLICIT set of pitches exactly as given (Phase 7 §13's "Hear
- * this voicing" — the displayed piano voicing, not a regenerated generic
- * chord). The seam any future instrument-specific voicing (guitar/bass)
- * hands its own `PlayablePitch[]` to as well, reusing this same engine
- * rather than duplicating it.
+ * Plays an EXPLICIT set of pitches exactly as given (Phase 7 §13 / Phase 8
+ * §19's "Hear this voicing" — the displayed piano/guitar voicing, not a
+ * regenerated generic chord). The seam any instrument-specific voicing
+ * hands its own `PlayablePitch[]` to, reusing this same engine rather than
+ * duplicating it. A non-zero `strumDelaySeconds` staggers onsets low-to-high
+ * for a light strum feel — still the exact pitches, just not simultaneous.
  */
-export async function hearPitches(pitches: PlayablePitch[], durationSeconds = 1.4): Promise<void> {
+export async function hearPitches(pitches: PlayablePitch[], options?: HearPitchesOptions): Promise<void> {
   await ensureAudioReady();
-  playPitches(pitchesToFrequencies(pitches), durationSeconds);
+  const durationSeconds = options?.durationSeconds ?? 1.4;
+  const strumDelaySeconds = options?.strumDelaySeconds ?? 0;
+
+  if (strumDelaySeconds <= 0) {
+    playPitches(pitchesToFrequencies(pitches), durationSeconds);
+    return;
+  }
+
+  const synthInstance = getSynth();
+  const now = Tone.now();
+  pitches.forEach((pitch, index) => {
+    synthInstance.triggerAttackRelease(pitch.frequencyHz, durationSeconds, now + index * strumDelaySeconds);
+  });
 }
 
 /** Low-level playback primitive — assumes the AudioContext is already running; prefer `hearChord`/`hearPitches` from a click handler instead of calling this directly. */

@@ -5,10 +5,14 @@ import { useTranslations } from "next-intl";
 import { chordsEqual, type Explanation, type ZoomLevel } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
-import type { PianoVoicing } from "@/domain/instruments/piano";
+import type { PlayablePitch } from "@/domain/instruments";
+import type { HearPitchesOptions } from "@/audio/player";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
 import { functionDisplayInfo } from "./functionDisplay";
 import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
+import { GuitarVoicingPanel } from "./guitar/GuitarVoicingPanel";
+import { InstrumentSelector } from "./InstrumentSelector";
+import type { Instrument } from "./instrument";
 
 export interface ChordContextPanelProps {
   chord: Chord;
@@ -17,14 +21,19 @@ export interface ChordContextPanelProps {
   /** The map's currently active Zoom — relationships shown here must never go deeper than what's on the map (see chordDisplayInfo.ts). */
   zoom: ZoomLevel;
   isDesktop: boolean;
+  activeInstrument: Instrument;
+  onInstrumentChange: (instrument: Instrument) => void;
   onExploreFrom: (chord: Chord) => void;
   /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
   onAddToProgression: (chord: Chord) => void;
   /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
   onHearChord: (chord: Chord) => void;
-  /** Plays EXACTLY the pitches of the currently displayed piano voicing (Phase 7 §13) — distinct from `onHearChord`'s generic neutral preview. */
-  onHearVoicing: (voicing: PianoVoicing) => void;
+  /** Plays EXACTLY the pitches of the currently displayed instrument voicing (Phase 7 §13 / Phase 8 §19) — distinct from `onHearChord`'s generic neutral preview. */
+  onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => void;
 }
+
+/** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
+const GUITAR_STRUM_DELAY_SECONDS = 0.02;
 
 function explanationText(
   t: ReturnType<typeof useTranslations>,
@@ -47,10 +56,12 @@ export function ChordContextPanel({
   context,
   zoom,
   isDesktop,
+  activeInstrument,
+  onInstrumentChange,
   onExploreFrom,
   onAddToProgression,
   onHearChord,
-  onHearVoicing,
+  onHearPitches,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
@@ -118,12 +129,32 @@ export function ChordContextPanel({
         </section>
       )}
 
-      <PianoVoicingPanel
-        key={info.symbol}
-        chord={chord}
-        isDesktop={isDesktop}
-        onHearVoicing={onHearVoicing}
-      />
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
+          {tPanel("instrument")}
+        </h3>
+        <InstrumentSelector value={activeInstrument} onChange={onInstrumentChange} />
+      </div>
+
+      {activeInstrument === "piano" ? (
+        <PianoVoicingPanel
+          key={`piano-${info.symbol}`}
+          chord={chord}
+          isDesktop={isDesktop}
+          onHearVoicing={(voicing) => onHearPitches(voicing.pitches)}
+        />
+      ) : (
+        <GuitarVoicingPanel
+          key={`guitar-${info.symbol}`}
+          chord={chord}
+          onHearVoicing={(voicing) =>
+            onHearPitches(
+              voicing.strings.filter((s) => s.pitch).map((s) => s.pitch!),
+              { strumDelaySeconds: GUITAR_STRUM_DELAY_SECONDS },
+            )
+          }
+        />
+      )}
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
         <button

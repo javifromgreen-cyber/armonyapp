@@ -18,6 +18,7 @@ import {
   type ProgressionAction,
 } from "./progression/progressionReducer";
 import { usePlaybackController } from "./audio/usePlaybackController";
+import type { Instrument } from "./chordPanel/instrument";
 
 const DEFAULT_CONTEXT: Key = { tonic: { letter: "C", accidental: 0 }, mode: "major" };
 const DEFAULT_CHORD: Chord = parseChordSymbol("Cmaj7");
@@ -71,6 +72,7 @@ export function ExplorerApp() {
   const [isFreeMode, setIsFreeMode] = useState(false);
   const [isPanelOpenOnMobile, setIsPanelOpenOnMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chord");
+  const [activeInstrument, setActiveInstrument] = useState<Instrument>("piano");
   const isDesktop = useIsDesktop();
   const playback = usePlaybackController();
 
@@ -152,10 +154,12 @@ export function ExplorerApp() {
       context={state.context}
       zoom={state.zoom}
       isDesktop={isDesktop}
+      activeInstrument={activeInstrument}
+      onInstrumentChange={setActiveInstrument}
       onExploreFrom={handleExplore}
       onAddToProgression={handleAddToProgression}
       onHearChord={playback.hearChord}
-      onHearVoicing={(voicing) => playback.hearVoicing(voicing.pitches)}
+      onHearPitches={playback.hearVoicing}
     />
   );
 

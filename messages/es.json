@@ -54,6 +54,7 @@
       "relationshipToSource": "Relación con {chord}",
       "addToProgression": "Añadir a la progresión",
       "hearChord": "Escuchar acorde",
+      "instrument": "Instrumento",
       "selectPrompt": "Selecciona un acorde en el mapa para ver sus detalles.",
       "additionalRelationships": "También relacionado como:"
     },
@@ -96,6 +97,35 @@
       "voicingCounter": "{current} de {total}",
       "suggestedFingering": "Digitación sugerida",
       "hearThisVoicing": "Escuchar esta disposición"
+    },
+    "guitar": {
+      "title": "Guitarra",
+      "diagramAriaLabel": "Diagrama de acorde de guitarra mostrando {notes}",
+      "openString": "Cuerda al aire",
+      "mutedString": "Cuerda silenciada",
+      "openPosition": "Posición abierta",
+      "movableShape": "Forma movible",
+      "positionVoicing": "Posición al traste {fret}",
+      "fret": "Traste",
+      "fingering": "Digitación",
+      "suggestedFingering": "Digitación sugerida",
+      "barre": "Cejilla",
+      "tab": "TAB",
+      "rootPosition": "Posición fundamental",
+      "inversion1": "Primera inversión",
+      "inversion2": "Segunda inversión",
+      "inversion3": "Tercera inversión",
+      "hearThisVoicing": "Escuchar esta disposición",
+      "previousVoicing": "Disposición anterior",
+      "nextVoicing": "Siguiente disposición",
+      "noSuitableVoicing": "No se encontró una disposición adecuada",
+      "voicingCounter": "{current} de {total}",
+      "proBadge": "Pro"
+    },
+    "instrument": {
+      "label": "Instrumento",
+      "piano": "Piano",
+      "guitar": "Guitarra"
     }
   },
   "harmony": {

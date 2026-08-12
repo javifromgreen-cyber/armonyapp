@@ -7,6 +7,7 @@ import {
   playProgression as playProgressionAudio,
   stopProgression as stopProgressionAudio,
   AudioInitError,
+  type HearPitchesOptions,
 } from "@/audio/player";
 import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
@@ -20,8 +21,8 @@ export interface PlaybackController {
   playingItemId: string | null;
   error: AudioErrorKind | null;
   hearChord: (chord: Chord) => void;
-  /** Plays an exact set of pitches (Phase 7 §13's "Hear this voicing") — never a regenerated generic chord. */
-  hearVoicing: (pitches: PlayablePitch[]) => void;
+  /** Plays an exact set of pitches (Phase 7 §13 / Phase 8 §19's "Hear this voicing") — never a regenerated generic chord. `options.strumDelaySeconds` staggers onsets for a light guitar-like strum. */
+  hearVoicing: (pitches: PlayablePitch[], options?: HearPitchesOptions) => void;
   playProgression: (progression: Progression) => void;
   stop: () => void;
   dismissError: () => void;
@@ -55,8 +56,8 @@ export function usePlaybackController(): PlaybackController {
     });
   }, []);
 
-  const hearVoicing = useCallback((pitches: PlayablePitch[]) => {
-    hearPitchesAudio(pitches).catch((cause: unknown) => {
+  const hearVoicing = useCallback((pitches: PlayablePitch[], options?: HearPitchesOptions) => {
+    hearPitchesAudio(pitches, options).catch((cause: unknown) => {
       if (cause instanceof AudioInitError) setError("init");
     });
   }, []);

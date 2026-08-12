@@ -316,9 +316,92 @@ Phase 11), per instruction. Updated the one affected test
 catalogue note. `npm run test` (366 tests), `typecheck`, `lint`, `build` all pass.
 
 ## Phase 8 — Guitar representation and voicing engine
-- [ ] Fretboard/chord diagram, TAB, finger numbers
-- [ ] Voicing generation + playability ranking, automated tests
-- [ ] Free (~2-3 voicings) vs Pro (expanded) catalogue
+- [x] Fretboard/chord diagram, TAB, finger numbers
+- [x] Voicing generation + playability ranking, automated tests
+- [x] Free (~2 voicings) vs Pro (expanded) catalogue
+
+Architecture: `src/domain/instruments/guitar/` (framework-free, standard tuning only — Phase 8
+§3), reusing Phase 7's shared `PlayablePitch` for real-octave pitch math and the same
+`ChordContextPanel` integration pattern as Piano (a GUITAR section, no separate page). Pipeline:
+`chordTones.ts` (pairs `chordNotes()`/`chordIntervalFormula()` per-tone — the chord engine is the
+only source of harmonic truth, never re-derived) → `candidates.ts` (raw fret/mute combinations
+from 3 musically-anchored search windows: open position frets 0-4, and movable E-shape/A-shape
+windows anchored to the root's fret on strings 6/5 — not an arbitrary neck-wide slide) →
+`playability.ts` (`evaluateCandidate`: rejects candidates with fewer than 3 sounding strings, a
+fret span over 4, or more than 4 independent fretting fingers after crediting a real barre as one
+finger; `detectBarre` requires every string in the FULL numeric range between the lowest and
+highest string sharing the minimum fret to be fretted, not just the strings that sound there — this
+is what correctly recognizes F major's 1-3-3-2-1-1 as a genuine 6-string barre even though only
+strings 6/2/1 sound at fret 1) → `ranking.ts` (deterministic scoring, no LLM) → `voicing.ts`
+(orchestrator: curated shape first when one exists, then generated candidates filtered for
+chord-tone completeness and deduplicated by exact fret signature, first 2 tagged Free / rest Pro,
+capped at 5 total; returns `[]` — never a fabricated shape — when nothing playable is found).
+`curatedShapes.ts` hand-verifies 8 canonical open shapes (C A G E D Am Em Dm, per product-spec
+§25's example list) cross-checked against the chord formula in tests; every other chord/root is
+purely algorithmic, sharing the exact same `GuitarVoicing` output model. `tab.ts` derives TAB lines
+directly from `GuitarVoicing.strings` (high string first, `E`/`e` distinguished correctly), so TAB
+and the diagram can never drift apart. React layer:
+`src/components/chordPanel/guitar/{GuitarDiagram,GuitarVoicingPanel}.tsx` (SVG diagram — string 6
+left, string 1 right, nut at top, per the documented fixed orientation — with fret/string grid,
+open/muted markers, a barre bar, and a root marker distinguished by an inner dot, never color
+alone) plus a new `InstrumentSelector` (Piano/Guitar radiogroup) lifted into `ExplorerApp` as plain
+`useState` with no reducer dispatch, so switching instruments cannot touch chord/map/progression
+state by construction (verified live, not just by code review). "Hear this voicing" plays the
+voicing's exact sounding `PlayablePitch[]` (muted strings silent) through the existing Phase 6/7
+player, extended with an optional `strumDelaySeconds` (20ms) for a light strum stagger — same
+shared synth, no new audio engine.
+
+Verified 2026-08-12: `npm run test` (474 tests, 40 files — up from 366; new coverage: 108
+guitar-domain tests across `tuning`/`curatedShapes`/`candidates`/`playability`/`voicing.test.ts`
+covering the full representative chord list from product-spec §33 — C G D A E F Am Em Dm Bm Cmaj7
+G7 Am7 Bm7b5 F#dim7 Dbmaj7 C9 Cm9 — plus negative/rejection cases for unplayable shapes),
+`typecheck`, `lint`, `build` all pass. Ran `music-theory-review` (extended per §34 to physical
+plausibility/fingering/barre realism, not just harmonic correctness): traced every domain module by
+hand against standard tuning and chord theory (tuning intervals, curated open shapes, barre
+full-range detection, chord-tone completeness rule, 9th-family tone ordering) and found them
+correct; the one real defect found was in ranking quality, not harmonic correctness (below). Ran
+`product-scope-review` (verdict: aligned — guitar stays inside the existing chord panel, the
+instrument selector is verified by construction never to touch selection/map/progression state, no
+DAW/theory-course/chatbot drift). Ran `release-check` (all four gates pass, no regressions in the
+pre-existing 366 tests).
+
+Manually exercised in a real browser (dev server + Playwright, English + Spanish + a 390px mobile
+viewport): switched Piano→Guitar without disturbing the selected/explored chord or map; selected C
+major and got the curated x32010 shape with diagram and TAB in exact agreement; used "Hear this
+voicing"; stepped through voicings with Previous/Next; selected G, F, Am, Cmaj7, G7, and Bm7b5
+directly from the map (Zoom 4) and confirmed each voicing's diagram/TAB/fingering were internally
+consistent and sounded the required chord tones; confirmed a Pro badge appears from the 3rd voicing
+onward; switched Guitar→Piano and confirmed the selected chord's `aria-label` was byte-identical
+before and after; verified Spanish translations (Guitarra/Posición abierta/Cejilla/Primera
+inversión/etc.) and mobile legibility. Zero console errors throughout. Dbmaj7 and C9 aren't reachable
+from C major's harmonic map (they're not diatonic/secondary/borrowed relationships in that key —
+correctly so, per Phase 8 §1's "harmonic map stays unchanged" and product identity as a harmony
+tool, not a free-form chord picker) — both are covered instead by the automated domain/integration
+test suite, which includes them explicitly in the representative chord list.
+
+**Bug found and fixed during live verification**: the initial ranking weights
+(`fingerCount * 5`, `mutedInteriorCount * 4`, `soundingStringCount * 1`) ranked a sparse 3-string F
+fragment (open A string plus only the top two strings fretted, with the D and G strings muted in
+between) above the standard 6-string F barre, because saving fingers outweighed a "string-skipping"
+penalty that was too weak — the top-ranked F voicing didn't read as "F" to a guitarist, even though
+every candidate involved was individually correct and playable per `evaluateCandidate`. This is
+exactly the class of bug isolated unit tests can't catch (each candidate was independently valid;
+only their relative ranking was wrong) and that live musician-facing review exists to catch.
+Rebalanced `ranking.ts` (`soundingStringCount * 2`, `fingerCount * 3`, `mutedInteriorCount * 10`) to
+properly implement the two documented-but-under-weighted ranking factors from product-spec §26
+("balanced distribution" and "awkward string skipping") — verified across F, G7, Bm7b5, C9, Dbmaj7,
+Cmaj7, Bb, and F#dim7 that recognizable shapes now surface without changing which shape wins for
+any curated chord (curated shapes always rank first regardless of score, so C/A/G/E/D/Am/Em/Dm were
+never affected). Added a regression test (`voicing.test.ts`) asserting F's top voicing sounds the
+full triad with zero muted-interior strings, so this can't silently regress.
+
+Known limitation, documented rather than hidden: the ranking formula rewards full/balanced string
+coverage, which occasionally surfaces a non-textbook inversion (e.g. Cmaj7's top-ranked shape rings
+the open low E string, giving a 1st-inversion 6-string voicing rather than the more commonly-taught
+x32000 with the low E muted). Every such voicing is musically correct and genuinely playable — this
+is a shape-preference nuance, not a wrong-notes bug — and is exactly the kind of thing a future
+"prefer textbook root-position when curated data doesn't already cover it" refinement could improve
+without any architecture change.
 
 ## Phase 9 — Bass representation
 - [ ] Bass fretboard, chord tones, one pattern (Free) vs multiple (Pro)

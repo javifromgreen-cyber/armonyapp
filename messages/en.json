@@ -54,6 +54,7 @@
       "relationshipToSource": "Relationship to {chord}",
       "addToProgression": "Add to progression",
       "hearChord": "Hear chord",
+      "instrument": "Instrument",
       "selectPrompt": "Select a chord on the map to see its details.",
       "additionalRelationships": "Also related as:"
     },
@@ -96,6 +97,35 @@
       "voicingCounter": "{current} of {total}",
       "suggestedFingering": "Suggested fingering",
       "hearThisVoicing": "Hear this voicing"
+    },
+    "guitar": {
+      "title": "Guitar",
+      "diagramAriaLabel": "Guitar chord diagram showing {notes}",
+      "openString": "Open string",
+      "mutedString": "Muted string",
+      "openPosition": "Open position",
+      "movableShape": "Movable shape",
+      "positionVoicing": "Fret {fret} position",
+      "fret": "Fret",
+      "fingering": "Fingering",
+      "suggestedFingering": "Suggested fingering",
+      "barre": "Barre",
+      "tab": "TAB",
+      "rootPosition": "Root position",
+      "inversion1": "1st inversion",
+      "inversion2": "2nd inversion",
+      "inversion3": "3rd inversion",
+      "hearThisVoicing": "Hear this voicing",
+      "previousVoicing": "Previous voicing",
+      "nextVoicing": "Next voicing",
+      "noSuitableVoicing": "No suitable voicing found",
+      "voicingCounter": "{current} of {total}",
+      "proBadge": "Pro"
+    },
+    "instrument": {
+      "label": "Instrument",
+      "piano": "Piano",
+      "guitar": "Guitar"
     }
   },
   "harmony": {

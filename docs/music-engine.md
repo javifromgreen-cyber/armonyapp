@@ -279,3 +279,70 @@ Fixes, all covered by regression tests:
   navigating can jump a full octave. This is a known v1 characteristic, not a bug: automatic
   voice-leading between voicings is explicitly deferred (product-spec Phase 7 §19), and the model
   retains full octave information so that future work remains possible without redesign.
+
+## Documented assumptions (Phase 8 — guitar representation)
+
+- **Standard tuning only, string 6 = low E to string 1 = high E** (`src/domain/instruments/guitar/tuning.ts`):
+  E2 A2 D3 G3 B3 E4. Every function derives open-string pitch from one tuning table, so an
+  alternate-tuning feature later only needs to swap that table in, not touch candidate generation,
+  playability, or ranking.
+- **Candidate search is anchored to 3 musically real shape families, not an arbitrary sliding
+  window** (`candidates.ts`): open position (frets 0-4, opens allowed), and movable E-shape/A-shape
+  windows (a 4-fret span starting at the root's fret on string 6 or string 5, no opens). A blind
+  0-12 slide would be both computationally wasteful and would generate shapes no guitarist would
+  recognize as a "position" — anchoring to real shape families keeps the search tractable (a few
+  hundred to ~1000 raw combinations per chord) while guaranteeing every candidate corresponds to
+  how a guitarist actually thinks about the neck.
+- **Barre detection uses the full numeric string range, not just the strings that sound at the
+  barre fret** (`playability.ts`'s `detectBarre`): a real barre finger physically touches every
+  string between the lowest and highest string sharing the minimum fret, even when a string inside
+  that range is fretted HIGHER by another finger. F major's standard 1-3-3-2-1-1 shape only
+  *sounds* at fret 1 on strings 6, 2, and 1 — but the barre is real and spans all 6 strings, with
+  strings 5/4/3 fretted higher by the other three fingers. Crediting a barre only for the
+  sounding-at-minimum-fret subset would have rejected this shape as needing more fingers than a
+  hand has. The full range must be entirely fretted (never open or muted) for a barre to be valid.
+- **Chord-tone completeness is keyed to tone count, not "always every tone"**
+  (`voicing.ts`'s `requiredToneIndexes`): 3-tone (triad) chords require root+3rd+5th, all three.
+  4-tone (7th/6th-family) chords require root+3rd+7th-or-6th; the 5th may be omitted (it carries
+  the least harmonic information and is routinely dropped in real guitar voicings). 5-tone
+  (9th-family) chords require root+3rd+7th+9th; the 5th may again be omitted. The 3rd and 7th/9th
+  are never optional — those are what make a chord's quality legible on the instrument. A voicing
+  that fails its required set is discarded, never fabricated with a missing tone silently accepted.
+- **Deterministic ranking, explicitly documented weights, no LLM** (`ranking.ts`): score starts at
+  100 and adds `openStringCount*4 + (rootPresent?15:0) + distinctToneCount*3 +
+  soundingStringCount*2`, then subtracts `fretSpan*6 + fingerCount*3 + baseFret*2 +
+  mutedInteriorCount*10`. The `soundingStringCount*2` and `mutedInteriorCount*10` weights implement
+  product-spec §26's "balanced distribution" (positive) and "awkward string skipping" (negative)
+  factors — these were originally under-weighted (`*1` and `*4` respectively, with `fingerCount` at
+  `*5`), which let a sparse, gap-riddled 3-string F fragment outrank the standard 6-string F barre
+  even though the fragment was individually correct and playable. Live browser verification (Phase
+  8 §35) caught this because it's a ranking-quality bug, not a wrong-notes bug — no unit test
+  written against a single candidate in isolation could have found it, since every candidate
+  involved passed `evaluateCandidate` correctly. Curated shapes are unaffected by any ranking
+  change, since they're always placed first regardless of score.
+- **Curated (hand-verified) shapes vs. algorithmic generation, sharing one output model**
+  (`curatedShapes.ts`): exactly the 8 chords product-spec §25 names as examples (C A G E D Am Em
+  Dm) use a small hand-verified table of canonical open shapes, cross-checked against
+  `chordToneTable` in tests. Every other root/quality is purely algorithmic. Both paths produce the
+  identical `GuitarVoicing` shape, so no caller needs to know or care which origin a voicing came
+  from.
+- **Free/Pro split**: the first 2 voicings by final rank are Free (curated shape always first when
+  one exists), the rest — up to a total cap of 5 — are Pro. Mirrors Phase 7.1's "first N Free, rest
+  Pro" rule. Pro voicings stay inspectable in the dev build (no enforcement) until Phase 11.
+- **Deduplication is exact-fret-signature only**, not fuzzy/near-duplicate matching — two
+  candidates are the same voicing if and only if every string's fret/mute/open state matches
+  exactly. This is deliberately simple and predictable rather than a similarity heuristic.
+- **No suitable voicing found is a real, honest empty state** (`guitarVoicingsFor` returns `[]`),
+  never a fabricated shape with missing or wrong tones — the UI shows a translated
+  "No suitable voicing found" message rather than guessing.
+- **Diagram nut-vs-position-marker threshold**: the diagram shows the nut (and starts numbering
+  from fret 1) when `baseFret <= 3` or the voicing has no fret span at all; otherwise it shows a
+  "Nfr" position label and starts the visible window at the voicing's own base fret — matching the
+  real chord-diagram convention where a diagram switches from "the open-position nut" to "a movable
+  position marker" once a shape is clearly up the neck.
+- **Known shape-preference nuance, not a correctness bug**: because ranking rewards full/balanced
+  string coverage, some non-curated maj7-family chords surface a 1st-inversion voicing that rings
+  every string (e.g. Cmaj7's top-ranked shape leaves the low E open, giving E-C-G-B-E rather than
+  the more commonly-taught x32000 with the low E muted) instead of the most "textbook" shape. Every
+  such voicing is musically correct, complete, and genuinely playable — this is a preference nuance
+  worth revisiting only if it proves confusing in practice, not a wrong-notes defect.
