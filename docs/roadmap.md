@@ -453,6 +453,29 @@ isn't a wrong-notes defect; it's the same class of shape-preference nuance docum
 Cmaj7, left as-is per the instruction to keep this pass focused and not chase every chord's
 "most iconic" shape individually.
 
+**Update (Phase 8.2):** the G7 trade-off above was exactly what this next pass fixed — see below.
+
+**Phase 8.2 canonical/basic voicing correction 2026-08-12 (user review):** the G7 trade-off flagged
+in Phase 8.1 conflicts with the Freemium philosophy — a canonical/basic shape must never sit behind
+Pro while unusual partial/inverted shapes are the Free defaults. Introduced an explicit small
+"canonical/basic guitar voicing" concept: `curatedShapes.ts`'s existing curated layer (already used
+for exactly this purpose for C/A/G/E/D/Am/Em/Dm/Cmaj7/F) gained one more entry, G7's classic open
+`320001` (root position), hand-verified against the chord formula. No new mechanism was built —
+this reuses the same curated-shape architecture from Phase 8/8.1 (bypasses ranking entirely, always
+ranks first, same `GuitarVoicing` model, same test-verification pattern), staying a small hand-picked
+layer rather than a chord dictionary. Verified all previously-curated shapes (C, G, D, A, E, Am, Em,
+Dm, F, Cmaj7) are byte-identical to before — this was a pure addition, not a rebalancing.
+
+Verified 2026-08-12: `npm run test` (500 tests, 41 files — up from 493; new coverage: `curatedShapes.test.ts`
+gained G7 to its cross-checked case list plus an explicit "returns undefined for a dominant7 chord
+whose root has no curated shape" negative case; `voicing.test.ts` gained a "Phase 8.2 canonical/basic
+voicing correction" describe block asserting 320001 exists/has G in the bass/is root position/has the
+correct G-B-D-F notes/is Free/ranks first, plus an explicit no-regression check that every
+previously-curated shape's fret pattern is unchanged), `typecheck`, `lint`, `build` all pass, zero
+regressions in the previously-passing 493. Ran `music-theory-review` (verdict: no correctness issues
+— 320001 hand-verified note-by-note against standard tuning, and the change is purely additive
+through the existing validated curated-shape pipeline).
+
 ## Phase 9 — Bass representation
 - [ ] Bass fretboard, chord tones, one pattern (Free) vs multiple (Pro)
 

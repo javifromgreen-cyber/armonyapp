@@ -152,6 +152,82 @@ describe("guitarVoicingsFor — curated shapes take priority when available", ()
     expect(first.rootPresent).toBe(true);
     expect(first.barre).toEqual({ finger: 1, fret: 1, strings: [6, 5, 4, 3, 2, 1] });
   });
+
+  it("G7's first voicing is the curated classic open shape (320001), root position", () => {
+    const voicings = guitarVoicingsFor(parseChordSymbol("G7"));
+    const [first] = voicings;
+    expect(first.origin).toBe("curated");
+    const frets = first.strings.map((s) =>
+      s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+    );
+    expect(frets).toEqual([3, 2, 0, 0, 0, 1]);
+  });
+});
+
+describe("guitarVoicingsFor — Phase 8.2 canonical/basic voicing correction", () => {
+  it("320001 exists in G7's catalogue, has G in the bass, is root position, and is Free", () => {
+    const chord = parseChordSymbol("G7");
+    const voicings = guitarVoicingsFor(chord);
+    const canonical = voicings.find((v) => {
+      const frets = v.strings.map((s) =>
+        s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+      );
+      return frets.join(",") === "3,2,0,0,0,1";
+    });
+    expect(canonical).toBeDefined();
+    expect(canonical!.inversion).toBe(0); // root position
+    expect(canonical!.rootPresent).toBe(true);
+    expect(canonical!.catalogue).toBe("free");
+
+    // Correct notes: G(root) B(3rd) D(5th) F(b7), G in the bass.
+    const soundingNotes = canonical!.strings
+      .filter((s) => s.pitch)
+      .map((s) => noteToPitchClass(s.pitch!.note));
+    const [root, third, fifth, seventh] = chordNotes(chord).map(noteToPitchClass);
+    expect(new Set(soundingNotes)).toEqual(new Set([root, third, fifth, seventh]));
+    const bass = canonical!.strings
+      .filter((s) => s.pitch)
+      .reduce((lowest, s) => (s.pitch!.midi < lowest.pitch!.midi ? s : lowest));
+    expect(noteToPitchClass(bass.pitch!.note)).toBe(root);
+  });
+
+  it("320001 ranks before G7's partial/inverted alternatives", () => {
+    const voicings = guitarVoicingsFor(parseChordSymbol("G7"));
+    const canonicalIndex = voicings.findIndex((v) => {
+      const frets = v.strings.map((s) =>
+        s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+      );
+      return frets.join(",") === "3,2,0,0,0,1";
+    });
+    expect(canonicalIndex).toBe(0); // curated shapes always rank first
+    // Every other returned voicing for G7 is a partial/inverted alternative —
+    // confirm the canonical shape isn't merely present but is the very first
+    // one a user sees.
+    expect(voicings[0].origin).toBe("curated");
+  });
+
+  it("previously-curated canonical shapes are unchanged by the Phase 8.2 addition", () => {
+    const expected: [string, (number | "x")[]][] = [
+      ["C", ["x", 3, 2, 0, 1, 0]],
+      ["G", [3, 2, 0, 0, 0, 3]],
+      ["D", ["x", "x", 0, 2, 3, 2]],
+      ["A", ["x", 0, 2, 2, 2, 0]],
+      ["E", [0, 2, 2, 1, 0, 0]],
+      ["Am", ["x", 0, 2, 2, 1, 0]],
+      ["Em", [0, 2, 2, 0, 0, 0]],
+      ["Dm", ["x", "x", 0, 2, 3, 1]],
+      ["F", [1, 3, 3, 2, 1, 1]],
+      ["Cmaj7", ["x", 3, 2, 0, 0, 0]],
+    ];
+    for (const [symbol, expectedFrets] of expected) {
+      const [first] = guitarVoicingsFor(parseChordSymbol(symbol));
+      expect(first.origin).toBe("curated");
+      const frets = first.strings.map((s) =>
+        s.state.status === "muted" ? "x" : s.state.status === "open" ? 0 : s.state.fret,
+      );
+      expect(frets).toEqual(expectedFrets);
+    }
+  });
 });
 
 describe("guitarVoicingsFor — Phase 8.1 ranking refinement", () => {

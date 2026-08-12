@@ -326,19 +326,24 @@ Fixes, all covered by regression tests:
   one for no reason a guitarist would endorse. Inversions remain fully valid and often still win
   on their own merits. Curated shapes are unaffected by any ranking change, since they're always
   placed first regardless of score.
-- **Curated (hand-verified) shapes vs. algorithmic generation, sharing one output model**
+- **CANONICAL/BASIC guitar voicing — a small curated layer, not a chord dictionary**
   (`curatedShapes.ts`): originally the 8 chords product-spec §25 names as examples (C A G E D Am
   Em Dm), each a canonical OPEN shape. Phase 8.1 §5 added two more after live verification showed
   the *generated* catalogue defaulting to a real but less-representative shape for two very common
   chords: Cmaj7 (`x32000`, root position — the generated catalogue's top pick left the low E
   ringing open, giving a 1st-inversion voicing instead) and F major (`133211`, root position, full
   barre — the generated catalogue's ranking favored smaller partial shapes over the shape every
-  guitarist calls "the F chord"). All 10 are cross-checked against `chordToneTable` in tests
+  guitarist calls "the F chord"). Phase 8.2 added an 11th entry, G7 (`320001`, root position), for
+  the same reason: the generated catalogue's Free picks were two compact partial/inverted shapes
+  while the classic open G7 sat in Pro — a canonical shape locked behind Pro directly conflicts
+  with the Freemium philosophy (Free must contain the musically obvious/common shape where one
+  strongly exists). All 11 are cross-checked against `chordToneTable` in tests
   (`curatedShapes.test.ts`) for correct chord tones AND correct root-in-bass. Every other
-  root/quality is purely algorithmic. Both paths produce the identical `GuitarVoicing` shape, so no
-  caller needs to know or care which origin a voicing came from. This set is deliberately kept
-  small — it exists only where a single shape is so standard that anything else would read as a
-  surprising default, not as a general substitute for the ranking system.
+  root/quality is purely algorithmic — this stays a small, deliberately curated layer, never a
+  substitute for the ranking/diversity system that covers the rest of the V1 catalogue. Both paths
+  produce the identical `GuitarVoicing` shape, so no caller needs to know or care which origin a
+  voicing came from. New entries are added only when live/product review identifies a chord whose
+  single obvious shape the generator isn't already surfacing as Free — not preemptively.
 - **Free/Pro split**: the first 2 voicings by final rank are Free (curated shape always first when
   one exists), the rest — up to a total cap of 5 — are Pro. Mirrors Phase 7.1's "first N Free, rest
   Pro" rule. Pro voicings stay inspectable in the dev build (no enforcement) until Phase 11.
@@ -366,13 +371,13 @@ Fixes, all covered by regression tests:
   "Nfr" position label and starts the visible window at the voicing's own base fret — matching the
   real chord-diagram convention where a diagram switches from "the open-position nut" to "a movable
   position marker" once a shape is clearly up the neck.
-- **Known shape-preference nuance, not a correctness bug** (updated Phase 8.1): the Cmaj7 case
-  originally noted here — the generated catalogue's top pick left the low E ringing open instead of
-  using the standard x32000 — was fixed in Phase 8.1 by curating x32000 directly (see above) rather
+- **Known shape-preference nuance, not a correctness bug** (updated Phase 8.2): the Cmaj7 and G7
+  cases originally noted here — the generated catalogue's Free picks left a canonical shape (x32000,
+  320001) sitting in Pro instead — were both fixed by curating the shape directly (see above) rather
   than by tuning weights alone, since curated shapes bypass ranking entirely and give the strongest
-  correctness guarantee. The general nuance still applies to OTHER non-curated chords: e.g. G7's
-  most iconic open shape (`320001`) currently lands in Pro rather than Free, because the ranking's
-  Free picks favor more compact partial voicings that score comparably well. Every such voicing is
-  musically correct, complete, and genuinely playable — this is a preference nuance worth revisiting
-  chord-by-chord (via further curation, per the same pattern) only if it proves confusing in
-  practice, not a wrong-notes defect.
+  correctness/Free-placement guarantee. The general nuance can still apply to OTHER non-curated
+  chords not yet reviewed. Every such voicing (before or after curation) is musically correct,
+  complete, and genuinely playable — this was always a shape-preference/catalogue-placement nuance,
+  never a wrong-notes defect — and the fix pattern is now established: identify via live/product
+  review, add one hand-verified curated entry, verify with `curatedShapes.test.ts` +
+  `voicing.test.ts`. Applied chord-by-chord as issues surface, not preemptively.
