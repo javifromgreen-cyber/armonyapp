@@ -100,14 +100,10 @@
     },
     "progression": {
       "title": "Progresión",
-      "bpmLabel": "BPM",
-      "timeSignatureLabel": "Compás",
-      "beats": "{count, plural, one {# tiempo} other {# tiempos}}",
       "chordTab": "Acorde",
       "progressionTab": "Progresión ({count})",
       "playButton": "Reproducir",
       "stopButton": "Detener",
-      "playDisabledHint": "Añade un acorde a la progresión para reproducirla",
       "nowPlaying": "Sonando ahora: {chord}"
     },
     "audio": {
@@ -124,7 +120,6 @@
       "inversion2": "Segunda inversión",
       "inversion3": "Tercera inversión",
       "openVoicing": "Disposición abierta",
-      "proBadge": "Pro",
       "voicingCounter": "{current} de {total}",
       "suggestedFingering": "Digitación sugerida",
       "hearThisVoicing": "Escuchar esta disposición",
@@ -132,6 +127,7 @@
     },
     "guitar": {
       "title": "Guitarra",
+      "fingeringDiagramHeading": "Diagrama de digitación",
       "diagramAriaLabel": "Diagrama de acorde de guitarra mostrando {notes}",
       "openString": "Cuerda al aire",
       "mutedString": "Cuerda silenciada",
@@ -152,11 +148,11 @@
       "nextVoicing": "Siguiente disposición",
       "noSuitableVoicing": "No se encontró una disposición adecuada",
       "voicingCounter": "{current} de {total}",
-      "proBadge": "Pro",
       "preparingSound": "Cargando sonido…"
     },
     "bass": {
       "title": "Bajo",
+      "fingeringDiagramHeading": "Diagrama de digitación",
       "fretboardAriaLabel": "Diapasón de bajo mostrando {notes}",
       "chordTone": "Nota del acorde: {interval}",
       "patternStep": "Paso {order}: {interval}",
@@ -178,7 +174,6 @@
       "noSuitablePattern": "No se encontró un patrón adecuado",
       "patternCounter": "{current} de {total}",
       "tab": "TAB",
-      "proBadge": "Pro",
       "preparingSound": "Cargando sonido…"
     },
     "instrument": {

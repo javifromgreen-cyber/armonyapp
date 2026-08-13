@@ -3,7 +3,6 @@ import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
 import type { InstrumentName } from "@/domain/instruments";
 import type { PlayablePitch } from "@/domain/instruments/playablePitch";
-import { buildProgressionSchedule } from "./scheduling";
 import { representativePitchesFor, representativeBassSteps } from "./instrumentVoicing";
 
 /**
@@ -376,11 +375,20 @@ export interface PlaybackHandlers {
  * state where the map says Guitar but the progression plays an unrelated
  * neutral sound). Guards against overlapping transports itself (Phase 6 §8)
  * by always clearing any prior schedule first — repeated Play presses can
- * never stack duplicate playback. Chords never overlap: each is released
- * ~8% early relative to the next one's start, giving a clean articulation
- * instead of pitches bleeding into each other (Bass's short note sequence
- * is spread within that same shortened window, via the shared
- * `scheduleInstrumentChord` helper `hearPath` also uses).
+ * never stack duplicate playback.
+ *
+ * Phase R3.4: uses the SAME simple, deterministic, fixed per-chord pacing
+ * as `hearPath` (`PATH_CHORD_GAP_SECONDS`/`PATH_CHORD_DURATION_SECONDS`)
+ * rather than BPM/time-signature/per-item-duration math — Armony's
+ * progression is a quick harmonic-route audition, not a rhythmic
+ * composition, so there is deliberately no tempo intelligence here (see
+ * `docs/product-spec.md` §16/§18's R3.4 revision). This is now, by design,
+ * the same underlying timing "Hear Path" uses on the exact same confirmed
+ * chords (`progression.items` IS the confirmed path, Phase R3.3) — the two
+ * controls remain because they serve different UI contexts (a quick replay
+ * anchored to the map vs. a Play/Stop control with per-chord highlighting
+ * on the visible progression strip), not because they behave differently
+ * musically.
  */
 export async function playProgression(
   progression: Progression,
@@ -390,29 +398,27 @@ export async function playProgression(
   await ensureAudioReady();
   stopProgression();
 
-  const schedule = buildProgressionSchedule(progression);
-  if (schedule.length === 0) return;
+  const items = progression.items;
+  if (items.length === 0) return;
 
   const voice = getInstrumentVoice(instrument);
   await voice.ready;
 
   const transport = Tone.getTransport();
 
-  for (const event of schedule) {
-    const soundingSeconds = event.durationSeconds * 0.92;
+  items.forEach((item, index) => {
     scheduleInstrumentChord(
       transport,
       voice.sampler,
-      event.chord,
+      item.chord,
       instrument,
-      event.startSeconds,
-      soundingSeconds,
-      (time) => Tone.getDraw().schedule(() => handlers.onChordStart(event.itemId), time),
+      index * PATH_CHORD_GAP_SECONDS,
+      PATH_CHORD_DURATION_SECONDS,
+      (time) => Tone.getDraw().schedule(() => handlers.onChordStart(item.id), time),
     );
-  }
+  });
 
-  const lastEvent = schedule[schedule.length - 1];
-  const endSeconds = lastEvent.startSeconds + lastEvent.durationSeconds;
+  const endSeconds = (items.length - 1) * PATH_CHORD_GAP_SECONDS + PATH_CHORD_DURATION_SECONDS;
   transport.schedule((time) => {
     Tone.getDraw().schedule(() => handlers.onFinish(), time);
     transport.stop();

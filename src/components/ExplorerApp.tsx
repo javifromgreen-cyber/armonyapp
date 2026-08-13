@@ -6,13 +6,7 @@ import { parseChordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import { currentEndpoint } from "@/domain/navigation";
 import type { InstrumentName } from "@/domain/instruments";
-import {
-  progressionFromPath,
-  clampBpm,
-  DEFAULT_BPM,
-  DEFAULT_TIME_SIGNATURE,
-  type TimeSignature,
-} from "@/domain/progression";
+import { progressionFromPath } from "@/domain/progression";
 import { HarmonicMap } from "./map/HarmonicMap";
 import { explorerReducer, initialExplorerState } from "./map/explorerState";
 import { MapLocalBack } from "./map/MapLocalBack";
@@ -70,13 +64,6 @@ export function ExplorerApp() {
     undefined,
     () => initialExplorerState(DEFAULT_CONTEXT, DEFAULT_CHORD),
   );
-  // BPM/time signature are the only progression state that ISN'T derived
-  // from `state.navPath` (Phase R3.3 §22/§33/§65) — tempo/meter are
-  // performance preferences orthogonal to harmonic content, so they
-  // deliberately survive Back/Reset/root-context changes rather than
-  // resetting alongside the path.
-  const [bpm, setBpmValue] = useState(DEFAULT_BPM);
-  const [timeSignature, setTimeSignature] = useState<TimeSignature>(DEFAULT_TIME_SIGNATURE);
   const [isFreeMode, setIsFreeMode] = useState(false);
   const [isPanelOpenOnMobile, setIsPanelOpenOnMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chord");
@@ -97,24 +84,10 @@ export function ExplorerApp() {
   // mutated state that could drift from it. See
   // `domain/progression/fromNavigationPath.ts` for why this alone gives
   // auto-root-insertion, confirm-appends, Back-removes, and root-change-
-  // resets for free, structurally.
-  const progression = useMemo(
-    () => progressionFromPath(state.navPath, bpm, timeSignature),
-    [state.navPath, bpm, timeSignature],
-  );
-
-  // BPM/time-signature edits mid-playback invalidate what's currently
-  // sounding (Phase 6 §8/§9) — stopping is the simplest reliable choice the
-  // brief explicitly allows.
-  function handleSetBpm(nextBpm: number) {
-    if (playback.isPlaying) playback.stop();
-    setBpmValue(clampBpm(nextBpm));
-  }
-
-  function handleSetTimeSignature(nextTimeSignature: TimeSignature) {
-    if (playback.isPlaying) playback.stop();
-    setTimeSignature(nextTimeSignature);
-  }
+  // resets for free, structurally. Phase R3.4: no BPM/time-signature state
+  // left to derive with — Armony's progression is a harmonic-route
+  // audition, not a rhythmic composition (see `docs/product-spec.md` §16).
+  const progression = useMemo(() => progressionFromPath(state.navPath), [state.navPath]);
 
   // Purely a preference switch (Phase R3.3 §8): never touches the current
   // chord, confirmed path, preview candidate, key/context, or the
@@ -232,7 +205,6 @@ export function ExplorerApp() {
       context={state.context}
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
-      bpm={progression.bpm}
       onHearChord={(chord) => playback.hearChord(chord, activeInstrument)}
       onHearPitches={playback.hearVoicing}
     />
@@ -241,8 +213,6 @@ export function ExplorerApp() {
   const progressionEditor = (
     <ProgressionEditor
       progression={progression}
-      onSetBpm={handleSetBpm}
-      onSetTimeSignature={handleSetTimeSignature}
       isPlaying={playback.isPlaying}
       playingItemId={playback.playingItemId}
       onPlay={() => playback.playProgression(progression, activeInstrument)}

@@ -76,6 +76,9 @@ export function GuitarVoicingPanel({ chord, onHearVoicing }: GuitarVoicingPanelP
       </h3>
 
       <div className="mt-2 rounded-xl border border-border bg-surface-raised p-3">
+        <h4 className="text-center text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
+          {t("fingeringDiagramHeading")}
+        </h4>
         <GuitarDiagram
           voicing={voicing}
           rootPitchClass={rootPitchClass}
@@ -96,11 +99,6 @@ export function GuitarVoicingPanel({ chord, onHearVoicing }: GuitarVoicingPanelP
           <div className="flex flex-col items-center">
             <span className="text-sm font-medium text-foreground">
               {t(positionLabelKey(voicing), { fret: voicing.baseFret })}
-              {voicing.catalogue === "pro" && (
-                <span className="ml-1.5 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                  {t("proBadge")}
-                </span>
-              )}
             </span>
             {inversionKey && (
               <span className="text-xs text-foreground-muted">{t(inversionKey)}</span>

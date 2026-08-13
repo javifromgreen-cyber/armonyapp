@@ -399,17 +399,15 @@ describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§1
   });
 });
 
-describe("playProgression — instrument-aware (Phase R3.3 §39)", () => {
+describe("playProgression — instrument-aware (Phase R3.3 §39), fixed pacing (Phase R3.4 §8)", () => {
   it("uses the selected instrument's sampler, never the neutral synth", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
     const progression = {
       items: [
-        { id: "1", chord: parseChordSymbol("C"), durationBeats: 4 },
-        { id: "2", chord: parseChordSymbol("G"), durationBeats: 4 },
+        { id: "1", chord: parseChordSymbol("C") },
+        { id: "2", chord: parseChordSymbol("G") },
       ],
-      bpm: 90,
-      timeSignature: "4/4" as const,
     };
     await player.playProgression(progression, "guitar", { onChordStart: () => {}, onFinish: () => {} });
     expect(Tone.Sampler.instances).toHaveLength(1);

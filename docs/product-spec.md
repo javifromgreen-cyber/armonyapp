@@ -30,6 +30,18 @@ top-N-truncated) and `docs/roadmap.md`'s Phase R3 for the implementation of this
 Phases 1–4 built the harmonic graph engine and an initial map UI; R3 is the phase that builds the
 progressive, path-based navigation experience described here on top of that existing engine.
 
+**Platform positioning (added R3.4 — a documentation clarification, not a product change to
+Armony itself):** Armony is one complete, standalone product — but it is also intended to become
+the FIRST app inside a future multi-app web platform focused on **music composition and music
+understanding**. Armony's own identity, scope, and UI above are unchanged by this; nothing here
+licenses scope creep into a DAW, sequencer, or theory course (§1's positioning holds exactly as
+written). What this clarifies is purely architectural/commercial framing for what comes after
+Armony: future mini-apps will live alongside Armony under one shared account/entitlement/billing
+system (§19/§25-26), rather than each being its own separately-purchased product. Future mini-apps
+are NOT designed, named, or scoped here — do not invent one. The future platform itself does not
+have a decided brand name yet; refer to it generically as "the platform" or "the music-app
+platform" in documentation until one is chosen — never assume "Armony" becomes that name.
+
 ## 1. Product Philosophy
 
 Three inseparable purposes, delivered through one interaction model (never three modes):
@@ -56,6 +68,26 @@ Web-only, fully responsive. No native iOS/Android/desktop apps. Two layers under
   starts a 72-hour full-access trial; no payment card is required to begin (§19). *(Revised R1:
   previously "requires a free account" — reworded since "free" is no longer a commercial tier
   name and that phrasing risked implying a permanent free plan.)*
+
+**Future platform shape (added R3.4, documentation only — do not build any of this yet):** the
+long-term intent is that this same account/domain eventually hosts more than one app, conceptually:
+
+```
+PLATFORM
+ → Home / Marketing
+ → Apps / Tools
+    → Armony
+    → (future app)
+    → (future app)
+ → Account
+```
+
+The exact navigation/design of that structure is deliberately undecided and will be designed later,
+per future app. R3.4 establishes only the PRINCIPLE that Armony must be able to live as one app
+among several sharing one account/entitlement/billing system (§19/§25-26) — not a plugin
+architecture, not placeholder routes/app IDs, not a marketplace, none of which should be built now
+(see `docs/roadmap.md`'s R3.4 entry and "Roadmap After Armony" section for the deliberately
+high-level future sequence).
 
 ## 3. Languages
 
@@ -226,7 +258,15 @@ multiple playable voicings — a chord never has one single shape.
 active product access, whether trialing or licensed, can inspect and use the COMPLETE catalogue;
 "basic" vs "extended" is a presentation/ranking grouping (what's shown first), not a commercial
 gate. The underlying code's `VoicingCatalogue` type still uses `"free" | "pro"` values as of this
-revision — see `docs/music-engine.md`'s migration note — pending a future non-behavioral rename.)*
+revision — see `docs/music-engine.md`'s migration note — pending a future non-behavioral rename.
+**Revised R3.4**: R1's "not a commercial gate" intent had not actually been fully carried into the
+UI — a visible "Pro" badge was still rendering next to individual voicings/shapes/patterns
+(Piano/Guitar/Bass) in the right panel. That badge is REMOVED (§14 of `docs/roadmap.md`'s R3.4
+entry) — no catalogue item shows any commercial label anymore, and no catalogue content was
+removed in the process (the full "basic"+"extended" set stays equally reachable to every user with
+active access). The internal `VoicingCatalogue` "free"/"pro" type values are retained as legacy
+internal metadata only — see `src/domain/instruments/piano/types.ts`'s doc comment — never
+influencing rendering, entitlement, or the trial.)*
 
 Future: filter by fretboard area, inversion, strings, root position, voicing characteristics.
 Never enumerate every mathematically possible fret combination — voicings are ranked by
@@ -267,30 +307,34 @@ this chord?
 
 ## 16. Progression Builder
 
-*(Revised R3.3 — supersedes the original "add/remove/reorder chords, transpose it" model. §63/§64's
-own instruction: remove/update any documentation still saying "only Add to progression changes the
-progression" — that rule no longer holds. See `docs/roadmap.md`'s R3.3 entry for the full
-rationale.)*
+*(Revised R3.3, then simplified further R3.4 — supersedes the original "add/remove/reorder chords,
+transpose it" model, and then supersedes R3.3's own "BPM/time signature stay adjustable" framing.
+§63/§64's own instruction: remove/update any documentation still saying "only Add to progression
+changes the progression" — that rule no longer holds. See `docs/roadmap.md`'s R3.3 and R3.4
+entries for the full rationale.)*
 
-Not a DAW — a lightweight, musically useful builder, and no longer an independently-edited list:
-**the progression automatically mirrors the confirmed exploration path** (§7/§30's preview/confirm
-model). Previewing a candidate never touches it; confirming a candidate appends it exactly once;
-Back removes exactly the item that corresponds to the confirmed step it undoes; changing the
-starting harmonic context/chord (the top-left control) resets the progression to just the new
-root. There is no manual "Add to progression" action — a musician's route through the harmonic map
-*is* their progression, without confirming the same musical decision twice.
+Not a DAW, and — as of R3.4 — explicitly not a sequencer either: **the progression automatically
+mirrors the confirmed exploration path** (§7/§30's preview/confirm model), rendered as just the
+confirmed chord list plus one Play control (§1's product positioning: Armony is fast harmonic
+exploration and understanding, not rhythmic composition). Previewing a candidate never touches it;
+confirming a candidate appends it exactly once; Back removes exactly the item that corresponds to
+the confirmed step it undoes; changing the starting harmonic context/chord (the top-left control)
+resets the progression to just the new root. There is no manual "Add to progression" action — a
+musician's route through the harmonic map *is* their progression, without confirming the same
+musical decision twice.
 
-Each progression item still carries: chord, duration in beats (the domain default, §16's original
-per-item metadata), order (== the confirmed path's order). Project has BPM and time signature —
-both remain user-adjustable and survive Back/Reset/root changes (tempo/meter are performance
-preferences, orthogonal to harmonic content). Users can: change BPM/time signature, play the
-progression. Manual per-item reorder/remove and whole-progression transpose are REMOVED (see §17)
-— once the progression's identity/order is derived from confirmed navigation, editing it
-independently would silently diverge from the harmonic route the user actually navigated; Back and
-the top-left harmonic-context control are the coherent ways to change it now.
+Each progression item is just `{chord}` — no duration-in-beats, no BPM, no time signature (all
+REMOVED in R3.4, not merely hidden; see §17/§18). A chord card's only job is to communicate the
+chord. Playback uses a simple, fixed, deterministic pacing (§18) — comfortable for quickly
+auditioning a route, never configurable rhythm. Manual per-item reorder/remove and
+whole-progression transpose were already REMOVED in R3.3 (see §17) — once the progression's
+identity/order is derived from confirmed navigation, editing it independently would silently
+diverge from the harmonic route the user actually navigated; Back and the top-left harmonic-context
+control are the coherent ways to change it now.
 
 Future architecture: sections, repetitions, verse/chorus, arrangement blocks, mini-sequencer
-behavior — not built yet.
+behavior, tempo/rhythm control — belongs to a DIFFERENT kind of tool, not Armony (§1). If a future
+platform app wants that, it is a separate app, not a redesign of Armony into one.
 
 ## 17. Transposition
 
@@ -305,7 +349,8 @@ context rather than relabeling already-computed chords — out of scope for this
 ## 18. Audio
 
 *(Revised R3.3 — "neutral harmonic playback" as the primary map/preview sound is superseded by a
-GLOBAL instrument selection; see §30 and `docs/roadmap.md`'s R3.3 entry.)*
+GLOBAL instrument selection; see §30 and `docs/roadmap.md`'s R3.3 entry. Revised again R3.4: no
+BPM/tempo control exists anymore — progression playback timing is described below.)*
 
 One global selected instrument (Piano/Guitar/Bass) drives BOTH of these, always through that
 instrument's real sampled sound (Phase R2), never a generic synth:
@@ -327,32 +372,51 @@ Web Audio API and/or Tone.js. Sample-based instrument sounds (Phase R2) plus a l
 synth kept only as an internal fallback — correctness of pitch, timing, voicing, and responsiveness
 matter more than realism. Avoid expensive external audio services.
 
+**Progression playback timing (Phase R3.4):** with BPM/time signature removed from the product
+(§16), the bottom Play control uses a simple, fixed, deterministic per-chord pacing — the same
+pacing "Hear Path" already used for map/path audition — never tempo intelligence, never a
+configurable rhythm. Both controls remain (§9's review): Hear Path is a quick replay anchored next
+to the map; Play is a Play/Stop control with a "now playing" highlight on the visible progression
+strip. They now share the same underlying timing by design, kept as two controls because they
+serve different UI contexts, not because they sound different.
+
 ## 19. The 72-Hour Trial
 
-*(Revised R1 — replaces the previous permanent "Free Plan" section. There is no permanent free
-tier: see §25 for the full commercial model.)*
+*(Revised R1, then R3.4 — R1 replaced the previous permanent "Free Plan" section; R3.4 makes
+explicit that the trial is PLATFORM-WIDE, not Armony-only, now that Armony is documented as the
+first app in a future multi-app platform — §0/§2. There is no permanent free tier: see §25 for the
+full commercial model.)*
 
-Every newly registered user gets exactly **72 hours of complete product access**, starting at
-registration. No payment card is required to begin. The trial is genuinely the full product, not a
-crippled demo — the purpose is "use the real product and decide whether it's valuable enough to
-keep," so nothing about the core experience is artificially withheld during those 72 hours.
+Every newly registered user gets exactly **72 hours of full access to the entire platform**,
+starting at registration — not 72 hours of Armony specifically. No payment card is required to
+begin. The trial is genuinely the full product, not a crippled demo — the purpose is "use the real
+product and decide whether it's valuable enough to keep," so nothing about the core experience is
+artificially withheld during those 72 hours, in Armony or in any other platform app that exists at
+the time.
 
-Trial access includes: account; all four Zoom/harmonic-depth levels; the complete
-harmonic-navigation system; all three instruments (Guitar, Bass, Piano); the complete voicing/
-position/pattern catalogue for each instrument (not just the "basic" grouping — see §13–15); core
-chord info and contextual explanations; harmonic playback and instrument/pattern playback;
-progression builder (BPM, time signature, durations, playback, transposition); projects, once
-persistence exists (§10A/§10B of `docs/roadmap.md`); PDF exports; Guitar TAB exports; Bass TAB
-exports; other approved export formats (§20). Depth of exploration and catalogue completeness are
-never rationed during an active trial.
+Trial access includes, for Armony specifically: account; all four Zoom/harmonic-depth levels; the
+complete harmonic-navigation system; all three instruments (Guitar, Bass, Piano); the complete
+voicing/position/pattern catalogue for each instrument (not just the "basic" grouping — see
+§13–15, and R3.4's removal of any remaining item-level commercial badge — §14 of that revision);
+core chord info and contextual explanations; harmonic playback and instrument/pattern playback; the
+auto-synced progression and its playback (§16, revised R3.4 — no BPM/rhythm concepts to gate
+either way); projects, once persistence exists (§10A/§10B of `docs/roadmap.md`); PDF exports;
+Guitar TAB exports; Bass TAB exports; other approved export formats (§20) — **and equally, the
+complete functionality of every other platform app that exists at that time.** Depth of
+exploration, catalogue completeness, and app access are never rationed feature-by-feature during an
+active trial — there is no item-level gating anywhere on the platform (§26).
 
 ## 20. After the Trial, and Export Policy
 
-When the 72 hours elapse: the account, profile, and all saved projects/musical work remain intact
-— **nothing is deleted**. The user can still log in. Full product usage (harmonic navigation
-beyond inspection, catalogue access, playback of new material, etc.) and exports become locked,
-and the user is invited to activate an annual license (§25). Reactivating an annual license
-restores full access immediately, to the same account and the same saved work.
+*(Revised R3.4 — explicit about platform-wide lock/unlock, not Armony-only.)*
+
+When the 72 hours elapse: the account, profile, and all saved projects/musical work — in Armony and
+any other platform app — remain intact, **nothing is deleted**. The user can still log in. Full
+product usage across the WHOLE platform (harmonic navigation beyond inspection in Armony, catalogue
+access, playback of new material, any other app's functionality, etc.) and exports become locked
+until the user activates the annual Platform Pro license (§25). Reactivating Platform Pro restores
+full access immediately, across every platform app, to the same account and the same saved work —
+never a per-app reactivation.
 
 **Exports** (Progression PDF; a useful chord/instrument PDF; Piano representation PDF; Guitar
 diagram/TAB PDF; Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text; other formats added later)
@@ -378,7 +442,9 @@ rest of the product (§26): available while `trialing` or `active`; projects and
 never deleted on `expired`, but creating/editing may be locked until the account reactivates.
 Enforced through the central configurable entitlement system (§26), not scattered checks. (Whether
 a numeric project-count cap exists for an active license, if any, is a decision for the phase that
-implements enforcement — `docs/roadmap.md`'s Phase 11 — not decided in this revision.)
+implements enforcement — `docs/roadmap.md`'s Phase 11 — not decided in this revision.) *(Note
+added R3.4: account/data retention on `expired` — §20's "nothing is deleted" — is a platform-level
+principle, not specific to Armony's own projects; any future app's data follows the same rule.)*
 
 ## 23. Authentication
 
@@ -386,7 +452,10 @@ v1 minimum: email/password, email verification, password reset. Google OAuth des
 straightforward. Apple login not required for v1. Onboarding asks **primary instrument**
 (Guitar/Bass/Piano) and **main goal** (Explore harmony / Compose / Understand progressions / All
 of the above); store these preferences. Registration is also the moment the 72-hour trial (§19)
-starts — `trial_started_at` is set server-side at account creation, never client-derived.
+starts — `trial_started_at` is set server-side at account creation, never client-derived. *(Note
+added R3.4: this account is intended to be the PLATFORM account, not an Armony-specific one — see
+§0/§2 — though nothing about the login flow itself changes; still not implemented as of R3.4, see
+§26's scope boundary.)*
 
 ## 24. Marketing Consent
 
@@ -397,21 +466,30 @@ to marketing email. Explicit opt-in checkbox. GDPR/EU-friendly by design.
 
 *(Fully revised R1 — replaces the previous permanent Free/Pro-Annual/Pro-Lifetime three-tier
 model. That model, including the Lifetime license, is obsolete and must not be reintroduced without
-another deliberate spec revision.)*
+another deliberate spec revision. Revised again R3.4 to make explicit that this is a
+PLATFORM-LEVEL model, not an Armony-specific one — Armony is the first app under it, not a
+separately-sold product; see §0/§2.)*
 
 ```
-REGISTER → 72-HOUR FULL TRIAL → ANNUAL PAID LICENSE REQUIRED
+REGISTER → 72-HOUR FULL-PLATFORM TRIAL → ANNUAL PLATFORM PRO REQUIRED
 ```
 
-- **Trial**: 72 hours of complete product access, starting at registration, no payment card
-  required (§19).
-- **Annual license**: the only ongoing paid product. **Price not yet decided — do not display or
-  hard-code a price anywhere until a decision is made and this section is updated with it.** (The
-  previous €34.99/year figure was tied to the now-obsolete three-tier model and should not be
-  treated as a placeholder or default.)
-- **There is no Lifetime license.** There is no permanent free tier. Annual licenses renew yearly;
-  behavior on cancellation/non-renewal (grace period, exact `past_due`/`canceled` handling) is a
-  decision for the phase that implements billing (`docs/roadmap.md`'s Phase 12), not decided here.
+- **Trial**: 72 hours of complete access to the entire platform (every app that exists at the
+  time, Armony included), starting at registration, no payment card required (§19).
+- **Platform Pro (annual)**: the only ongoing paid product — ONE subscription that grants access to
+  the platform's complete app catalogue, not a per-app purchase. **Price not yet decided — do not
+  display or hard-code a price anywhere until a decision is made and this section is updated with
+  it.** (The previous €34.99/year figure was tied to the now-obsolete three-tier model and should
+  not be treated as a placeholder or default.)
+- **There is no Lifetime license, no permanent free tier, no app-by-app purchase, and no
+  individually-priced "Pro feature" within any app** (§26 makes the "no item-level gating" rule
+  explicit). Annual licenses renew yearly; behavior on cancellation/non-renewal (grace period,
+  exact `past_due`/`canceled` handling) is a decision for the phase that implements billing
+  (`docs/roadmap.md`'s Phase 12), not decided here.
+- **Future apps are included automatically.** A valid Platform Pro entitlement grants access to
+  whatever apps exist in the platform's catalogue at any given time — adding a new mini-app later
+  must not require a new SKU, a new entitlement flag, or a separate purchase flow. See §26's
+  "platform-level, not per-app" entitlement design.
 
 Naming note: the UI concept sometimes called "Free Mode" (§5/§6 — no locked tonal key) is
 UNRELATED to this commercial model and predates it; it must not be confused with the removed
@@ -419,28 +497,53 @@ commercial "Free" tier. Consider renaming that UI concept later (candidates: "Op
 "Unlocked Key", "No Fixed Key") if the shared word "free" proves confusing in practice — do not
 rename casually without reviewing current i18n/UI implications first.
 
+Second, unrelated naming note (R3.4): "Platform Pro" (this section) is a FUTURE ACCOUNT-LEVEL
+commercial plan — the only kind of "Pro" that legitimately exists in this product going forward.
+It must never be confused with, or used to justify reintroducing, ITEM-LEVEL "Pro" labels on
+individual catalogue entries (a specific Guitar shape, Bass pattern, Piano voicing, a Depth level,
+a harmonic relationship, a single feature) — that model is obsolete and was removed from the UI in
+R3.4 (§14 of that revision; see §13's note above). "Pro" appearing anywhere in the product must
+always mean the account's platform-wide entitlement, never a per-item unlock.
+
 ## 26. Billing and Entitlements
 
-Stripe (Checkout) unless a compelling reason otherwise, for the single Annual license product.
+*(Revised R3.4 — entitlement is explicitly PLATFORM-LEVEL: one account-wide state, never a
+per-app or per-feature flag. This section documents the intended design; none of it is implemented
+yet — see §28's scope boundary.)*
+
+Stripe (Checkout) unless a compelling reason otherwise, for the single annual Platform Pro product.
 Secure webhook handling, server-side entitlement updates, idempotent webhook processing, billing
 status. Never trust client-side payment/trial state — entitlement state is always written
 server-side. Never hard-code secrets or Stripe price IDs — environment variables only.
 
-**Central entitlement system** — never scatter `if (user.plan === "pro")` or ad-hoc trial-timer
-checks through the app. One module is the single source of truth for account access, minimally
-modeling these states:
+**Central, platform-level entitlement system** — never scatter `if (user.plan === "pro")` or
+ad-hoc trial-timer checks through the app, and never model entitlement as a set of per-app flags
+like `armony_pro`/`future_app_2_pro`/`future_app_3_pro`. One module is the single source of truth
+for the account's PLATFORM access, minimally modeling these states:
 
-- `trialing` — within the 72-hour window from `trial_started_at`.
-- `active` — a currently-valid annual license.
-- `expired` — trial elapsed with no active license, or a license that lapsed.
+- `trialing` — within the 72-hour window from `trial_started_at`; grants full access to every
+  platform app, Armony included.
+- `active` — a currently-valid annual Platform Pro license; grants full access to every platform
+  app, Armony included — the same access as `trialing`, just not time-limited.
+- `expired` — trial elapsed with no active license, or a license that lapsed; platform apps become
+  locked (§20) until entitlement becomes `active` again. Account/data is never deleted on
+  `expired`.
 - Reserved for later billing nuance, not required to implement yet: `past_due`, `canceled`, etc.
 
 That state answers named capability questions — e.g. `canUseApp`, `canSaveProjects`, `canExport` —
-never a scattered `user.plan === "..."` string check. See `docs/architecture.md`'s Entitlements
-section for the concrete module shape. (Depth/catalogue-specific entitlements like the previous
-`canAccessZoom3`/`canAccessFullVoicings` no longer apply — see §9 and §13–15: those are not
-gated behind a commercial tier at all anymore, only behind whether the account currently has
-active access.)
+never a scattered `user.plan === "..."` string check, and never a per-app variant of those
+capability names. See `docs/architecture.md`'s Entitlements section for the concrete module shape.
+(Depth/catalogue-specific entitlements like the previous `canAccessZoom3`/`canAccessFullVoicings`
+no longer apply — see §9 and §13–15: those are not gated behind a commercial tier at all anymore,
+only behind whether the account currently has active PLATFORM access. R3.4 additionally confirms
+there is no item-level "Pro" gating left anywhere in Armony's UI to even accidentally wire up to
+this system — see §14 of `docs/roadmap.md`'s R3.4 entry.)
+
+**Scope boundary (R3.4 §28):** this section documents the intended design only. Registration,
+login, account UI, a trial countdown/timer, Supabase, Stripe, annual billing, entitlement
+enforcement, and locked screens are NOT implemented as of R3.4 — they belong to a future
+"Platform Foundation" phase (see `docs/roadmap.md`'s "Roadmap After Armony"), built once, shared by
+every app rather than rebuilt per app.
 
 ## 27. Technical Principles
 

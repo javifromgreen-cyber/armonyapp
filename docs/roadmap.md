@@ -983,6 +983,124 @@ without a very strong reason. If per-item duration control turns out to matter i
 clean way to reintroduce it is folding it into the SAME reducer transaction that mutates `navPath`
 (so it can never desync structurally), not a second independent reducer.
 
+## Phase R3.4 — Armony product closure + platform positioning
+
+- [x] Simplify the bottom Progression UI to just the confirmed chord list + one Play control — no
+      BPM, no time signature, no per-chord duration/"beats" label, no reorder/remove/transpose
+      controls (those were already removed in R3.3; R3.4 removes the remaining rhythm-composition
+      concepts BPM/time-signature/duration entirely, not just their UI)
+- [x] Progression playback uses simple, fixed, deterministic pacing (the same pacing "Hear Path"
+      already used) through the global selected instrument — no tempo intelligence, no rhythm
+      controls exposed
+- [x] Reviewed and kept both Hear Path and Progression Play despite now sharing identical timing —
+      different UI contexts (quick map-anchored replay vs. Play/Stop with per-chord highlight on
+      the visible strip), documented explicitly rather than silently duplicated
+- [x] Guitar and Bass panels each gain a clear "Fingering diagram"/"Diagrama de digitación" heading
+      directly above their visual, establishing a beginner-readable section hierarchy — no shapes/
+      patterns/voicings changed, explanatory UI only
+- [x] Removed the last remaining visible item-level "Pro" badge (next to individual Guitar shapes/
+      Piano voicings/Bass patterns) — searched the whole app for legacy commercial copy (Pro, Free,
+      Premium, Upgrade, Locked); confirmed all remaining matches are either legitimate ("Free mode"
+      — a tonal concept unrelated to commercial tiers) or internal domain metadata never rendered
+- [x] Confirmed catalogue content itself is untouched — every previously-available Piano voicing,
+      Guitar shape, and Bass pattern remains equally reachable; only the commercial presentation
+      was removed
+- [x] Internal `VoicingCatalogue` "free"/"pro" domain metadata deliberately RETAINED (not a risky
+      rewrite) but documented as legacy, never influencing rendering/entitlement/trial/Platform Pro
+- [x] Documented Armony as the first app in a future multi-app platform for music composition and
+      understanding — platform name undecided, never assumed to be "Armony"; no future mini-apps
+      invented, no plugin architecture/placeholder routes/marketplace built
+- [x] Documented the definitive platform-wide commercial model: register → 72-hour full-PLATFORM
+      trial (not Armony-only) → annual Platform Pro required, granting access to ALL platform apps
+      (present and future) as one subscription — no per-app purchases, no item-level paid features,
+      no Lifetime access, no price decided/hard-coded
+- [x] Documented that trial/Platform Pro both resolve to one platform-level entitlement state
+      (`trialing`/`active`/`expired`) — explicitly not per-app flags (`armony_pro`, etc.)
+- [x] Documented that account/data is retained (never deleted) when the trial/entitlement expires —
+      access locks across the whole platform until entitlement becomes active again
+- [x] Confirmed NO auth/login/account UI/trial countdown/Supabase/Stripe/billing/entitlement
+      enforcement/persistence was implemented — documentation only, per the phase's explicit scope
+      boundary
+
+This was the **final Armony-only refinement**, prompted by the user personally reviewing R3.3 in
+Vercel and closing out three remaining product rough edges before moving toward shared platform
+infrastructure: the Progression UI still read as a mini-sequencer (BPM/time-signature/duration
+controls a musician exploring harmony doesn't need — product positioning, §1/§2 of the governing
+spec, is FAST HARMONIC EXPLORATION AND UNDERSTANDING, not rhythmic composition); the Guitar/Bass
+diagrams lacked a beginner-readable label explaining what they show; and a legacy "Pro" badge from
+the pre-R1 permanent-tier business model was still visibly rendering next to individual catalogue
+items despite R1 having already declared that model obsolete in principle. Separately, this phase
+formally documents (without implementing) that Armony's future commercial container is a
+platform-wide account/trial/entitlement system, not something built and owned by Armony alone.
+
+Also found and fixed a genuine documentation defect while writing this entry: `docs/architecture.md`
+had a stray duplicated sentence fragment ("interaction changes; no new UI system was introduced.")
+orphaned at the end of the R3.3 deviation entry from an earlier editing artifact — removed, and the
+surrounding paragraph (which had described Hear Path/Progression Play as using genuinely different
+BPM-based vs. fixed timing) updated to reflect that R3.4 supersedes that distinction.
+
+Verified 2026-08-13: `npm run test` (676 tests, down from 689 — net reduction from deleting
+`scheduling.ts`/`scheduling.test.ts` and trimming `progression.test.ts`/`fromNavigationPath.test.ts`
+for the removed BPM/time-signature/duration fields, more than offset by updated coverage
+elsewhere), `npx tsc --noEmit`, `npm run lint`, `npm run build` all pass with zero regressions.
+`music-theory-review`: confirmed as a regression check only (no music-engine changes expected or
+made) — harmonic territories/classifier/completeness untouched (`git diff` empty against R3.3 for
+`src/domain/navigation/harmonicTerritory.ts`/`harmonicCharacter.ts`); Piano voicings, Guitar shapes/
+TAB, and Bass patterns/TAB all unchanged (zero diff under `src/domain/instruments/**` except the
+`VoicingCatalogue` doc-comment rewrite, which changes no runtime behavior); confirmed removing the
+"Pro" badges did not remove any catalogue item (voicing/shape/pattern counts and generation logic
+untouched). `product-scope-review`: verdict aligned — the bottom progression now reads as a route
+(chord list + Play), not a DAW/sequencer; a beginner can identify the Guitar/Bass diagrams via their
+new heading; all item-level Pro/Free/Premium labels confirmed gone via full-repo search; catalogue
+content confirmed intact; Armony confirmed clearly documented as one app within a future platform;
+the 72-hour trial confirmed clearly platform-wide, not Armony-only, in the updated product-spec
+text; Platform Pro confirmed documented as granting ALL apps, never a per-app entitlement; confirmed
+no auth/billing/persistence code was written. `release-check`: confirmed no R4 export work, no
+auth, no Supabase, no Stripe, no trial timer, no new mini-app, and no unintended harmonic-engine
+changes began.
+
+Live-browser verification (Playwright, desktop 1440×900 + mobile 390×844, English + Spanish):
+progression strip shows only chord cards (chord name, no duration badge) plus one Play/Stop button
+— no BPM field, no time-signature select, no "4 beats"/"4 tiempos" text anywhere; building
+C → Am → Dm → G7 automatically synced the strip with no manual action at any step; switching the
+global instrument between Piano/Guitar/Bass and pressing Play produced audibly/network-verifiably
+different sample requests for the same confirmed chords, without altering the confirmed
+progression; Back correctly removed the matching progression item down to (never past) the root at
+every step; preview never touched the progression while confirm always appended exactly once
+(unchanged from R3.3, re-verified); the Guitar panel showed "Fingering diagram"/"Diagrama de
+digitación" directly above the chord diagram in both languages, with position/inversion info,
+suggested fingering, TAB, and "Hear this voicing" all still present and in order; the Bass panel
+showed the equivalent heading above its fretboard visual with pattern/TAB/fingering/"Hear this
+pattern" intact; opened multiple Guitar voicings (open, movable/barre, inversions) and multiple
+Bass patterns and confirmed zero visible "Pro" badges anywhere while the same total voicing/pattern
+counts as before remained reachable via the previous/next navigator; zero console errors throughout.
+
+## Roadmap After Armony
+
+*(Recorded R3.4 §43 — documentation only, no implementation begins from this section. Armony's own
+core product is considered functionally closed as of R3.4; see the entry above for what "closed"
+means concretely. Phase R4 below remains a legitimate, still-unstarted Armony-specific phase — this
+section does not cancel it, it records the broader future arc it sits within.)*
+
+The next high-level direction, once resumed, is a shared **Platform Foundation** — built once,
+reused by every app rather than rebuilt per app:
+
+- a shared website shell (marketing Home/Features/Pricing/FAQ + the app catalogue/navigation
+  described in `docs/product-spec.md` §2's "future platform shape");
+- account/authentication (§23);
+- the 72-hour full-platform trial (§19, already documented as platform-wide, not Armony-only);
+- one shared, platform-level entitlement system (§26 — `trialing`/`active`/`expired`, never
+  per-app flags);
+- project/data persistence, scoped appropriately once real accounts exist (§22);
+- annual Platform Pro billing (§25-26), granting access to the platform's complete app catalogue as
+  one subscription.
+
+Only after that foundation exists does it make sense to design future mini-apps individually — this
+document deliberately does not name, scope, or invent any of them now (§17-19 of the governing
+spec). Phase R4 (Export system, below) and any other remaining Armony-specific polish may be
+revisited before or after Platform Foundation, depending on future direction — nothing here commits
+to an order between them.
+
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
       Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text

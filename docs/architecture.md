@@ -52,12 +52,17 @@ components from accumulating hidden harmonic rules.
 
 ## Entitlements
 
-**Revised R1** — replaces the previous permanent `plan: "free" | "pro"` model
-(`docs/product-spec.md` §25/§26). There is no permanent Free tier and no Lifetime license; access
-is governed by the 72-hour trial and a single Annual license.
+**Revised R1, then R3.4** — R1 replaced the previous permanent `plan: "free" | "pro"` model
+(`docs/product-spec.md` §25/§26); R3.4 makes explicit that this entitlement is PLATFORM-LEVEL, not
+Armony-specific — Armony is documented as the first app in a future multi-app platform
+(`docs/product-spec.md` §0/§2), so this module (once built) must model one account-wide
+`trialing`/`active`/`expired` status shared by every platform app, never a per-app flag like
+`armony_pro`/`future_app_2_pro`. There is no permanent Free tier and no Lifetime license; access is
+governed by the 72-hour full-platform trial and a single annual Platform Pro license. **Not yet
+implemented as of R3.4** — this section documents the intended shape only.
 
-A single module (`src/domain/entitlements`) maps an account's entitlement **status** to a typed
-capability object:
+A single module (`src/domain/entitlements`) maps an account's PLATFORM entitlement **status** to a
+typed capability object:
 
 ```ts
 type EntitlementStatus = "trialing" | "active" | "expired"; // + reserved for later: "past_due" | "canceled"
@@ -326,8 +331,84 @@ flatten that back into one-node-per-edge.
     rather than refactored, since it's still correct, low-risk, and out of this phase's stated
     scope. `music-theory-review`/`product-scope-review` confirmed §70's question (is "Hear Path"
     now redundant with "Progression Play"?) has a real answer, not just "keep both by default":
-    Hear Path always uses a fixed quick per-chord gap (exploratory pacing, instrument-aware since
-    this same phase) while Progression Play uses real BPM/time-signature/per-item-duration timing
-    (`buildProgressionSchedule`) — a quick route-check vs. a tempo-accurate performance of the same
-    chords, genuinely different purposes, not redundant.
-    interaction changes; no new UI system was introduced.
+    at the time of R3.3, Hear Path used a fixed quick per-chord gap (exploratory pacing,
+    instrument-aware since this same phase) while Progression Play used real
+    BPM/time-signature/per-item-duration timing (`buildProgressionSchedule`) — a quick route-check
+    vs. a tempo-accurate performance of the same chords, genuinely different purposes, not
+    redundant. **Superseded by R3.4** (see below) — BPM/time signature were removed entirely, and
+    Progression Play now uses the SAME fixed pacing as Hear Path; both controls are kept anyway,
+    now for UI-context reasons rather than timing-model reasons.
+- **R3.4: Armony product closure — progression simplified to a chord list, Guitar/Bass beginner
+  headings, item-level "Pro" badge removed, platform vision documented.** Prompted by the user
+  personally testing the deployed R3.3 preview and declaring this the final Armony-only refinement
+  before the product moves toward shared platform infrastructure. Four independent changes:
+  - **Progression UI stripped to chord-list + Play.** `src/domain/progression/types.ts`'s
+    `Progression`/`ProgressionItem` lose `bpm`, `timeSignature`, and `durationBeats` entirely — not
+    hidden, deleted from the type. `fromNavigationPath.ts`'s `progressionFromPath(navPath)` drops
+    its `bpm`/`timeSignature` parameters accordingly. `src/domain/progression/progression.ts` is
+    trimmed further to just `DEFAULT_BPM` (repurposed — see below); `MIN_BPM`/`MAX_BPM`/
+    `DEFAULT_TIME_SIGNATURE`/`DEFAULT_DURATION_BEATS`/`clampBpm` are deleted, genuinely unreachable
+    once nothing reads a user-adjustable BPM/time-signature/duration anymore (confirmed via
+    `git diff`/grep before deletion, same discipline as R3.3's progression-function cleanup).
+    `src/audio/scheduling.ts` (`buildProgressionSchedule`/`progressionDurationSeconds`/
+    `secondsPerBeat`) is deleted outright — nothing computes a BPM-derived schedule anymore.
+    `ExplorerApp.tsx` drops its `bpm`/`timeSignature` `useState` and the `handleSetBpm`/
+    `handleSetTimeSignature` handlers entirely. `ProgressionChordCard.tsx` renders only the chord
+    symbol (no "X beats" label); `ProgressionEditor.tsx` renders the chord-card strip plus a single
+    Play/Stop button — no BPM input, no time-signature select — and the button's disabled-when-
+    empty branch is removed too, since `progression.items` can no longer legitimately be empty
+    (`navPath` always has ≥1 step, unchanged since R3).
+  - **Progression playback: fixed pacing, not BPM math.** `src/audio/player.ts`'s
+    `playProgression` no longer calls `buildProgressionSchedule` — it schedules
+    `progression.items` directly through the same `scheduleInstrumentChord` helper `hearPath`
+    already used, with the SAME `PATH_CHORD_GAP_SECONDS`/`PATH_CHORD_DURATION_SECONDS` constants.
+    This means Hear Path and Progression Play are now, by construction, playing the identical
+    chord sequence at the identical pacing through the identical instrument — reviewed explicitly
+    in `product-scope-review` (§9 of the governing spec) and kept as two controls anyway because
+    they serve different UI contexts (a quick replay anchored to the map vs. a Play/Stop control
+    with per-chord highlighting on the visible progression strip), not because they behave
+    differently musically anymore. `DEFAULT_BPM` (90) survives as a plain constant, repurposed as
+    the fixed tempo reference for Bass's "Hear this pattern" step timing (an exact-playback,
+    instrument-specific control, unrelated to the removed progression-level BPM) —
+    `ChordContextPanel.tsx`'s bass step-timing calculation now reads this constant directly instead
+    of a `bpm` prop threaded from the (now nonexistent) progression BPM state; this preserves the
+    exact same 90bpm-equivalent timing "Hear this pattern" already defaulted to, so it's a
+    state-plumbing simplification, not an audible behavior change for anyone who never touched the
+    removed BPM field.
+  - **Guitar/Bass beginner-clarity headings.** `GuitarVoicingPanel.tsx` and `BassPatternPanel.tsx`
+    each gain a small `<h4>` heading ("Fingering diagram" / "Diagrama de digitación", new
+    `app.guitar.fingeringDiagramHeading`/`app.bass.fingeringDiagramHeading` i18n keys) directly
+    above their respective diagram/fretboard visual, establishing the section hierarchy the
+    governing spec asked for (instrument title → fingering diagram heading → visual → position/
+    inversion info → suggested fingering → TAB → "Hear this voicing/pattern"). Piano's keyboard
+    visual is self-evidently a piano keyboard and was left alone — the spec's beginner-clarity
+    concern was specifically about Guitar/Bass's fretboard-diagram visuals, confirmed via the
+    governing spec's own §10-13 framing. No shape/pattern/voicing GENERATION logic touched — purely
+    explanatory UI.
+  - **Item-level "Pro" badge removed.** `PianoVoicingPanel.tsx`, `GuitarVoicingPanel.tsx`, and
+    `BassPatternPanel.tsx` each rendered a small "Pro" badge next to any voicing/shape/pattern whose
+    `catalogue === "pro"` (e.g. "Movable shape — Pro") — a leftover from the pre-R1 permanent-tier
+    business model that R1's own spec revision (`docs/product-spec.md` §13) had already declared
+    obsolete in principle but never actually removed from the rendered UI. All three badge blocks
+    are deleted; every voicing/shape/pattern in the catalogue renders identically regardless of its
+    internal `catalogue` label, and `git grep '\.catalogue'` across `src/components` now returns
+    zero matches — confirmed no other UI consumer reads it. The internal `VoicingCatalogue =
+    "free" | "pro"` domain type (`src/domain/instruments/piano/types.ts`, shared by guitar/bass via
+    re-export) is DELIBERATELY RETAINED, per the governing spec's explicit "do not undertake a
+    risky catalogue/domain rewrite merely to delete internal metadata if it is still structurally
+    useful" instruction — its doc comment is rewritten to document that it's legacy metadata,
+    unused for any gating/hiding/locking/entitlement/trial/Pro purpose now that Armony's commercial
+    model is a single platform-wide entitlement (`docs/product-spec.md` §25-26), kept only as a
+    structurally cheap "small curated set vs. fuller generated catalogue" distinction in case a
+    future non-commercial feature (e.g. a density toggle) wants it again. `proBadge` i18n keys
+    deleted from all three instrument namespaces (EN/ES) as now-unused.
+  - **Platform vision documented (no implementation).** `docs/product-spec.md` §0/§2 add a
+    "platform positioning" note: Armony is the first app in a future multi-app platform for music
+    composition/understanding (name undecided — never assume "Armony"), sharing one future account/
+    entitlement/billing system rather than each app being separately purchased; §19/§20/§25/§26 are
+    revised to make the 72-hour trial and annual license explicitly PLATFORM-WIDE (every app that
+    exists, not Armony-only) rather than rewording around it implicitly. This is a documentation-
+    only change — no auth/Supabase/Stripe/billing/entitlement-enforcement code exists yet, and
+    `docs/roadmap.md`'s "Roadmap After Armony" section records the intended future high-level
+    sequence (Platform Foundation, then individually-designed future mini-apps) without building or
+    scoping any of it now.

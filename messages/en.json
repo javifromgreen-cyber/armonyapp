@@ -100,14 +100,10 @@
     },
     "progression": {
       "title": "Progression",
-      "bpmLabel": "BPM",
-      "timeSignatureLabel": "Time signature",
-      "beats": "{count, plural, one {# beat} other {# beats}}",
       "chordTab": "Chord",
       "progressionTab": "Progression ({count})",
       "playButton": "Play",
       "stopButton": "Stop",
-      "playDisabledHint": "Add a chord to the progression to play it",
       "nowPlaying": "Now playing: {chord}"
     },
     "audio": {
@@ -124,7 +120,6 @@
       "inversion2": "2nd inversion",
       "inversion3": "3rd inversion",
       "openVoicing": "Open voicing",
-      "proBadge": "Pro",
       "voicingCounter": "{current} of {total}",
       "suggestedFingering": "Suggested fingering",
       "hearThisVoicing": "Hear this voicing",
@@ -132,6 +127,7 @@
     },
     "guitar": {
       "title": "Guitar",
+      "fingeringDiagramHeading": "Fingering diagram",
       "diagramAriaLabel": "Guitar chord diagram showing {notes}",
       "openString": "Open string",
       "mutedString": "Muted string",
@@ -152,11 +148,11 @@
       "nextVoicing": "Next voicing",
       "noSuitableVoicing": "No suitable voicing found",
       "voicingCounter": "{current} of {total}",
-      "proBadge": "Pro",
       "preparingSound": "Loading sound…"
     },
     "bass": {
       "title": "Bass",
+      "fingeringDiagramHeading": "Fingering diagram",
       "fretboardAriaLabel": "Bass fretboard showing {notes}",
       "chordTone": "Chord tone: {interval}",
       "patternStep": "Step {order}: {interval}",
@@ -178,7 +174,6 @@
       "noSuitablePattern": "No suitable pattern found",
       "patternCounter": "{current} of {total}",
       "tab": "TAB",
-      "proBadge": "Pro",
       "preparingSound": "Loading sound…"
     },
     "instrument": {

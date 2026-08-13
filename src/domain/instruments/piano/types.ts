@@ -1,7 +1,21 @@
 import type { Chord } from "../../chords/chord";
 import type { PlayablePitch } from "../playablePitch";
 
-/** V1 gates by named catalogue, not a scattered plan check — Phase 11 will enforce this centrally (CLAUDE.md's entitlements rule), this module only needs to LABEL each voicing correctly. */
+/**
+ * Legacy per-item catalogue metadata (Phase 7). Deliberately RETAINED
+ * internally rather than removed (Phase R3.4 §16) — Armony's commercial
+ * model is now a single platform-wide entitlement (72-hour trial, then
+ * annual Platform Pro; see `docs/product-spec.md` §19/§25-26 and CLAUDE.md)
+ * with NO item-level gating, so this label is no longer used to hide, lock,
+ * or badge anything in the UI (all "free"/"pro" voicings/patterns render
+ * identically and are equally reachable — confirmed via `git grep
+ * '\.catalogue'` finding zero remaining UI consumers). Kept because it's
+ * still a structurally cheap, harmless way to distinguish "the small
+ * curated everyday set" from "the fuller generated catalogue" internally,
+ * in case a future feature (e.g. a "show fewer/more voicings" density
+ * toggle) wants that distinction again — but it must never be reintroduced
+ * as commercial gating.
+ */
 export type VoicingCatalogue = "free" | "pro";
 
 export interface Fingering {

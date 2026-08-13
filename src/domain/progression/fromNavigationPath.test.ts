@@ -4,17 +4,14 @@ import { parseNoteName } from "../notes/note";
 import type { Key } from "../keys/key";
 import { startPath, advancePath, goBack, resetPath } from "../navigation/path";
 import { progressionFromPath } from "./fromNavigationPath";
-import { DEFAULT_BPM, DEFAULT_DURATION_BEATS, DEFAULT_TIME_SIGNATURE } from "./progression";
 
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
 
 function symbolsOf(path: ReturnType<typeof startPath>): string[] {
-  return progressionFromPath(path, DEFAULT_BPM, DEFAULT_TIME_SIGNATURE).items.map((item) =>
-    chordSymbol(item.chord),
-  );
+  return progressionFromPath(path).items.map((item) => chordSymbol(item.chord));
 }
 
-describe("progressionFromPath — Phase R3.3 §22/§33/§53-57: progression mirrors the confirmed path", () => {
+describe("progressionFromPath — Phase R3.3 §22/§33/§53-57, revised R3.4 (no BPM/time signature)", () => {
   it("§53 the starting chord automatically IS progression item 1, with no manual Add", () => {
     const path = startPath(parseChordSymbol("C"));
     expect(symbolsOf(path)).toEqual(["C"]);
@@ -72,25 +69,21 @@ describe("progressionFromPath — Phase R3.3 §22/§33/§53-57: progression mirr
     expect(symbolsOf(path)).toEqual(["C", "Am"]);
   });
 
-  it("every derived item uses the domain default duration (§66) — no invented rhythmic intelligence", () => {
+  it("Phase R3.4: items carry no BPM/time-signature/duration — a plain {id, chord} list", () => {
     let path = startPath(parseChordSymbol("C"));
     path = advancePath(path, cMajor, parseChordSymbol("Am"));
-    const progression = progressionFromPath(path, DEFAULT_BPM, DEFAULT_TIME_SIGNATURE);
-    expect(progression.items.every((item) => item.durationBeats === DEFAULT_DURATION_BEATS)).toBe(true);
-  });
-
-  it("carries the given bpm/timeSignature through untouched", () => {
-    const path = startPath(parseChordSymbol("C"));
-    const progression = progressionFromPath(path, 140, "3/4");
-    expect(progression.bpm).toBe(140);
-    expect(progression.timeSignature).toBe("3/4");
+    const progression = progressionFromPath(path);
+    expect(Object.keys(progression)).toEqual(["items"]);
+    progression.items.forEach((item) => {
+      expect(Object.keys(item).sort()).toEqual(["chord", "id"]);
+    });
   });
 
   it("item ids stay stable by position across recomputation (React key / playingItemId stability, §67)", () => {
     let path = startPath(parseChordSymbol("C"));
     path = advancePath(path, cMajor, parseChordSymbol("Am"));
-    const first = progressionFromPath(path, DEFAULT_BPM, DEFAULT_TIME_SIGNATURE);
-    const second = progressionFromPath(path, DEFAULT_BPM, DEFAULT_TIME_SIGNATURE);
+    const first = progressionFromPath(path);
+    const second = progressionFromPath(path);
     expect(second.items.map((i) => i.id)).toEqual(first.items.map((i) => i.id));
   });
 });

@@ -62,6 +62,9 @@ export function BassPatternPanel({ chord, isDesktop, onHearPattern }: BassPatter
       <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">{t("title")}</h3>
 
       <div className="mt-2 rounded-xl border border-border bg-surface-raised p-3">
+        <h4 className="text-center text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
+          {t("fingeringDiagramHeading")}
+        </h4>
         <BassFretboard
           chord={chord}
           pattern={pattern}
@@ -82,14 +85,7 @@ export function BassPatternPanel({ chord, isDesktop, onHearPattern }: BassPatter
           </button>
 
           <div className="flex flex-col items-center">
-            <span className="text-sm font-medium text-foreground">
-              {t(positionLabelKey(pattern))}
-              {pattern.catalogue === "pro" && (
-                <span className="ml-1.5 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                  {t("proBadge")}
-                </span>
-              )}
-            </span>
+            <span className="text-sm font-medium text-foreground">{t(positionLabelKey(pattern))}</span>
             <span className="text-xs text-foreground-muted">
               {t("patternCounter", { current: patternIndex + 1, total: patterns.length })}
             </span>

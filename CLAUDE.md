@@ -11,7 +11,17 @@ changes — do not re-derive product decisions from memory.
 Armony is an interactive harmonic exploration environment: EXPLORE → UNDERSTAND → HEAR → PLAY →
 COMPOSE, always combined in one interaction, never split into separate modes. It is not a chord
 generator, chord dictionary, Tonnetz, theory course, DAW, or AI chatbot. "Google Maps for harmony"
-is a navigation metaphor only — the UI must not look like a geographic map.
+is a navigation metaphor only — the UI must not look like a geographic map. Armony's purpose is
+FAST HARMONIC EXPLORATION AND UNDERSTANDING — finding, comparing, hearing, and playing chords that
+work next, then quickly building/auditioning a progression from that route. It is not a rhythmic
+composition/sequencing tool (no BPM, time signature, or per-chord duration UI — Phase R3.4, see
+`docs/product-spec.md` §16/§18).
+
+**Platform positioning (Phase R3.4, documentation only — does not change Armony itself):** Armony
+is the FIRST app inside a future multi-app platform for music composition and understanding. Future
+mini-apps are not designed/named/scoped here — never invent one. The future platform has no decided
+brand name — refer to it generically as "the platform," never assume "Armony" becomes that name.
+See `docs/product-spec.md` §0/§2.
 
 ## Hard architectural rules
 
@@ -20,11 +30,23 @@ is a navigation metaphor only — the UI must not look like a geographic map.
 - Never bury harmonic/music-theory rules inside React components.
 - No giant catch-all files (no single `musicTheory.ts`) — split by music domain per
   `architecture.md`.
-- Entitlements are centralized in `src/domain/entitlements`; never scatter
-  `if (user.plan === "pro")` or ad-hoc trial-timer checks through the app. Gate by named
-  capability (`canUseApp`, `canSaveProjects`, `canExport`) derived from entitlement status
-  (`trialing`/`active`/`expired`), not by plan string. There is no permanent Free/Pro tier and no
-  Lifetime license — see `docs/product-spec.md` §9/§19/§20/§25/§26 (revised R1).
+- Entitlements are centralized (future: `src/domain/entitlements`, not yet built — see Scope
+  boundary below); never scatter `if (user.plan === "pro")` or ad-hoc trial-timer checks through
+  the app, and never model entitlement as per-app flags (`armony_pro`, `future_app_2_pro`, ...).
+  Gate by named capability (`canUseApp`, `canSaveProjects`, `canExport`) derived from a single
+  PLATFORM-LEVEL entitlement status (`trialing`/`active`/`expired`), not by plan string. There is
+  no permanent Free/Pro tier and no Lifetime license — see `docs/product-spec.md`
+  §9/§19/§20/§25/§26 (revised R1, then R3.4). **Commercial model (Phase R3.4)**: register → 72-hour
+  trial of the FULL PLATFORM (every app, not just Armony) → annual **Platform Pro** required after,
+  granting access to ALL platform apps (present and future) as one subscription — never a
+  per-app/per-feature purchase. Account/data is never deleted on `expired`. **No item-level "Pro"
+  gating exists anywhere in Armony** — individual voicings/shapes/patterns/instruments/Depth
+  levels/relationships are never commercially badged, hidden, or locked (Phase R3.4 removed the
+  last remaining visible per-voicing "Pro" badge — see `docs/roadmap.md`'s R3.4 entry); "Pro"
+  means the account's platform-wide entitlement, nothing narrower. **Scope boundary**:
+  registration/login/account UI/trial countdown/Supabase/Stripe/billing/entitlement enforcement are
+  NOT implemented yet — they belong to a future shared "Platform Foundation" phase, built once for
+  every app rather than per app.
 - Harmonic "Zoom"/Depth (1–4) is harmonic depth (which relationship types are shown), not visual
   scale, and is cumulative (Zoom N = Zoom 1..N's families combined). Every graph edge must carry a
   real musical relationship — never add chords just to fill space. **Within an active depth, every
@@ -61,16 +83,20 @@ is a navigation metaphor only — the UI must not look like a geographic map.
   (Revised R3.3) it IS the progression now — see `docs/product-spec.md` §7/§16/§30 for the full
   revision.
 - **The progression is the confirmed exploration path — never a second, independently-edited list**
-  (Phase R3.3, `docs/product-spec.md` §16, revised): `Progression.items` is derived (a pure
-  projection, see `src/domain/progression/fromNavigationPath.ts`) from `navPath.steps`, never
-  imperatively appended/removed by a separate "Add to progression" action, which no longer exists.
-  Previewing a candidate never touches it; confirming appends exactly once; Back removes exactly
-  the corresponding item and never removes the starting/root chord; changing the starting harmonic
-  context (the top-left control) resets it to just the new root. Manual per-item reorder/remove and
-  whole-progression transpose are REMOVED, not merely hidden — they had no coherent meaning once
-  the progression's order/identity is derived from navigation rather than independently editable
-  (`docs/product-spec.md` §17, revised). BPM/time signature remain independently adjustable and
-  survive Back/Reset/root changes (tempo/meter are orthogonal to harmonic content).
+  (Phase R3.3, simplified further R3.4, `docs/product-spec.md` §16, revised): `Progression.items`
+  is derived (a pure projection, see `src/domain/progression/fromNavigationPath.ts`) from
+  `navPath.steps`, never imperatively appended/removed by a separate "Add to progression" action,
+  which no longer exists. Previewing a candidate never touches it; confirming appends exactly once;
+  Back removes exactly the corresponding item and never removes the starting/root chord; changing
+  the starting harmonic context (the top-left control) resets it to just the new root. Manual
+  per-item reorder/remove and whole-progression transpose are REMOVED, not merely hidden — they had
+  no coherent meaning once the progression's order/identity is derived from navigation rather than
+  independently editable (`docs/product-spec.md` §17, revised). **Revised R3.4**: `Progression`/
+  `ProgressionItem` carry NO BPM, time signature, or per-item duration at all anymore — Armony is a
+  harmonic-route audition tool, not a rhythmic composition tool (`docs/product-spec.md` §16). The
+  bottom progression UI shows ONLY the confirmed chord list plus one Play control; a chord card
+  shows the chord name only, nothing else. Progression playback uses the same simple, fixed,
+  deterministic per-chord pacing "Hear Path" already used — no tempo intelligence.
 - **One global instrument selection drives all instrument-aware audio and the side panel's
   execution representation** (Phase R3.3, `docs/product-spec.md` §18/§30): a single
   `InstrumentName` (`"piano" | "guitar" | "bass"`, `src/domain/instruments/instrumentName.ts`) state
@@ -91,10 +117,14 @@ is a navigation metaphor only — the UI must not look like a geographic map.
 
 ## Workflow
 
-- Work in the phases defined in `docs/roadmap.md` (now including refinement phases R1–R4 before
-  the infrastructure phases 10A/10B/11/12). Don't jump ahead to later-phase functionality (MIDI
-  export, voice-leading optimisation, arrangement/sections, PDF/TAB export before Phase R4, etc. —
-  see product-spec §32, §33) unless explicitly asked.
+- Work in the phases defined in `docs/roadmap.md`. As of Phase R3.4, Armony's own standalone
+  product experience is considered functionally closed for now — do not add new Armony features
+  unless fixing a genuine bug. Future work moves toward a shared "Platform Foundation" (account/
+  auth, the 72-hour full-platform trial, platform-wide entitlement, project persistence, annual
+  Platform Pro billing — see `docs/roadmap.md`'s "Roadmap After Armony") and, later, individually-
+  designed future mini-apps — neither begins until explicitly requested. Don't jump ahead to
+  later-phase functionality (MIDI export, voice-leading optimisation, arrangement/sections, PDF/TAB
+  export before Phase R4, etc. — see product-spec §32, §33) unless explicitly asked.
 - At the end of each phase: run tests, typecheck, lint, build; fix failures; update
   `docs/roadmap.md` status before moving on. Don't build on a known-broken foundation.
 - When uncertain about a music-theory rule: don't guess — write the rule down explicitly, add a

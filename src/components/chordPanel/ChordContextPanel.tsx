@@ -6,6 +6,7 @@ import { type Explanation } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import type { InstrumentName, PlayablePitch } from "@/domain/instruments";
+import { DEFAULT_BPM } from "@/domain/progression";
 import type { HearPitchesOptions } from "@/audio/player";
 import { harmonicCharacterFor, harmonicTerritoryFor, DEPTH_LABEL_KEY } from "@/domain/navigation";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
@@ -27,8 +28,6 @@ export interface ChordContextPanelProps {
   isDesktop: boolean;
   /** The ONE global instrument (Phase R3.3 §6-8) — set exclusively by the toolbar's `InstrumentSelector`; this panel only READS it to decide which sub-panel (Piano/Guitar/Bass) to render. No instrument-choice control lives here anymore (§7 — the old right-panel selector was a duplicate of the global one and is removed). */
   activeInstrument: InstrumentName;
-  /** The progression's current BPM (Phase 9 §24) — reused as-is for bass pattern step timing rather than introducing a second, unrelated tempo state. */
-  bpm: number;
   /** Purely auditory preview of ONLY this chord, isolated from any exploration route (Phase R3.2 §42/§43 — "Hear this chord only") — must never navigate or mutate the progression. Uses the global instrument (Phase R3.3 §71) for coherence with the rest of the UI. */
   onHearChord: (chord: Chord) => void;
   /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
@@ -59,7 +58,6 @@ export function ChordContextPanel({
   context,
   isDesktop,
   activeInstrument,
-  bpm,
   onHearChord,
   onHearPitches,
 }: ChordContextPanelProps) {
@@ -190,7 +188,7 @@ export function ChordContextPanel({
           chord={chord}
           isDesktop={isDesktop}
           onHearPattern={(pattern) => {
-            const stepSeconds = 60 / bpm;
+            const stepSeconds = 60 / DEFAULT_BPM;
             return onHearPitches(
               pattern.steps.map((s) => s.pitch),
               {

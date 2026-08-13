@@ -3,7 +3,6 @@ import { parseChordSymbol, chordSymbol } from "../chords/chord";
 import { parseNoteName } from "../notes/note";
 import type { Key } from "../keys/key";
 import { chordIdentityKey } from "../harmony/chordIdentity";
-import { DEFAULT_TIME_SIGNATURE } from "../progression/progression";
 import type { Progression } from "../progression/types";
 import { outgoingOptions } from "./options";
 import { startPath, advancePath } from "./path";
@@ -13,7 +12,7 @@ import type { RankedNavigationOption } from "./types";
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
 
 function emptyProgression(): Progression {
-  return { items: [], bpm: 90, timeSignature: DEFAULT_TIME_SIGNATURE };
+  return { items: [] };
 }
 
 function rankPosition(ranked: RankedNavigationOption[], symbol: string): number {
@@ -123,11 +122,9 @@ describe("resolveHistoryContext — Phase R3 §22 precedence rule", () => {
 
     const progression: Progression = {
       items: [
-        { id: "1", chord: parseChordSymbol("Dm7"), durationBeats: 4 },
-        { id: "2", chord: parseChordSymbol("G7"), durationBeats: 4 },
+        { id: "1", chord: parseChordSymbol("Dm7") },
+        { id: "2", chord: parseChordSymbol("G7") },
       ],
-      bpm: 90,
-      timeSignature: "4/4",
     };
 
     const history = resolveHistoryContext(path, progression, cMajor);

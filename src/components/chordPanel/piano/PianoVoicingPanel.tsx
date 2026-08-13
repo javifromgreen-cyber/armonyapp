@@ -69,14 +69,7 @@ export function PianoVoicingPanel({ chord, isDesktop, onHearVoicing }: PianoVoic
           </button>
 
           <div className="flex flex-col items-center">
-            <span className="text-sm font-medium text-foreground">
-              {t(voicingLabelKey(voicing))}
-              {voicing.catalogue === "pro" && (
-                <span className="ml-1.5 rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                  {t("proBadge")}
-                </span>
-              )}
-            </span>
+            <span className="text-sm font-medium text-foreground">{t(voicingLabelKey(voicing))}</span>
             <span className="text-xs text-foreground-muted">
               {t("voicingCounter", { current: voicingIndex + 1, total: voicings.length })}
             </span>
