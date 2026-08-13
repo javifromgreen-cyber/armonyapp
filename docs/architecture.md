@@ -145,3 +145,26 @@ flatten that back into one-node-per-edge.
   72-hour full trial followed by a required Annual license; see `docs/product-spec.md` §9/§19/§20/
   §25/§26 and `docs/roadmap.md`'s R1 entry for the full revision and rationale. This is
   documentation-only as of R1 — no application code changed.
+- **R3 interaction-rule revision: inspecting and advancing are no longer two separately-clicked
+  steps.** Phase 4's "select vs. explore" two-click model (select a node, then press a separate
+  "Explore from here" button) is superseded by the harmonic-path-explorer redesign
+  (`docs/product-spec.md` §0/§7/§30, revised R3): hovering/keyboard-focusing a map candidate
+  previews it in the side panel (inspection, still never touching the progression), and a
+  click/tap on that same already-previewed candidate commits it as the new path endpoint directly.
+  "Add to progression" remains a fully separate, explicit action throughout — this revision only
+  merges inspect+advance's UI steps, never folds in progression mutation. Implemented in
+  `src/components/map/explorerState.ts` (`PREVIEW`/`ADVANCE` actions) and
+  `src/components/map/MapNode.tsx`/`HarmonicMap.tsx` (hover/focus = preview, click = advance-if-
+  already-previewed-else-preview).
+- **R3 map layout: rings key by move depth, not a chord's shallowest depth.** Phase 4's
+  `computeRadialLayout` placed a chord on the ring of its SHALLOWEST relationship
+  (`MapGraphNode.introducedAtDepth`), so it never "retreated" outward just because a deeper
+  relationship also applied. R3 removes the manual Zoom selector (product-spec.md §4/§34) — every
+  depth is always shown at once — so that mismatch became visible: a node could sit on an inner
+  ring while the relationship/depth badge actually displayed for it (the strongest one, i.e.
+  `NavigationOption.primaryRelationship`) described a deeper move. R3's `computeRadialLayout`
+  (`src/components/map/layout.ts`) now keys rings by `NavigationOption.depth` — the same
+  relationship whose depth/character/explanation the UI shows — so ring position and displayed
+  depth always agree. `src/domain/graph/mapGraph.ts`'s `MapGraphNode.introducedAtDepth` is
+  unchanged and still correct for what it documents (a chord's shallowest depth); it's just no
+  longer what the R3 map's layout keys off.

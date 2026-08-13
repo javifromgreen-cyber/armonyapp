@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   hearChord as hearChordAudio,
   hearPitches as hearPitchesAudio,
+  hearTransition as hearTransitionAudio,
+  hearPath as hearPathAudio,
   playProgression as playProgressionAudio,
   stopProgression as stopProgressionAudio,
   AudioInitError,
@@ -31,6 +33,10 @@ export interface PlaybackController {
    * only meaningful the first time a given instrument is heard this session.
    */
   hearVoicing: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
+  /** Auditions current-endpoint -> candidate before committing it to the path (Phase R3 §25/§26) — neutral playback, same error routing as the other Hear actions. */
+  hearTransition: (from: Chord, to: Chord) => Promise<void>;
+  /** Plays the full chosen exploration path in sequence (Phase R3 §27). */
+  hearPath: (chords: Chord[]) => Promise<void>;
   playProgression: (progression: Progression) => void;
   stop: () => void;
   dismissError: () => void;
@@ -70,6 +76,18 @@ export function usePlaybackController(): PlaybackController {
     });
   }, []);
 
+  const hearTransition = useCallback((from: Chord, to: Chord) => {
+    return hearTransitionAudio(from, to).catch((cause: unknown) => {
+      if (cause instanceof AudioInitError) setError("init");
+    });
+  }, []);
+
+  const hearPath = useCallback((chords: Chord[]) => {
+    return hearPathAudio(chords).catch((cause: unknown) => {
+      if (cause instanceof AudioInitError) setError("init");
+    });
+  }, []);
+
   const playProgression = useCallback((progression: Progression) => {
     if (progression.items.length === 0) return; // defense in depth — the Play control is disabled for this case already
     setError(null);
@@ -94,6 +112,8 @@ export function usePlaybackController(): PlaybackController {
     error,
     hearChord,
     hearVoicing,
+    hearTransition,
+    hearPath,
     playProgression,
     stop,
     dismissError,

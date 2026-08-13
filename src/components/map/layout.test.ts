@@ -2,45 +2,59 @@ import { describe, expect, it } from "vitest";
 import { parseChordSymbol } from "@/domain/chords";
 import { parseNoteName } from "@/domain/notes";
 import type { Key } from "@/domain/keys";
-import { relationshipsFrom, groupRelationshipsByTarget } from "@/domain/graph";
+import { outgoingOptions, rankOptions, type HistoryContext } from "@/domain/navigation";
 import { computeRadialLayout } from "./layout";
 
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
 
-function buildNodes(depth: 1 | 2 | 3 | 4) {
-  const edges = relationshipsFrom(parseChordSymbol("C"), cMajor, depth);
-  return groupRelationshipsByTarget(edges);
+function buildRankedOptions(symbol: string) {
+  const chord = parseChordSymbol(symbol);
+  const options = outgoingOptions(chord, cMajor);
+  const history: HistoryContext = { context: cMajor, endpoint: chord, previousChord: undefined };
+  return rankOptions(options, history);
 }
 
 describe("computeRadialLayout", () => {
-  it("positions every node exactly once", () => {
-    const nodes = buildNodes(2);
-    const layout = computeRadialLayout(nodes);
-    expect(layout.nodes).toHaveLength(nodes.length);
+  it("positions every option exactly once", () => {
+    const options = buildRankedOptions("C");
+    const layout = computeRadialLayout(options);
+    expect(layout.nodes).toHaveLength(options.length);
   });
 
-  it("is deterministic: the same input always produces the same positions", () => {
-    const nodes = buildNodes(3);
-    const first = computeRadialLayout(nodes);
-    const second = computeRadialLayout([...nodes].reverse());
+  it("is deterministic: the same input always produces the same positions regardless of array order", () => {
+    const options = buildRankedOptions("C");
+    const first = computeRadialLayout(options);
+    const second = computeRadialLayout([...options].reverse());
     expect(second.nodes.map((n) => ({ x: n.x, y: n.y }))).toEqual(
       first.nodes.map((n) => ({ x: n.x, y: n.y })),
     );
   });
 
-  it("Zoom-1-only nodes sit on a smaller ring than Zoom-2-only nodes", () => {
-    const nodes = buildNodes(2);
-    const layout = computeRadialLayout(nodes);
-    const zoom1Radii = layout.nodes.filter((n) => n.node.introducedAtDepth === 1).map((n) => n.radius);
-    const zoom2Radii = layout.nodes.filter((n) => n.node.introducedAtDepth === 2).map((n) => n.radius);
-    expect(zoom1Radii.length).toBeGreaterThan(0);
-    expect(zoom2Radii.length).toBeGreaterThan(0);
-    expect(Math.max(...zoom1Radii)).toBeLessThan(Math.min(...zoom2Radii));
+  it("Depth-1 options sit on a smaller ring than Depth-2 options", () => {
+    const options = buildRankedOptions("C");
+    const layout = computeRadialLayout(options);
+    const depth1Radii = layout.nodes.filter((n) => n.option.depth === 1).map((n) => n.radius);
+    const depth2Radii = layout.nodes.filter((n) => n.option.depth === 2).map((n) => n.radius);
+    expect(depth1Radii.length).toBeGreaterThan(0);
+    expect(depth2Radii.length).toBeGreaterThan(0);
+    expect(Math.max(...depth1Radii)).toBeLessThan(Math.min(...depth2Radii));
+  });
+
+  it("a node's ring matches its OWN move's depth, not some other chord's shallowest relationship (Phase R3 §6)", () => {
+    const options = buildRankedOptions("C");
+    const layout = computeRadialLayout(options);
+    for (const positioned of layout.nodes) {
+      const expectedRadius = computeRadialLayout([positioned.option]).nodes[0].radius;
+      // same depth => same ring radius constant, regardless of which other options are present
+      const sameDepthAnyLayout = layout.nodes.find((n) => n.option.depth === positioned.option.depth)!;
+      expect(positioned.radius).toBe(sameDepthAnyLayout.radius);
+      expect(expectedRadius).toBeGreaterThan(0);
+    }
   });
 
   it("all positions fall within the declared viewBox", () => {
-    const nodes = buildNodes(4);
-    const layout = computeRadialLayout(nodes);
+    const options = buildRankedOptions("C");
+    const layout = computeRadialLayout(options);
     for (const positioned of layout.nodes) {
       expect(positioned.x).toBeGreaterThanOrEqual(0);
       expect(positioned.x).toBeLessThanOrEqual(layout.size);

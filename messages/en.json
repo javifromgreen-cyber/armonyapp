@@ -28,20 +28,34 @@
       "title": "Free mode",
       "description": "Harmonic exploration without a locked key isn't implemented yet. Pick a key above to explore."
     },
-    "zoom": {
-      "label": "Harmonic depth",
-      "level1": "Zoom 1",
-      "level2": "Zoom 2",
-      "level3": "Zoom 3",
-      "level4": "Zoom 4",
-      "description1": "Immediate harmonic environment",
-      "description2": "Expanded common harmony",
-      "description3": "Advanced harmony",
-      "description4": "Deep harmonic exploration"
+    "navigation": {
+      "back": "Back",
+      "reset": "Reset exploration",
+      "hearPath": "Hear path",
+      "hearTransition": "Hear transition",
+      "continueHere": "Continue path here",
+      "pathLabel": "Exploration path",
+      "jumpToStep": "Jump back to {chord}",
+      "currentMove": "Current move",
+      "pathDepth": "Path depth",
+      "depth": {
+        "direct": "Direct",
+        "expanded": "Expanded",
+        "colour": "Colour",
+        "deep": "Deep"
+      },
+      "character": {
+        "naturalContinuation": "Natural continuation",
+        "strongResolution": "Strong resolution",
+        "tension": "Tension",
+        "deceptive": "Deceptive resolution",
+        "modalColour": "Modal colour",
+        "substitution": "Substitution",
+        "chromaticColour": "Chromatic colour",
+        "adventurous": "Adventurous"
+      }
     },
     "map": {
-      "exploreFrom": "Explore from here",
-      "exploringFrom": "Exploring from {chord}",
       "moreRelationships": "+{count} more",
       "sourceLabel": "{chord}, current chord",
       "nodeLabel": "{chord}, {relationship}",

@@ -28,20 +28,34 @@
       "title": "Modo libre",
       "description": "La exploración armónica sin una tonalidad fija todavía no está implementada. Elige una tonalidad arriba para explorar."
     },
-    "zoom": {
-      "label": "Profundidad armónica",
-      "level1": "Zoom 1",
-      "level2": "Zoom 2",
-      "level3": "Zoom 3",
-      "level4": "Zoom 4",
-      "description1": "Entorno armónico inmediato",
-      "description2": "Armonía común ampliada",
-      "description3": "Armonía avanzada",
-      "description4": "Exploración armónica profunda"
+    "navigation": {
+      "back": "Atrás",
+      "reset": "Reiniciar exploración",
+      "hearPath": "Escuchar camino",
+      "hearTransition": "Escuchar transición",
+      "continueHere": "Continuar camino aquí",
+      "pathLabel": "Camino de exploración",
+      "jumpToStep": "Volver a {chord}",
+      "currentMove": "Movimiento actual",
+      "pathDepth": "Profundidad del camino",
+      "depth": {
+        "direct": "Directo",
+        "expanded": "Ampliado",
+        "colour": "Color",
+        "deep": "Profundo"
+      },
+      "character": {
+        "naturalContinuation": "Continuación natural",
+        "strongResolution": "Resolución fuerte",
+        "tension": "Tensión",
+        "deceptive": "Resolución engañosa",
+        "modalColour": "Color modal",
+        "substitution": "Sustitución",
+        "chromaticColour": "Color cromático",
+        "adventurous": "Aventurado"
+      }
     },
     "map": {
-      "exploreFrom": "Explorar desde aquí",
-      "exploringFrom": "Explorando desde {chord}",
       "moreRelationships": "+{count} más",
       "sourceLabel": "{chord}, acorde actual",
       "nodeLabel": "{chord}, {relationship}",

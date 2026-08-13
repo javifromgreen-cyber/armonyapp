@@ -100,13 +100,25 @@ Mobile/tablet get purpose-designed responsive behavior, not a shrunk desktop UI.
 
 ## 7. Critical Interaction Rule
 
+*(Revised R3 — superseded the original "select, then a separate Explore-from-here click"
+two-step model per the harmonic-path-explorer redesign; §30 and `docs/roadmap.md`'s R3 entry have
+the full navigation-model detail.)*
+
 Three distinct operations, never conflated:
 
-1. Selecting a chord (inspect it).
-2. Exploring/recentring the map around a chord.
+1. Inspecting a chord (seeing its info without moving the exploration path).
+2. Advancing the exploration path to a chord (clicking a valid next-chord node on the map commits
+   it as the new path endpoint directly — no separate "Explore from here" step).
 3. Adding the chord to the progression.
 
-Selecting a chord must never silently modify the progression.
+Inspecting and advancing are no longer two separately-clicked actions the way selecting and
+exploring used to be — on the map, hovering/keyboard-focusing a candidate previews it (inspection),
+and a click/tap on that same, already-previewed candidate commits it as the new endpoint (the
+literal example this section now codifies: exploring `Cmaj7`, the user clicks `F`, and
+`Cmaj7 -> F` immediately becomes the path with `F` as the new endpoint — no second click). What
+must stay true regardless: inspecting a chord must never silently modify the progression, and
+adding to the progression always stays a distinct, explicit action, never triggered by inspecting
+or advancing.
 
 ## 8. Harmonic Map — Harmonic Depth ("Zoom")
 

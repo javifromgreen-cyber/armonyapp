@@ -11,9 +11,11 @@ import {
   chordsEqual,
   type ContextualRole,
   type HarmonicEdge,
-  type ZoomLevel,
 } from "@/domain/harmony";
 import { relationshipsBetween } from "@/domain/graph";
+
+/** Phase R3 removes the manual Zoom selector — every depth the engine models is always queryable. */
+const ALL_DEPTHS = 4;
 
 /**
  * Everything the contextual side panel needs for a chord — a thin,
@@ -34,22 +36,19 @@ export interface ChordDisplayInfo {
 }
 
 /**
- * `activeDepth` is the currently active harmonic Zoom — the same value the
- * map itself queries with (`HarmonicMap`'s `relationshipsFrom(..., zoom)`).
- * The panel must never show a relationship deeper than what's actually
- * visible on the map (e.g. a Zoom-2 "Substitute chord" leaking into the
- * panel while the map is at Zoom 1 — see docs/roadmap.md Phase 4.2). Once
- * the entitlement system caps the zoom a user can reach
- * (`maxAllowedHarmonicDepth`, Phase 11), that cap is enforced by clamping
- * `activeDepth` itself before it ever reaches this function — so this stays
- * a single, always-correct `min(activeHarmonicDepth, maxAllowedHarmonicDepth)`
- * without this function needing to know about entitlements at all.
+ * `sourceChord` is the map's current path endpoint (Phase R3) — this panel
+ * shows `chord`'s relationship TO that endpoint. Phase R3 removes the
+ * manual Zoom selector: every depth the engine models is always shown on
+ * the map, so this always queries the full depth range too (no cap to stay
+ * in sync with a zoom control that no longer exists). Once the entitlement
+ * system gates account-level access (Phase 11), that's enforced elsewhere
+ * (§9's account-access-level gating, never a per-relationship depth cap
+ * here).
  */
 export function getChordDisplayInfo(
   chord: Chord,
   sourceChord: Chord,
   context: Key,
-  activeDepth: ZoomLevel,
 ): ChordDisplayInfo {
   const isSource = chordsEqual(chord, sourceChord);
 
@@ -61,6 +60,6 @@ export function getChordDisplayInfo(
     contextualRole: contextualRole(chord, context),
     relationshipsFromSource: isSource
       ? []
-      : relationshipsBetween(sourceChord, chord, context, activeDepth),
+      : relationshipsBetween(sourceChord, chord, context, ALL_DEPTHS),
   };
 }

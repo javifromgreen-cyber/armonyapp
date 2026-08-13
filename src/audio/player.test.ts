@@ -206,6 +206,43 @@ describe("hearPitches — staggered playback order and timing (Guitar strum / Ba
   });
 });
 
+describe("hearPath / hearTransition — neutral sequential chord playback (Phase R3 §25/§26/§27)", () => {
+  it("hearPath triggers one call per chord, in order, at increasing times, on the neutral synth", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("Am"), parseChordSymbol("Dm")]);
+
+    expect(Tone.PolySynth.instances).toHaveLength(1);
+    expect(Tone.Sampler.instances).toHaveLength(0); // neutral voice only, never an instrument sampler
+    const calls = Tone.PolySynth.instances[0].calls;
+    expect(calls).toHaveLength(3);
+    for (let i = 1; i < calls.length; i++) {
+      const prevTime = (calls[i - 1].args as [number[], number, number])[2];
+      const time = (calls[i].args as [number[], number, number])[2];
+      expect(time).toBeGreaterThan(prevTime);
+    }
+  });
+
+  it("hearPath is a no-op for fewer than 2 chords — nothing to sequence", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearPath([parseChordSymbol("C")]);
+    await player.hearPath([]);
+    expect(Tone.PolySynth.instances).toHaveLength(0);
+  });
+
+  it("hearTransition plays exactly the from-chord then the to-chord", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearTransition(parseChordSymbol("Dm"), parseChordSymbol("G7"));
+
+    const calls = Tone.PolySynth.instances[0].calls;
+    expect(calls).toHaveLength(2);
+    const [firstTime, secondTime] = calls.map((c) => (c.args as [number[], number, number])[2]);
+    expect(secondTime).toBeGreaterThan(firstTime);
+  });
+});
+
 describe("stopProgression — releases every voice, including instrument samplers", () => {
   it("calls releaseAll on the neutral synth and any instrument samplers that were used", async () => {
     const { player, Tone } = await freshPlayer();

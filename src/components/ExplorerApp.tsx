@@ -4,12 +4,13 @@ import { useReducer, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { parseChordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
-import type { ZoomLevel } from "@/domain/harmony";
+import { currentEndpoint } from "@/domain/navigation";
 import { createProgressionItem, type TimeSignature } from "@/domain/progression";
 import { HarmonicMap } from "./map/HarmonicMap";
-import { explorerReducer, initialExplorerState } from "./map/explorerState";
+import { explorerReducer, initialExplorerState, panelChord } from "./map/explorerState";
+import { PathBreadcrumb } from "./map/PathBreadcrumb";
+import { DepthIndicator } from "./map/DepthIndicator";
 import { ChordContextPanel } from "./chordPanel/ChordContextPanel";
-import { ZoomControl } from "./controls/ZoomControl";
 import { KeySelector } from "./controls/KeySelector";
 import { ProgressionEditor } from "./progression/ProgressionEditor";
 import {
@@ -85,18 +86,54 @@ export function ExplorerApp() {
     progressionDispatch(action);
   }
 
-  function handleSelect(chord: Chord) {
-    dispatch({ type: "SELECT", chord });
-    setMobileTab("chord");
-    setIsPanelOpenOnMobile(true);
+  // Clicking an already-previewed candidate on the map (or the panel's
+  // fallback "Continue path here" button) commits it as the new path
+  // endpoint directly (product-spec.md §30/Phase R3 §10) — no separate
+  // "Explore from here" step. Opens the mobile bottom sheet so the result
+  // is actually visible there, without needlessly touching that state on
+  // desktop where it's unused.
+  function handleAdvance(chord: Chord) {
+    dispatch({ type: "ADVANCE", chord });
+    if (!isDesktop) {
+      setMobileTab("chord");
+      setIsPanelOpenOnMobile(true);
+    }
   }
 
-  function handleExplore(chord: Chord) {
-    dispatch({ type: "EXPLORE", chord });
+  // Hover/keyboard-focus previews a candidate in the side panel WITHOUT
+  // moving the path (Phase R3 §12); a subsequent click/Enter on the same
+  // candidate is what actually advances (see MapNode's onActivate). On
+  // touch, this is effectively desktop/keyboard-only: mobile browsers
+  // synthesize a compatibility mouseenter immediately before the click for
+  // a single tap, so a tap previews-then-advances in one gesture rather
+  // than requiring a separate peek tap — which is fine, since that's
+  // exactly the direct "tap advances" behavior §10/§44 require, and
+  // forcing a distinct peek-only tap target onto small map nodes would cut
+  // against §12's own "don't make the interaction cumbersome" instruction.
+  // Mobile inspection instead happens after landing on a chord, via the
+  // bottom sheet this opens below.
+  function handlePreview(chord: Chord) {
+    dispatch({ type: "PREVIEW", chord });
+    if (!isDesktop) {
+      setMobileTab("chord");
+      setIsPanelOpenOnMobile(true);
+    }
   }
 
-  function handleZoomChange(zoom: ZoomLevel) {
-    dispatch({ type: "SET_ZOOM", zoom });
+  function handleClearPreview() {
+    dispatch({ type: "CLEAR_PREVIEW" });
+  }
+
+  function handleBack() {
+    dispatch({ type: "BACK" });
+  }
+
+  function handleJumpToStep(index: number) {
+    dispatch({ type: "JUMP_TO", index });
+  }
+
+  function handleResetExploration() {
+    dispatch({ type: "RESET" });
   }
 
   function handleKeyChange(context: Key | null) {
@@ -149,18 +186,18 @@ export function ExplorerApp() {
 
   const chordPanel = !isFreeMode && (
     <ChordContextPanel
-      chord={state.selectedChord}
-      sourceChord={state.exploredChord}
+      chord={panelChord(state)}
+      endpointChord={currentEndpoint(state.navPath)}
       context={state.context}
-      zoom={state.zoom}
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
       onInstrumentChange={setActiveInstrument}
       bpm={progression.bpm}
-      onExploreFrom={handleExplore}
+      onAdvance={handleAdvance}
       onAddToProgression={handleAddToProgression}
       onHearChord={playback.hearChord}
       onHearPitches={playback.hearVoicing}
+      onHearTransition={playback.hearTransition}
     />
   );
 
@@ -185,10 +222,22 @@ export function ExplorerApp() {
     <div className="flex h-full flex-1 flex-col">
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex flex-wrap items-end gap-4 border-b border-border px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-4 py-3 sm:px-6">
             <KeySelector value={isFreeMode ? null : state.context} onChange={handleKeyChange} />
-            <ZoomControl zoom={state.zoom} onChange={handleZoomChange} />
+            {!isFreeMode && <DepthIndicator navPath={state.navPath} />}
           </div>
+
+          {!isFreeMode && (
+            <div className="border-b border-border px-4 py-2 sm:px-6">
+              <PathBreadcrumb
+                navPath={state.navPath}
+                onJumpTo={handleJumpToStep}
+                onBack={handleBack}
+                onReset={handleResetExploration}
+                onHearPath={() => playback.hearPath(state.navPath.steps.map((step) => step.chord))}
+              />
+            </div>
+          )}
 
           {playback.error && <AudioErrorBanner onDismiss={playback.dismissError} />}
 
@@ -198,10 +247,12 @@ export function ExplorerApp() {
             ) : (
               <HarmonicMap
                 context={state.context}
-                exploredChord={state.exploredChord}
-                selectedChord={state.selectedChord}
-                zoom={state.zoom}
-                onSelect={handleSelect}
+                navPath={state.navPath}
+                progression={progression}
+                previewChord={state.previewChord}
+                onAdvance={handleAdvance}
+                onPreview={handlePreview}
+                onClearPreview={handleClearPreview}
               />
             )}
           </div>

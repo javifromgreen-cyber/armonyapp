@@ -2,11 +2,12 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { chordsEqual, type Explanation, type ZoomLevel } from "@/domain/harmony";
+import { chordsEqual, type Explanation } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import type { PlayablePitch } from "@/domain/instruments";
 import type { HearPitchesOptions } from "@/audio/player";
+import { harmonicCharacterFor, DEPTH_LABEL_KEY } from "@/domain/navigation";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
 import { functionDisplayInfo } from "./functionDisplay";
 import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
@@ -16,23 +17,34 @@ import { InstrumentSelector } from "./InstrumentSelector";
 import type { Instrument } from "./instrument";
 
 export interface ChordContextPanelProps {
+  /** The chord currently shown — the previewed candidate if any, otherwise the path's current endpoint (Phase R3 §12). */
   chord: Chord;
-  sourceChord: Chord;
+  /** The map's current path endpoint (Phase R3) — what `chord` is shown relative to. */
+  endpointChord: Chord;
   context: Key;
-  /** The map's currently active Zoom — relationships shown here must never go deeper than what's on the map (see chordDisplayInfo.ts). */
-  zoom: ZoomLevel;
   isDesktop: boolean;
   activeInstrument: Instrument;
   onInstrumentChange: (instrument: Instrument) => void;
   /** The progression's current BPM (Phase 9 §24) — reused as-is for bass pattern step timing rather than introducing a second, unrelated tempo state. */
   bpm: number;
-  onExploreFrom: (chord: Chord) => void;
-  /** Adds `chord` — the panel's currently SELECTED chord, never `sourceChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from select/explore). */
+  /**
+   * Commits `chord` as the new path endpoint — normal navigation happens by
+   * clicking the map directly (Phase R3 §10), so this is only surfaced here
+   * as a lightweight fallback for committing an already-previewed candidate
+   * from the panel itself (useful on mobile, where the map may be out of
+   * view once the panel/bottom sheet is open). Never shown for the endpoint
+   * itself. Not the old "Explore from here" — that unconditional
+   * second-click step is removed (§11).
+   */
+  onAdvance: (chord: Chord) => void;
+  /** Adds `chord` — the panel's currently displayed chord, never `endpointChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from navigating/previewing). */
   onAddToProgression: (chord: Chord) => void;
   /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
   onHearChord: (chord: Chord) => void;
   /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
   onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
+  /** Auditions the move from the current endpoint to a previewed candidate, without committing it (Phase R3 §25/§26). Only meaningful (and only shown) when `chord` isn't already the endpoint. */
+  onHearTransition: (from: Chord, to: Chord) => Promise<void>;
 }
 
 /** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
@@ -48,38 +60,40 @@ function explanationText(
 }
 
 /**
- * The first version of the selected-chord panel (product-spec.md §11):
- * identity, notes, interval formula, contextual role, and relationship to
- * the currently explored chord — musical/contextual information only.
- * Deliberately has no instrument content yet (guitar/piano/bass are Phase
- * 7-9); the layout leaves room for an instrument section to be added later
- * without restructuring.
+ * The selected/previewed-chord panel (product-spec.md §11, revised Phase
+ * R3): identity, notes, interval formula, contextual role, and — when
+ * `chord` isn't the path endpoint itself — its relationship to the
+ * endpoint, including the move's depth and harmonic character (§7/§23/§24).
+ * Deliberately has no "Explore from here" button (§11); normal path
+ * navigation happens by clicking the map (§10).
  */
 export function ChordContextPanel({
   chord,
-  sourceChord,
+  endpointChord,
   context,
-  zoom,
   isDesktop,
   activeInstrument,
   onInstrumentChange,
   bpm,
-  onExploreFrom,
+  onAdvance,
   onAddToProgression,
   onHearChord,
   onHearPitches,
+  onHearTransition,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
   const tFunction = useTranslations("harmony.function");
+  const tDepth = useTranslations("app.navigation.depth");
+  const tCharacter = useTranslations("app.navigation.character");
 
   const info = useMemo(
-    () => getChordDisplayInfo(chord, sourceChord, context, zoom),
-    [chord, sourceChord, context, zoom],
+    () => getChordDisplayInfo(chord, endpointChord, context),
+    [chord, endpointChord, context],
   );
   const functionDisplay = useMemo(() => functionDisplayInfo(chord, context), [chord, context]);
 
-  const isSource = chordsEqual(chord, sourceChord);
+  const isEndpoint = chordsEqual(chord, endpointChord);
   const [primaryRelationship, ...additionalRelationships] = info.relationshipsFromSource;
 
   return (
@@ -112,11 +126,19 @@ export function ChordContextPanel({
         </p>
       </section>
 
-      {!isSource && primaryRelationship && (
+      {!isEndpoint && primaryRelationship && (
         <section>
           <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
-            {tPanel("relationshipToSource", { chord: chordSymbol(sourceChord) })}
+            {tPanel("relationshipToSource", { chord: chordSymbol(endpointChord) })}
           </h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
+              {primaryRelationship.harmonicDepth} · {tDepth(DEPTH_LABEL_KEY[primaryRelationship.harmonicDepth])}
+            </span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
+              {tCharacter(harmonicCharacterFor(primaryRelationship))}
+            </span>
+          </div>
           <p className="mt-1.5 text-sm text-foreground">
             {explanationText(t, primaryRelationship.explanation)}
           </p>
@@ -189,13 +211,22 @@ export function ChordContextPanel({
         >
           {tPanel("hearChord")}
         </button>
-        {!isSource && (
+        {!isEndpoint && (
           <button
             type="button"
-            onClick={() => onExploreFrom(chord)}
+            onClick={() => onHearTransition(endpointChord, chord)}
+            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+          >
+            {t("app.navigation.hearTransition")}
+          </button>
+        )}
+        {!isEndpoint && (
+          <button
+            type="button"
+            onClick={() => onAdvance(chord)}
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
           >
-            {t("app.map.exploreFrom")}
+            {t("app.navigation.continueHere")}
           </button>
         )}
         <button

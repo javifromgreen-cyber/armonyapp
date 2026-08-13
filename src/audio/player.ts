@@ -190,6 +190,38 @@ export async function hearChord(chord: Chord): Promise<void> {
   playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
 }
 
+/** Seconds between successive chords in `hearPath`/`hearTransition` — enough space to actually hear each one land before the next starts (Phase R3 §25/§26/§27). */
+const PATH_CHORD_GAP_SECONDS = 0.65;
+const PATH_CHORD_DURATION_SECONDS = 0.55;
+
+/**
+ * Neutral harmonic playback (product-spec.md §18) of a sequence of whole
+ * chords, one after another — the primitive both "Hear transition" (a
+ * 2-chord sequence) and "Hear path" (the full exploration path) reuse
+ * (Phase R3 §25/§27), rather than each having its own scheduling logic.
+ * Deliberately simple: no voice-leading optimisation, same neutral voicing
+ * `hearChord` already uses. A no-op for an empty/single-chord sequence —
+ * there's nothing to sequence.
+ */
+export async function hearPath(chords: Chord[]): Promise<void> {
+  if (chords.length < 2) return;
+  await ensureAudioReady();
+  const synthInstance = getSynth();
+  const now = Tone.now();
+  chords.forEach((chord, index) => {
+    synthInstance.triggerAttackRelease(
+      pitchesToFrequencies(neutralVoicing(chord)),
+      PATH_CHORD_DURATION_SECONDS,
+      now + index * PATH_CHORD_GAP_SECONDS,
+    );
+  });
+}
+
+/** "Hear transition" (Phase R3 §25/§26) — auditions a candidate move (current endpoint -> a previewed chord) before committing it to the path, without requiring the user to advance first. */
+export function hearTransition(from: Chord, to: Chord): Promise<void> {
+  return hearPath([from, to]);
+}
+
 export interface HearPitchesOptions {
   durationSeconds?: number;
   /**

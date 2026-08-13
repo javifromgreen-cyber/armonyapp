@@ -1,9 +1,9 @@
 import { noteToPitchClass } from "@/domain/notes";
 import type { ZoomLevel } from "@/domain/harmony";
-import type { MapGraphNode } from "@/domain/graph";
+import type { RankedNavigationOption } from "@/domain/navigation";
 
 export interface PositionedNode {
-  node: MapGraphNode;
+  option: RankedNavigationOption;
   x: number;
   y: number;
   angleDeg: number;
@@ -19,35 +19,51 @@ export interface RadialLayout {
 
 /** Rendered node radii — shared with HarmonicMap.tsx so the layout's viewBox margin always matches what's actually drawn. */
 export const SOURCE_NODE_RADIUS = 54;
-export const NEIGHBOR_NODE_RADIUS = 34;
+export const NEIGHBOR_NODE_RADIUS = 30;
 
-/** Ring radius per Zoom depth — deeper harmonic depth sits further out, visually reinforcing that Zoom IS depth, not just node count. */
-const RING_RADIUS: Record<ZoomLevel, number> = { 1: 140, 2: 215, 3: 285, 4: 350 };
+/** Ring radius per move depth — a deeper (more distant/colourful) move sits further out, visually reinforcing depth as distance (Phase R3 §16). */
+const RING_RADIUS: Record<ZoomLevel, number> = { 1: 150, 2: 235, 3: 315, 4: 390 };
 
-const VIEWBOX_MARGIN = 24;
+const VIEWBOX_MARGIN = 28;
+
+/** 3 decimal places — far more precision than the pixel-level rendering needs, while collapsing any cross-platform floating-point last-bit divergence in `Math.cos`/`Math.sin`. */
+function round(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 /**
- * Deterministic radial layout: the source chord is implicitly at the center
- * (callers render it separately); every other chord is placed on the ring
- * for the Zoom depth it was first introduced at, evenly spaced by angle.
- * Ordering within a ring is by root pitch class then quality id, so the same
- * query always produces the same layout regardless of edge-generation order
- * — required for the map to feel stable rather than jittery when relationships
- * are recomputed (e.g. after a Zoom change that doesn't affect this ring).
+ * Deterministic radial layout: the current path endpoint is implicitly at
+ * the center (callers render it separately); every outgoing option is
+ * placed on the ring for ITS OWN move's depth — `option.depth`, i.e. the
+ * depth of `option.primaryRelationship`, the same relationship whose
+ * explanation/character the UI displays for that option (Phase R3 §6:
+ * "depth belongs to the move"). This is a deliberate R3 revision of the
+ * Phase 4 layout, which keyed rings by a chord's SHALLOWEST depth across
+ * all its relationships (`introducedAtDepth`) — that could show a node on
+ * an inner ring while its displayed (strongest) relationship badge/
+ * explanation described a deeper move, which read as inconsistent once
+ * every depth is always visible at once (no more manual Zoom selector to
+ * hide the mismatch). See docs/architecture.md's R3 deviation note.
  *
- * The viewBox is sized to whatever is actually populated (not a fixed
- * worst-case box for Zoom 4) — at Zoom 1 that's just the inner ring, so the
- * map fills its available screen space instead of sitting small in the
- * middle of a mostly-empty box reserved for rings that aren't shown yet.
+ * Since Phase R3 removes the manual Zoom selector, ALL depths 1-4 are
+ * always present together — ordering within a ring is by root pitch class
+ * then quality id for a stable, non-jittery layout across re-renders
+ * (ranking changes prominence via visual treatment elsewhere, not position
+ * — position only encodes depth, per §9's "combination of number/edge
+ * treatment/badge" guidance rather than relying on order alone).
+ *
+ * The viewBox is sized to whatever depths are actually populated (never a
+ * fixed worst-case box), so a chord with only Zoom 1-2 options still fills
+ * its available space instead of sitting small inside an oversized box.
  */
-export function computeRadialLayout(nodes: MapGraphNode[]): RadialLayout {
-  const byDepth = new Map<ZoomLevel, MapGraphNode[]>();
-  for (const node of nodes) {
-    const ring = byDepth.get(node.introducedAtDepth);
+export function computeRadialLayout(options: RankedNavigationOption[]): RadialLayout {
+  const byDepth = new Map<ZoomLevel, RankedNavigationOption[]>();
+  for (const option of options) {
+    const ring = byDepth.get(option.depth);
     if (ring) {
-      ring.push(node);
+      ring.push(option);
     } else {
-      byDepth.set(node.introducedAtDepth, [node]);
+      byDepth.set(option.depth, [option]);
     }
   }
 
@@ -73,13 +89,18 @@ export function computeRadialLayout(nodes: MapGraphNode[]): RadialLayout {
     const radius = RING_RADIUS[depth];
     const angleStep = 360 / sorted.length;
 
-    sorted.forEach((node, index) => {
+    sorted.forEach((option, index) => {
       const angleDeg = -90 + index * angleStep;
       const angleRad = (angleDeg * Math.PI) / 180;
       positioned.push({
-        node,
-        x: center.x + radius * Math.cos(angleRad),
-        y: center.y + radius * Math.sin(angleRad),
+        option,
+        // Rounded to avoid a React hydration mismatch: Math.cos/Math.sin can
+        // differ in their very last bit between the server (Node) and
+        // client (browser) V8 builds for the same input, which otherwise
+        // renders two different (though visually identical) SVG coordinate
+        // strings for the same node.
+        x: round(center.x + radius * Math.cos(angleRad)),
+        y: round(center.y + radius * Math.sin(angleRad)),
         angleDeg,
         radius,
       });

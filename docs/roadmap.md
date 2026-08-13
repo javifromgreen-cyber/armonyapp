@@ -645,19 +645,73 @@ phase's own instruction, that judgment is the user's, pending their listen on th
 preview.
 
 ## Phase R3 — Progressive contextual harmonic navigation
-- [ ] New `ProgressionNavigationEngine`-equivalent layer on top of the existing (preserved) harmony
+- [x] New `ProgressionNavigationEngine`-equivalent layer on top of the existing (preserved) harmony
       graph engine — never a rewrite of `src/domain/harmony`/`src/domain/graph`
-- [ ] Core completeness guarantee: the navigation layer's next-chord set, deduplicated by chord
+- [x] Core completeness guarantee: the navigation layer's next-chord set, deduplicated by chord
       identity, equals the full outgoing set the harmony engine exposes for that chord/context/depth
       — ranking organizes, never deletes
-- [ ] Progressive path UI: chosen path stays visible; only the current endpoint's options expand;
+- [x] Progressive path UI: chosen path stays visible; only the current endpoint's options expand;
       choosing a next chord collapses the previous endpoint's unchosen siblings
-- [ ] Contextual ranking (recent path / actual progression precedence rule, documented explicitly)
-- [ ] "Hear transition" (current → candidate) and, if cleanly achievable, "Hear path"
-- [ ] Back/Reset navigation; explicit "Add to progression" stays distinct from exploring
-- [ ] Completeness invariant test across Depth 1–4 for representative chords/contexts
-- [ ] Context-ranking tests for representative paths (documented in the R3 report)
-- [ ] Live verification (desktop/mobile, English/Spanish) on the deployed Vercel preview
+- [x] Contextual ranking (recent path / actual progression precedence rule, documented explicitly)
+- [x] "Hear transition" (current → candidate) and, if cleanly achievable, "Hear path"
+- [x] Back/Reset navigation; explicit "Add to progression" stays distinct from exploring
+- [x] Completeness invariant test across Depth 1–4 for representative chords/contexts
+- [x] Context-ranking tests for representative paths (documented in the R3 report)
+- [x] Live verification (desktop/mobile, English/Spanish) on the deployed Vercel preview
+
+New framework-free `src/domain/navigation` module (`outgoingOptions`, `NavigationPath`/
+`advancePath`/`goBack`/`jumpToStep`/`resetPath`, `currentMoveDepth`/`pathDepth`,
+`harmonicCharacterFor`, `resolveHistoryContext`/`rankOptions`) sits above the untouched
+`src/domain/harmony`/`src/domain/graph` engine — `outgoingOptions` reuses
+`relationshipsFrom`+`groupRelationshipsByTarget` directly rather than re-deriving the graph, so
+completeness is inherited from Phase 3/4's own tested grouping and re-verified by a dedicated R3
+invariant test (`options.test.ts`) across 8 chord/context cases. Map interaction revised per the
+user's superseding R3 instructions: clicking an already-previewed candidate node advances the path
+directly (no "Explore from here" step); hovering/keyboard-focusing a candidate previews it in the
+side panel first, without moving the path — this is a deliberate, explicitly-authorized revision of
+the "select vs. explore" two-click rule from `docs/product-spec.md` §7/`CLAUDE.md` (both updated in
+this change; `docs/architecture.md`'s Deviations log has the full rationale). The old manual Zoom
+1–4 selector is removed (`ZoomControl.tsx` deleted, now dead code) — all four depths are always
+queried at once; `DepthIndicator`/`PathBreadcrumb` take over that toolbar area with Current
+Move/Path Depth and the chosen path (with Back/Reset/Hear path). Contextual ranking implements the
+progression-vs-path precedence rule from a small, real-domain-grounded bonus (`classifyFunction`
+tonic/predominant/dominant, never an invented per-component heuristic) — reorders only, proven
+membership-preserving by construction (`rankOptions` is a map+sort over its own input). Harmonic
+character (`naturalContinuation`/`strongResolution`/`tension`/`deceptive`/`modalColour`/
+`substitution`/`chromaticColour`/`adventurous`) is derived from `relationshipType`, with two
+context-sensitive, major-mode-only overrides (authentic-cadence "strongResolution" and V-vi
+"deceptive") caught and scoped correctly during the `music-theory-review` pass below (natural
+minor's weak natural dominant/subtonic must not read as a strong/deceptive resolution — its real
+strong dominant, the harmonic-minor-derived V7/vii°, already gets `strongResolution` via the
+baseline relationship-type table). `computeRadialLayout` now keys rings by each option's own move
+depth (`NavigationOption.depth`) rather than a chord's shallowest depth across all its
+relationships, so ring position always agrees with the depth badge/label shown on that node.
+
+Verified 2026-08-13: `npm run test` (671 tests, up from 614 — 57 new: 49 in
+`src/domain/navigation/*.test.ts`, 3 in `src/audio/player.test.ts` for `hearPath`/`hearTransition`,
+plus `explorerState.test.ts`/`layout.test.ts`/`chordDisplayInfo.test.ts` rewritten for the new
+model), `npm run typecheck`, `npm run lint`, `npm run build` all pass with zero regressions. Ran the
+`music-theory-review` skill against `src/domain/navigation` — found and fixed one real issue (the
+strongResolution/deceptive character overrides incorrectly firing on natural minor's weak natural
+dominant/subtonic; scoped to major mode only, with a regression test). Ran `product-scope-review` —
+verdict aligned; flagged that R3's click-to-advance model revises the previously-documented "three
+distinct actions" rule, which is now written up in `product-spec.md` §7/`CLAUDE.md`/
+`architecture.md` rather than left as a silent deviation. Live-browser verification (Playwright
+against the dev server, desktop 1400×900 + mobile 390×844 with real touch events + Spanish locale):
+the required C→Am→Dm→G7 scenario advances on a single click with no second "Explore from here"
+click at any step, old sibling options collapse automatically, breadcrumb/Back/Reset/breadcrumb-
+jump all work, Current Move/Path Depth update correctly, hover-preview shows a candidate in the
+panel without moving the path and "Hear transition" plays it, a second click on an
+already-previewed candidate advances, instrument selection (tested with Guitar) survives
+navigation, all EN/ES strings render correctly. One real bug was found and fixed during this pass:
+a React hydration mismatch from `Math.cos`/`Math.sin` differing in their last bit between server
+and client — fixed by rounding `computeRadialLayout`'s coordinates to 3 decimal places. Zero
+console errors after the fix. On mobile, a single tap both previews and advances in one gesture
+(touch browsers synthesize a compatibility `mouseenter` immediately before `click`) — this still
+satisfies the direct-click-advance requirement identically to desktop; true two-step
+preview-then-commit is effectively a desktop/keyboard-focus refinement, documented in
+`ExplorerApp.tsx` rather than forcing an extra dedicated tap target onto small map nodes, which
+would work against §12's own "don't make the interaction cumbersome" instruction.
 
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;

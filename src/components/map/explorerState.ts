@@ -1,26 +1,44 @@
 import { buildChord, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
-import type { ZoomLevel } from "@/domain/harmony";
+import { chordsEqual } from "@/domain/harmony";
+import {
+  startPath,
+  currentEndpoint,
+  advancePath,
+  goBack,
+  jumpToStep,
+  resetPath,
+  type NavigationPath,
+} from "@/domain/navigation";
 
 /**
- * The map's interaction state, kept deliberately small and framework-free so
- * it can be unit-tested without rendering React. Two chords are tracked on
- * purpose, preserving the product's core interaction rule (product-spec.md
- * §7): `selectedChord` is "what the contextual panel is showing" and
- * `exploredChord` is "what the map is centered on" — selecting a chord must
- * never silently recenter the map.
+ * The map's interaction state (Phase R3, superseding the Phase 4
+ * exploredChord/selectedChord/zoom model). Kept deliberately small and
+ * framework-free so it can be unit-tested without rendering React.
+ *
+ * `navPath` IS the chosen exploration path (product-spec.md §30/§13) — its
+ * last step is always the current endpoint. `previewChord` is the map's
+ * "inspect without advancing" mechanism (Phase R3 §12): hovering/focusing a
+ * candidate node sets it; clicking a chord that's already the preview
+ * commits it (ADVANCE); clicking anywhere else (including the endpoint
+ * itself) just changes or clears the preview. This is what keeps "clicking
+ * a next-chord node advances the path directly" (§10) true while still
+ * allowing lightweight inspection — the panel always shows
+ * `previewChord ?? currentEndpoint(navPath)`.
  */
 export interface ExplorerState {
   context: Key;
-  exploredChord: Chord;
-  selectedChord: Chord;
-  zoom: ZoomLevel;
+  navPath: NavigationPath;
+  previewChord: Chord | null;
 }
 
 export type ExplorerAction =
-  | { type: "SELECT"; chord: Chord }
-  | { type: "EXPLORE"; chord: Chord }
-  | { type: "SET_ZOOM"; zoom: ZoomLevel }
+  | { type: "ADVANCE"; chord: Chord }
+  | { type: "PREVIEW"; chord: Chord }
+  | { type: "CLEAR_PREVIEW" }
+  | { type: "BACK" }
+  | { type: "JUMP_TO"; index: number }
+  | { type: "RESET" }
   | { type: "SET_CONTEXT"; context: Key };
 
 function tonicTriad(context: Key): Chord {
@@ -29,24 +47,41 @@ function tonicTriad(context: Key): Chord {
 
 export function initialExplorerState(context: Key, startingChord?: Chord): ExplorerState {
   const chord = startingChord ?? tonicTriad(context);
-  return { context, exploredChord: chord, selectedChord: chord, zoom: 1 };
+  return { context, navPath: startPath(chord), previewChord: null };
 }
 
-/**
- * SELECT never touches `exploredChord`/`zoom` (inspecting a chord must not
- * recenter the map or change what's queried). EXPLORE recenters the map and,
- * since you're now looking at that chord's own neighborhood, also becomes
- * the selection. Changing the key resets both to the new key's tonic — the
- * previous chord may not even be meaningful in the new context.
- */
+/** What the contextual side panel should show — the previewed candidate if any, otherwise the path's current endpoint. */
+export function panelChord(state: ExplorerState): Chord {
+  return state.previewChord ?? currentEndpoint(state.navPath);
+}
+
 export function explorerReducer(state: ExplorerState, action: ExplorerAction): ExplorerState {
   switch (action.type) {
-    case "SELECT":
-      return { ...state, selectedChord: action.chord };
-    case "EXPLORE":
-      return { ...state, exploredChord: action.chord, selectedChord: action.chord };
-    case "SET_ZOOM":
-      return { ...state, zoom: action.zoom };
+    case "ADVANCE": {
+      if (chordsEqual(action.chord, currentEndpoint(state.navPath))) {
+        return state.previewChord === null ? state : { ...state, previewChord: null };
+      }
+      return {
+        ...state,
+        navPath: advancePath(state.navPath, state.context, action.chord),
+        previewChord: null,
+      };
+    }
+    case "PREVIEW": {
+      if (chordsEqual(action.chord, currentEndpoint(state.navPath))) {
+        return state.previewChord === null ? state : { ...state, previewChord: null };
+      }
+      if (state.previewChord && chordsEqual(action.chord, state.previewChord)) return state;
+      return { ...state, previewChord: action.chord };
+    }
+    case "CLEAR_PREVIEW":
+      return state.previewChord === null ? state : { ...state, previewChord: null };
+    case "BACK":
+      return { ...state, navPath: goBack(state.navPath), previewChord: null };
+    case "JUMP_TO":
+      return { ...state, navPath: jumpToStep(state.navPath, action.index), previewChord: null };
+    case "RESET":
+      return { ...state, navPath: resetPath(tonicTriad(state.context)), previewChord: null };
     case "SET_CONTEXT":
       return initialExplorerState(action.context);
     default:
