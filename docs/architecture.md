@@ -7,9 +7,9 @@
 | Framework | Next.js (App Router) + React + TypeScript (strict) | Single project serves the marketing site and `/app`; file-based routing fits the public/app split; server components keep marketing pages fast and SEO-friendly while the app is client-heavy. |
 | Styling | Tailwind CSS | Fast iteration for a solo developer, easy dark-first theming via CSS variables + Tailwind tokens, no runtime CSS-in-JS cost. |
 | Auth + DB | Supabase (Postgres + Auth + Row Level Security) | Managed Postgres, built-in email/password + email verification + password reset + Google OAuth, RLS gives per-user data isolation without a bespoke API layer, generous free tier, low ops burden for a solo dev. |
-| Billing | Stripe (Checkout + Webhooks) | Spec mandates it; handles PCI scope entirely; Checkout covers both the annual subscription and the lifetime one-time payment. |
+| Billing | Stripe (Checkout + Webhooks) | Spec mandates it; handles PCI scope entirely; Checkout covers the single Annual license subscription. **Revised R1**: the previous "and the lifetime one-time payment" no longer applies — there is no Lifetime license (`docs/product-spec.md` §25). |
 | Audio | Tone.js (built on Web Audio API) | Scheduling, synths and transport primitives out of the box; avoids hand-rolling audio-clock math for progression playback. |
-| Harmonic map rendering | Custom deterministic SVG renderer (no Canvas/force-physics, no generic graph library) | The map is not a generic force-directed graph — layout must express harmonic depth (Zoom 1–4) and relationship type, which a general-purpose graph library (react-flow, cytoscape) would fight against. A small custom renderer keeps the "every edge has musical meaning" rule enforceable and keeps the bundle light. **v1 decision (recorded ahead of Phase 4, not yet implemented):** plain SVG with deterministic (non-physics) layout — the visible map shows a local harmonic neighborhood (current chord + its relevant edges at the active Zoom level), never a large simultaneous node set, so a physics/force-directed simulation is unnecessary complexity. SVG also gets DOM-native accessibility (focus, ARIA, keyboard nav) essentially for free, which a Canvas renderer would have to reimplement by hand. Revisit only if this becomes a real rendering-performance bottleneck. |
+| Harmonic map rendering | Custom deterministic SVG renderer (no Canvas/force-physics, no generic graph library) | The map is not a generic force-directed graph — layout must express harmonic depth (Zoom 1–4) and relationship type, which a general-purpose graph library (react-flow, cytoscape) would fight against. A small custom renderer keeps the "every edge has musical meaning" rule enforceable and keeps the bundle light. **v1 decision (recorded ahead of Phase 4, not yet implemented):** plain SVG with deterministic (non-physics) layout — the visible map shows a local harmonic neighborhood (current chord + its relevant edges at the active Zoom level), never a large simultaneous node set, so a physics/force-directed simulation is unnecessary complexity. SVG also gets DOM-native accessibility (focus, ARIA, keyboard nav) essentially for free, which a Canvas renderer would have to reimplement by hand. Revisit only if this becomes a real rendering-performance bottleneck. **Revised R1**: this renderer choice still holds, but the map's UX MODEL is revised — a progressive harmonic path explorer (chosen path + all next-move options from the current endpoint, never a truncated top-N) rather than a fixed local neighborhood; see `docs/product-spec.md` §0/§30. Implementation is Phase R3, not yet built. |
 | i18n | `next-intl` | Native App Router support, namespaced JSON message files, type-safe message keys, no hard-coded copy in components. |
 | Testing | Vitest (unit/domain) + Playwright (e2e, added in Phase 15) | Vitest is fast and TS-native for the music engine; Playwright is the standard for the e2e flows listed in the spec. |
 | Package manager | npm | Default, zero extra tooling. |
@@ -31,7 +31,7 @@
       /guitar                fretboard model, voicing generation + ranking
       /bass                  fretboard model, patterns/arpeggios
       /piano                 keyboard model, voicings/inversions
-    /entitlements            plan -> feature flags, pure functions, no Stripe/Supabase imports
+    /entitlements            entitlement status (trialing/active/expired) -> capability flags, pure functions, no Stripe/Supabase imports
   /app/[locale]             Next.js App Router: marketing routes + /app (the product) routes, one locale segment
                             globals.css (Tailwind entry + dark-first design tokens) lives in src/app
   /components               presentational + composed UI components (React), consume /domain only through hooks/adapters
@@ -52,32 +52,47 @@ components from accumulating hidden harmonic rules.
 
 ## Entitlements
 
-A single module (`src/domain/entitlements`) maps a plan (`free | pro`) to a typed capability
-object:
+**Revised R1** — replaces the previous permanent `plan: "free" | "pro"` model
+(`docs/product-spec.md` §25/§26). There is no permanent Free tier and no Lifetime license; access
+is governed by the 72-hour trial and a single Annual license.
+
+A single module (`src/domain/entitlements`) maps an account's entitlement **status** to a typed
+capability object:
 
 ```ts
+type EntitlementStatus = "trialing" | "active" | "expired"; // + reserved for later: "past_due" | "canceled"
+
 interface Entitlements {
-  maxHarmonicZoom: 1 | 2 | 3 | 4;
-  maxCloudProjects: number | null; // null = unlimited
-  voicingCatalogue: "basic" | "full";
-  canExportMidi: boolean;
-  canExportPdf: boolean;
+  status: EntitlementStatus;
+  canUseApp: boolean; // full harmonic navigation, all Zoom depths, complete instrument catalogues
+  canSaveProjects: boolean;
+  canExport: boolean; // PDF/TAB export (docs/product-spec.md §20)
 }
 ```
 
-Server-side, the user's plan is derived from the `subscriptions`/`entitlements` table (updated only
-by verified Stripe webhooks), never from client state. UI reads entitlements through a single hook
-(`useEntitlements()`) that wraps this table — no `user.plan === "pro"` checks scattered through
-components.
+There is no `maxHarmonicZoom`/depth cap and no `voicingCatalogue: "basic" | "full"` split in this
+model — all four Zoom depths and each instrument's complete catalogue are part of `canUseApp`
+(`docs/product-spec.md` §9/§13–15), not independently gated. A numeric project-count cap, if any is
+ever added for `active` accounts, is a decision for the phase that implements enforcement (Phase
+11), not decided here.
+
+Server-side, the user's entitlement status is derived from `trial_started_at` (set at registration)
+and the `subscriptions`/`entitlements` table (updated only by verified Stripe webhooks), never from
+client state. UI reads entitlements through a single hook (`useEntitlements()`) that wraps this —
+no `user.plan === "pro"` or ad-hoc trial-timer checks scattered through components.
 
 ## Data model (initial, Supabase/Postgres)
 
 - `profiles` — id (references `auth.users`), display_name, primary_instrument, main_goal,
-  locale, marketing_consent, created_at.
-- `entitlements` — user_id, plan (`free` | `pro_annual` | `pro_lifetime`), status, current_period_end
-  (nullable, null for lifetime), stripe_customer_id, stripe_subscription_id, updated_at.
-- `projects` — id, user_id, name, key_context (nullable = free mode), bpm, time_signature,
-  instrument, created_at, updated_at.
+  locale, marketing_consent, created_at, `trial_started_at`.
+- `entitlements` — user_id, status (`trialing` | `active` | `expired`, reserved: `past_due` |
+  `canceled`), current_period_end (nullable), stripe_customer_id, stripe_subscription_id,
+  updated_at. **Revised R1**: the previous `plan` (`free` | `pro_annual` | `pro_lifetime`) column
+  is replaced by `status` above — there is only one paid product (Annual), so a `plan` column
+  distinguishing multiple paid tiers no longer applies.
+- `projects` — id, user_id, name, key_context (nullable — no locked tonal key; this is the TONAL
+  "free mode" concept from `docs/product-spec.md` §5/§6, unrelated to account entitlement status),
+  bpm, time_signature, instrument, created_at, updated_at.
 - `progression_chords` — id, project_id, chord_symbol, duration_beats, position, created_at.
 - `stripe_webhook_events` — event_id (unique, for idempotency), type, processed_at.
 
@@ -125,3 +140,8 @@ flatten that back into one-node-per-edge.
 - **Next.js 16 "Proxy" convention.** Next.js 16 renamed the `middleware.ts` file convention to
   `proxy.ts` (same request-interception role, used here for `next-intl`'s locale routing). The
   file lives at `src/proxy.ts`.
+- **R1 business-model revision (not an implementation deviation — a source-of-truth spec change).**
+  The permanent Free/Pro/Lifetime commercial model in `docs/product-spec.md` was replaced with a
+  72-hour full trial followed by a required Annual license; see `docs/product-spec.md` §9/§19/§20/
+  §25/§26 and `docs/roadmap.md`'s R1 entry for the full revision and rationale. This is
+  documentation-only as of R1 — no application code changed.

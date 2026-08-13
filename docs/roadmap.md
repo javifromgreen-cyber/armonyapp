@@ -568,18 +568,93 @@ descending line — this is a deliberate V1 simplification (guarantees the two c
 rather than a bug; a future pass could give it its own physically-optimized descent if that proves
 valuable in practice.
 
-## Phase 10 — Authentication and project persistence
+---
+
+# Refinement phases (R1–R4)
+
+Inserted 2026-08-13 after personally testing the deployed Phase 1–9 product. **Not a rebuild** —
+Phases 1–9's engine/architecture/tests are preserved and built upon, not replaced. These phases
+refine the business model, instrument audio, and core navigation UX before infrastructure
+(authentication/persistence/billing) resumes below. See `docs/product-spec.md` for the full
+revised spec text this implements/will implement.
+
+## Phase R1 — Product/business-model documentation revision
+- [x] Remove the permanent Free/Pro/Lifetime commercial model from all source-of-truth docs
+- [x] Document the 72-hour trial + required Annual license model (price not yet decided)
+- [x] Document the central entitlement model (`trialing`/`active`/`expired`)
+- [x] Document the Free/Pro catalogue-flag migration strategy (basic/extended, non-commercial)
+- [x] Document the export policy (trial/active only, Phase R4 implements it)
+- [x] Document the revised harmonic-navigation product concept (path explorer, completeness rule)
+- [x] Revise the roadmap sequence (R1–R4 before 10A/10B/11/12)
+
+**Documentation-only — no application behavior changed.** Files touched: `docs/product-spec.md`
+(§0, §6, §8, §9, §13–15, §17, §19–22, §23–26, §30–32, §40), `docs/architecture.md` (stack table,
+Entitlements section, data model, Deviations log), `docs/roadmap.md` (this section),
+`docs/music-engine.md` (a new migration note on Free/Pro catalogue tags), `CLAUDE.md` (entitlement
+capability names, a new "ranking organizes, never deletes" hard rule), `.env.example` (dropped the
+`STRIPE_PRICE_ID_PRO_LIFETIME` placeholder). No `src/` application code changed; the existing
+`VoicingCatalogue = "free" | "pro"` type and all Phase 7–9 instrument logic are untouched and still
+fully functional — see `docs/music-engine.md`'s new migration note for why, and what "clean
+migration" means when code-level renaming eventually happens.
+
+Full revision content, contradictions found, and rationale are in the R1 completion report
+delivered alongside this change (not duplicated here — see the conversation this phase was done
+in, and the substance is captured in the product-spec.md/architecture.md sections listed above).
+
+## Phase R2 — Instrument audio quality
+- [ ] Evaluate whether synth-only playback can achieve real Piano/Guitar/Bass identity
+- [ ] Move to a lightweight sample-based approach if not (`Tone.Sampler` or equivalent)
+- [ ] Piano: recognizable acoustic piano, not organ/generic synth/Guitar
+- [ ] Guitar: clean plucked guitar, clearly distinct from Piano
+- [ ] Bass: clean fingerstyle electric bass — not fretless/synth/slap/short-and-piercing
+- [ ] Preserve the shared scheduling/playback architecture (no duplicated timing logic)
+- [ ] Lazy-load instrument assets; cache per session; no blocking of initial map load
+- [ ] Tests: instrument routing, Guitar strum order, Bass sequence order, no pitch/MIDI regression
+- [ ] Live verification on the deployed Vercel preview; explicit judgment on Bass in particular
+
+## Phase R3 — Progressive contextual harmonic navigation
+- [ ] New `ProgressionNavigationEngine`-equivalent layer on top of the existing (preserved) harmony
+      graph engine — never a rewrite of `src/domain/harmony`/`src/domain/graph`
+- [ ] Core completeness guarantee: the navigation layer's next-chord set, deduplicated by chord
+      identity, equals the full outgoing set the harmony engine exposes for that chord/context/depth
+      — ranking organizes, never deletes
+- [ ] Progressive path UI: chosen path stays visible; only the current endpoint's options expand;
+      choosing a next chord collapses the previous endpoint's unchosen siblings
+- [ ] Contextual ranking (recent path / actual progression precedence rule, documented explicitly)
+- [ ] "Hear transition" (current → candidate) and, if cleanly achievable, "Hear path"
+- [ ] Back/Reset navigation; explicit "Add to progression" stays distinct from exploring
+- [ ] Completeness invariant test across Depth 1–4 for representative chords/contexts
+- [ ] Context-ranking tests for representative paths (documented in the R3 report)
+- [ ] Live verification (desktop/mobile, English/Spanish) on the deployed Vercel preview
+
+## Phase R4 — Export system
+- [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
+      Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text
+- [ ] Gated by entitlement status (`trialing`/`active`) once Phase 11 enforcement exists — until
+      then, available in dev without gating (same "inspectable, not enforced yet" pattern used for
+      Free/Pro catalogue tags in Phases 7–9)
+
+---
+
+# Infrastructure phases (resume after R1–R4)
+
+## Phase 10A — Authentication + 72-hour trial foundation
 - [ ] Supabase auth: email/password, verification, reset; Google OAuth
 - [ ] Onboarding (primary instrument, main goal)
+- [ ] `trial_started_at` set server-side at registration; trial status computable from it
+
+## Phase 10B — Project persistence
 - [ ] Project CRUD, RLS
+- [ ] Serialize/hydrate `Progression`/explorer state to/from a saved project
 
-## Phase 11 — Free/Pro entitlement system
-- [ ] Central entitlements module + `useEntitlements()`
-- [ ] Free project limit (3) enforced server-side
+## Phase 11 — Entitlement enforcement
+- [ ] Central entitlements module + `useEntitlements()` (`trialing`/`active`/`expired` →
+      `canUseApp`/`canSaveProjects`/`canExport`)
+- [ ] Server-side enforcement of post-trial/post-expiry access locking
 
-## Phase 12 — Stripe Annual + Lifetime
-- [ ] Checkout for annual + lifetime
-- [ ] Webhook handling, idempotency, entitlement sync
+## Phase 12 — Annual Stripe billing
+- [ ] Checkout for the single Annual license (no Lifetime)
+- [ ] Webhook handling, idempotency, entitlement sync (`trialing` → `active` on payment)
 
 ## Phase 13 — Complete English/Spanish UI
 - [ ] Full copy translated, no missing keys
@@ -595,4 +670,11 @@ valuable in practice.
 
 ## Deviations / notable decisions log
 
-(none yet)
+- **2026-08-13 — R1 business-model revision.** Removed the permanent Free/Pro/Lifetime commercial
+  model (previously: Free €0 / Pro Annual €34.99/year / Pro Lifetime €79.99 one-time, with Zoom 1–2
+  vs Zoom 1–4 and a 3-project Free cap) in favor of: register → 72-hour full trial (complete product
+  access, no card required) → required Annual license (price not yet decided — do not invent one).
+  Rationale: personal testing of the deployed product plus musician feedback. Full detail in
+  `docs/product-spec.md` §9/§19/§20/§25/§26 and this file's R1 entry above. Documentation-only;
+  no code changed in this pass — Phases R2 (audio) and R3 (navigation) are the next controlled
+  steps, each requiring separate approval before starting.

@@ -4,6 +4,19 @@ The music engine is the framework-free domain layer under `src/domain`. It must 
 anything is built on top of it. This document defines module boundaries and the testing bar for
 each.
 
+> **R1 terminology migration note (2026-08-13, documentation-only, no code changed):** every
+> `"free" | "pro"` `VoicingCatalogue`/pattern-catalogue tag referenced throughout this document
+> (Piano/Guitar/Bass voicing and pattern generation) predates a business-model revision —
+> `docs/product-spec.md`'s permanent Free/Pro commercial tiers no longer exist (see
+> `docs/product-spec.md` §9/§19/§20/§25/§26). Going forward, read every `"free"`/`"pro"` tag in this
+> document and in the code as a **basic/extended catalogue grouping** (which voicings/patterns
+> surface first vs. later in the navigator), NOT a commercial access gate. Any account with active
+> product access (trialing or licensed — `docs/product-spec.md` §26) can inspect and use the
+> complete catalogue regardless of tag. The working instrument logic and its extensive test suite
+> (Phases 7–9) are unchanged and fully valid; a future non-behavioral rename of the type/field names
+> themselves (e.g. `"free" | "pro"` → `"basic" | "extended"`) is a clean, low-risk follow-up but was
+> deliberately NOT done in this pass, since R1 is documentation-only.
+
 ## Module map
 
 - **notes** — pitch classes (0–11), note names, enharmonic spelling rules. Spelling must respect

@@ -21,6 +21,15 @@ understand where a chord can lead, hear those possibilities, see how to play the
 instrument, and turn discoveries into chord progressions. "Google Maps" is a navigation metaphor
 only — the UI must not look like a geographical map.
 
+**Revised framing (R1, superseding earlier phrasing where narrower):** the harmonic map is not
+primarily "a visualization of chords related to this chord" — it is a **navigable map of harmonic
+possibilities**, a harmonic path explorer rather than a static harmony graph. The core question it
+answers is *"where can this chord go next?"*, then *"and where can I go from there?"*. See §30 for
+the completeness rule this implies (all valid next moves stay accessible, never silently
+top-N-truncated) and `docs/roadmap.md`'s Phase R3 for the implementation of this navigation model —
+Phases 1–4 built the harmonic graph engine and an initial map UI; R3 is the phase that builds the
+progressive, path-based navigation experience described here on top of that existing engine.
+
 ## 1. Product Philosophy
 
 Three inseparable purposes, delivered through one interaction model (never three modes):
@@ -43,7 +52,10 @@ Web-only, fully responsive. No native iOS/Android/desktop apps. Two layers under
 
 - **Public website** (marketing): Home, Features, Pricing, FAQ, Login, Register, Privacy, Terms —
   accessible without an account; may show canned demos/screenshots.
-- **Application** at `/app` — interactive use requires a free account.
+- **Application** at `/app` — interactive use requires an account. Registration itself is free and
+  starts a 72-hour full-access trial; no payment card is required to begin (§19). *(Revised R1:
+  previously "requires a free account" — reworded since "free" is no longer a commercial tier
+  name and that phrasing risked implying a permanent free plan.)*
 
 ## 3. Languages
 
@@ -75,8 +87,11 @@ Architecture should later support modulation inside a progression; do not overbu
 Harmonic map and chord progression coexist always — never separate "map mode" / "composition
 mode". Conceptual desktop layout (may evolve for UX):
 
-- **Top**: project title, key/free mode, active instrument, account/settings.
-- **Centre**: harmonic map.
+- **Top**: project title, key/free mode (*"free mode" here is a TONAL concept — no locked key —
+  unrelated to any commercial plan; see the naming note in §25's revision history), active
+  instrument, account/settings.
+- **Centre**: harmonic map — a chosen harmonic path plus all next-move options from its current
+  endpoint (R3; see §30).
 - **Contextual side panel**: selected chord, harmonic info, relationship explanation, instrument
   representation.
 - **Bottom**: persistent progression strip, transport/playback, BPM, time signature.
@@ -96,7 +111,11 @@ Selecting a chord must never silently modify the progression.
 ## 8. Harmonic Map — Harmonic Depth ("Zoom")
 
 Zoom is harmonic depth, not visual scale: it controls which *types of relationships* are shown.
-Every edge must have real musical meaning — depth increases never just add random chords.
+Every edge must have real musical meaning — depth increases never just add random chords. **Depth
+is cumulative**: Zoom 2 = Zoom 1 + Zoom 2's own families; Zoom 3 = Zoom 1 + 2 + 3; Zoom 4 = every
+family the engine currently models (already the implementation in
+`src/domain/graph/harmonicGraph.ts`'s `maxDepth` filter — this is a documentation clarification,
+not a behavior change).
 
 - **Zoom 1 — Immediate harmonic environment**: diatonic chords of the current context; basic
   tonic/predominant/dominant relationships; common scale-degree movements; relative major/minor;
@@ -111,12 +130,23 @@ Every edge must have real musical meaning — depth increases never just add ran
   connections; chromatic chains; common-tone relationships; non-functional harmonic pathways; deep
   graph exploration.
 
-## 9. Free vs Pro Harmonic Depth
+**Within a depth, every valid modeled relationship stays accessible — ranking may organize
+prominence/order/grouping, but must never delete a valid possibility from what the user can reach.**
+No arbitrary "top N" recommendation cap at any depth (R3 formalizes and tests this rule; see §30 and
+`docs/roadmap.md`'s Phase R3).
 
-- **Free**: Zoom 1, Zoom 2.
-- **Pro**: Zoom 1–4.
+## 9. Harmonic Depth Availability
 
-Depth of exploration is gated, never individual chords arbitrarily locked.
+*(Revised R1 — this section previously read "Free vs Pro Harmonic Depth" with a permanent Zoom 1–2
+vs Zoom 1–4 split. That permanent commercial split no longer exists — see §25's revised business
+model.)*
+
+All four Zoom levels are available to any user with active product access — whether that's the
+72-hour trial or an active annual license (§25). There is no depth tier gated behind a permanent
+"Free" plan; depth of exploration is never gated by a payment tier at all, only by whether the
+account currently has active product access. Depth of exploration is never gated per-chord —
+gating, where it exists, is at the account-access level (§26's entitlement states), never by
+arbitrarily locking individual chords or relationships within an active session.
 
 ## 10. Initial Chord Catalogue (v1.0)
 
@@ -145,9 +175,15 @@ map, or progression.
 Fretboard/chord diagram, fretted notes, finger numbers where appropriate, TAB, chord tones,
 multiple playable voicings — a chord never has one single shape.
 
-- **Free**: ~2–3 useful/basic voicings where available (e.g. open position, common movable
-  alternative).
-- **Pro**: larger useful voicing catalogue.
+- **Basic catalogue**: ~2–3 useful/basic voicings where available (e.g. open position, common
+  movable alternative) — what's surfaced first in the voicing navigator.
+- **Extended catalogue**: the larger ranked voicing catalogue.
+
+*(Revised R1: "Free"/"Pro" is no longer the right label for this split — see §25. Any user with
+active product access, whether trialing or licensed, can inspect and use the COMPLETE catalogue;
+"basic" vs "extended" is a presentation/ranking grouping (what's shown first), not a commercial
+gate. The underlying code's `VoicingCatalogue` type still uses `"free" | "pro"` values as of this
+revision — see `docs/music-engine.md`'s migration note — pending a future non-behavioral rename.)*
 
 Future: filter by fretboard area, inversion, strings, root position, voicing characteristics.
 Never enumerate every mathematically possible fret combination — voicings are ranked by
@@ -158,8 +194,11 @@ duplicated notes, ergonomics). **The guitar voicing engine must have automated t
 
 Keyboard, highlighted notes, fingering where appropriate, root position, inversions, voicings.
 
-- **Free**: root position + a small number of useful alternatives.
-- **Pro**: expanded/full inversion and voicing catalogue.
+- **Basic catalogue**: root position + a small number of useful alternatives.
+- **Extended catalogue**: expanded/full inversion and voicing catalogue.
+
+*(Revised R1 — same basic/extended reframing as §13; full catalogue available to any user with
+active product access. See §13's note.)*
 
 Future: voice-leading optimisation (not in v1).
 
@@ -171,8 +210,11 @@ musically over this chord?"*, not *"how do I play the whole chord at once?"*
 Show: bass fretboard, root/third/fifth/seventh where applicable, chord-tone positions, TAB, a
 useful arpeggio/pattern.
 
-- **Free**: chord tones, basic position, one useful pattern/arpeggio.
-- **Pro**: additional positions, multiple patterns, alternative arpeggio orders.
+- **Basic catalogue**: chord tones, basic position, one to two useful patterns/arpeggios.
+- **Extended catalogue**: additional positions, multiple patterns, alternative arpeggio orders.
+
+*(Revised R1 — same basic/extended reframing as §13; full catalogue available to any user with
+active product access. See §13's note.)*
 
 Future: root-only mode, chord-tone mode, voice leading, chord-to-chord bass-line suggestions,
 double stops/chordal bass.
@@ -193,7 +235,8 @@ behavior — not built yet.
 
 ## 17. Transposition
 
-Basic progression transposition is a **Free** feature. Entire progression transposes while
+Progression transposition is part of core product access (available during the trial and to any
+active license — see §25; not a separately-gated feature). Entire progression transposes while
 preserving harmonic relationships; instrument views update accordingly.
 
 ## 18. Audio
@@ -210,43 +253,66 @@ Web Audio API and/or Tone.js. Simple synthesis / lightweight legally-usable soun
 v1 — correctness of pitch, timing, voicing, and responsiveness matter more than realism. Avoid
 expensive external audio services.
 
-## 19. Free Plan
+## 19. The 72-Hour Trial
 
-Genuinely useful, not a crippled demo. Full core loop (Explore/Understand/Hear/Play/Compose).
-Includes: account; Zoom 1–2; guitar/bass/piano; core chord info; contextual explanations; basic
-instrument representations; ~2–3 basic voicings where appropriate; harmonic playback;
-instrument/voicing playback; progression builder; BPM/time signature/durations; progression
-playback; transposition; max 3 cloud projects; copy progression as text; export basic progression
-image; limited basic examples of future assisted-harmony features once built.
+*(Revised R1 — replaces the previous permanent "Free Plan" section. There is no permanent free
+tier: see §25 for the full commercial model.)*
 
-## 20. Pro
+Every newly registered user gets exactly **72 hours of complete product access**, starting at
+registration. No payment card is required to begin. The trial is genuinely the full product, not a
+crippled demo — the purpose is "use the real product and decide whether it's valuable enough to
+keep," so nothing about the core experience is artificially withheld during those 72 hours.
 
-Everything in Free, plus: Zoom 3–4; deeper harmonic exploration; expanded/full voicing
-catalogues; advanced instrument positions; unlimited cloud projects. Future Pro-only: advanced
-path finding, voice-leading optimisation, fingering optimisation, advanced substitutions,
-progression-character transformations, modulation detection, reharmonisation, MIDI export, PDF
-export, advanced diagram/progression exports. Not all v1.0 requirements — architecture must
-support them. Never advertise unfinished functionality on the pricing page.
+Trial access includes: account; all four Zoom/harmonic-depth levels; the complete
+harmonic-navigation system; all three instruments (Guitar, Bass, Piano); the complete voicing/
+position/pattern catalogue for each instrument (not just the "basic" grouping — see §13–15); core
+chord info and contextual explanations; harmonic playback and instrument/pattern playback;
+progression builder (BPM, time signature, durations, playback, transposition); projects, once
+persistence exists (§10A/§10B of `docs/roadmap.md`); PDF exports; Guitar TAB exports; Bass TAB
+exports; other approved export formats (§20). Depth of exploration and catalogue completeness are
+never rationed during an active trial.
+
+## 20. After the Trial, and Export Policy
+
+When the 72 hours elapse: the account, profile, and all saved projects/musical work remain intact
+— **nothing is deleted**. The user can still log in. Full product usage (harmonic navigation
+beyond inspection, catalogue access, playback of new material, etc.) and exports become locked,
+and the user is invited to activate an annual license (§25). Reactivating an annual license
+restores full access immediately, to the same account and the same saved work.
+
+**Exports** (Progression PDF; a useful chord/instrument PDF; Piano representation PDF; Guitar
+diagram/TAB PDF; Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text; other formats added later)
+are part of the real paid product experience — available exactly when an account is `trialing` or
+`active` (§26's entitlement states), locked when `expired`. Exact implementation lands in a later
+controlled phase (`docs/roadmap.md`'s Phase R4); this section documents policy, not code.
 
 ## 21. Assisted Composition (future)
 
 Prefer deterministic musical algorithms over an LLM. Potential functions: path finding
 (Cmaj7 → ? → ? → Emaj7), substitution suggestions, voice-leading optimisation, smoother/tenser/more
-chromatic alternatives, reharmonisation. Free eventually gets simple examples; Pro unlocks depth.
-Prefer limiting harmonic depth/range over artificial "AI credits". No runtime LLM dependency
-required for v1.0.
+chromatic alternatives, reharmonisation. *(Revised R1: previously phrased as "Free eventually gets
+simple examples; Pro unlocks depth" — that permanent-tier framing is obsolete. Depth here, like
+elsewhere, is governed by active product access (trialing/active — §26), not a permanent plan
+distinction.)* Prefer limiting harmonic depth/range over artificial "AI credits". No runtime LLM
+dependency required for v1.0.
 
 ## 22. Project Storage
 
-Requires an account. Free: max 3 cloud projects. Pro: unlimited. Enforced through a central
-configurable entitlement system.
+*(Revised R1 — the previous "Free: max 3 cloud projects. Pro: unlimited" permanent split is
+obsolete.)* Requires an account. Project storage access follows the same entitlement states as the
+rest of the product (§26): available while `trialing` or `active`; projects and their data are
+never deleted on `expired`, but creating/editing may be locked until the account reactivates.
+Enforced through the central configurable entitlement system (§26), not scattered checks. (Whether
+a numeric project-count cap exists for an active license, if any, is a decision for the phase that
+implements enforcement — `docs/roadmap.md`'s Phase 11 — not decided in this revision.)
 
 ## 23. Authentication
 
 v1 minimum: email/password, email verification, password reset. Google OAuth desirable if
 straightforward. Apple login not required for v1. Onboarding asks **primary instrument**
 (Guitar/Bass/Piano) and **main goal** (Explore harmony / Compose / Understand progressions / All
-of the above); store these preferences.
+of the above); store these preferences. Registration is also the moment the 72-hour trial (§19)
+starts — `trial_started_at` is set server-side at account creation, never client-derived.
 
 ## 24. Marketing Consent
 
@@ -255,23 +321,52 @@ to marketing email. Explicit opt-in checkbox. GDPR/EU-friendly by design.
 
 ## 25. Business Model
 
-- **Free** — €0
-- **Pro Annual** — €34.99/year
-- **Pro Lifetime** — €79.99 one-time
+*(Fully revised R1 — replaces the previous permanent Free/Pro-Annual/Pro-Lifetime three-tier
+model. That model, including the Lifetime license, is obsolete and must not be reintroduced without
+another deliberate spec revision.)*
 
-No launch discount. Annual and Lifetime unlock identical Pro functionality. Lifetime never
-expires. Annual stays active until the end of the paid billing period after cancellation.
+```
+REGISTER → 72-HOUR FULL TRIAL → ANNUAL PAID LICENSE REQUIRED
+```
 
-## 26. Billing
+- **Trial**: 72 hours of complete product access, starting at registration, no payment card
+  required (§19).
+- **Annual license**: the only ongoing paid product. **Price not yet decided — do not display or
+  hard-code a price anywhere until a decision is made and this section is updated with it.** (The
+  previous €34.99/year figure was tied to the now-obsolete three-tier model and should not be
+  treated as a placeholder or default.)
+- **There is no Lifetime license.** There is no permanent free tier. Annual licenses renew yearly;
+  behavior on cancellation/non-renewal (grace period, exact `past_due`/`canceled` handling) is a
+  decision for the phase that implements billing (`docs/roadmap.md`'s Phase 12), not decided here.
 
-Stripe (Checkout) unless a compelling reason otherwise. Support annual subscription, Lifetime
-one-time payment, secure webhook handling, server-side entitlement updates, idempotent webhook
-processing, billing status. Never trust client-side payment state. Never hard-code secrets or
-Stripe price IDs — environment variables only.
+Naming note: the UI concept sometimes called "Free Mode" (§5/§6 — no locked tonal key) is
+UNRELATED to this commercial model and predates it; it must not be confused with the removed
+commercial "Free" tier. Consider renaming that UI concept later (candidates: "Open Harmony",
+"Unlocked Key", "No Fixed Key") if the shared word "free" proves confusing in practice — do not
+rename casually without reviewing current i18n/UI implications first.
 
-Central entitlement/feature system — never scatter `if (user.plan === "pro")` through the app.
-Prefer named entitlements: `canAccessZoom3`, `canAccessZoom4`, `maxCloudProjects`,
-`canAccessFullVoicings`, `canExportMidi`, `canExportPdf`, etc.
+## 26. Billing and Entitlements
+
+Stripe (Checkout) unless a compelling reason otherwise, for the single Annual license product.
+Secure webhook handling, server-side entitlement updates, idempotent webhook processing, billing
+status. Never trust client-side payment/trial state — entitlement state is always written
+server-side. Never hard-code secrets or Stripe price IDs — environment variables only.
+
+**Central entitlement system** — never scatter `if (user.plan === "pro")` or ad-hoc trial-timer
+checks through the app. One module is the single source of truth for account access, minimally
+modeling these states:
+
+- `trialing` — within the 72-hour window from `trial_started_at`.
+- `active` — a currently-valid annual license.
+- `expired` — trial elapsed with no active license, or a license that lapsed.
+- Reserved for later billing nuance, not required to implement yet: `past_due`, `canceled`, etc.
+
+That state answers named capability questions — e.g. `canUseApp`, `canSaveProjects`, `canExport` —
+never a scattered `user.plan === "..."` string check. See `docs/architecture.md`'s Entitlements
+section for the concrete module shape. (Depth/catalogue-specific entitlements like the previous
+`canAccessZoom3`/`canAccessFullVoicings` no longer apply — see §9 and §13–15: those are not
+gated behind a commercial tier at all anymore, only behind whether the account currently has
+active access.)
 
 ## 27. Technical Principles
 
@@ -300,45 +395,82 @@ from explicit musical rules, not hand-authored per node. Correctness over clever
 
 ## 30. Map UX
 
-Never dump the entire harmonic universe on screen. Always emphasise the current chord and its most
-relevant nearby options. Users can select, inspect, hear, understand, recenter, and explicitly add
-to the progression. More relationship categories appear as depth increases. Relationships must be
-distinguishable by more than colour alone.
+*(Revised R1 — the completeness rule below supersedes the previous "always emphasise the current
+chord and its most relevant nearby options" phrasing, which read as license to silently truncate.
+Implementation lands in `docs/roadmap.md`'s Phase R3, on top of the harmonic graph engine built in
+Phases 1–4.)*
+
+The map is a **harmonic path explorer**, not a static neighborhood graph (§0). For the current
+chord, harmonic context, and active Zoom/depth, the map exposes **every valid outgoing harmonic
+possibility the engine currently models** — ranking, grouping, and visual emphasis organize that
+set, but never remove a member of it. If 14 unique valid next chords exist at the active depth, the
+user can reach all 14, not a curated top handful.
+
+This is NOT the same as rendering a full recursive tree: the map shows the CHOSEN harmonic path
+(the sequence of chords already navigated) plus ALL next-move options from the current path
+endpoint only. Choosing an option advances the endpoint, collapses the previous endpoint's
+unchosen sibling options, and reveals all next-move options from the new endpoint. Previous context
+(the path taken so far, or the actual progression when it corresponds to the current exploration
+point — see the precedence rule in `docs/roadmap.md`'s Phase R3) may shift ranking, prominence,
+placement, category, and explanation — never membership.
+
+Users can select, inspect, hear (including a chord-to-chord "hear transition"), understand,
+navigate forward/backward along the path, reset to a new starting chord, and explicitly add to the
+progression. Relationships must be distinguishable by more than colour alone.
 
 ## 31. Paywall UX
 
-Paywalls feel natural, never abrupt. Bad: click an arbitrary chord → paywall. Good: experience
-Zoom 1–2 fully, then encounter "Zoom 3 — Advanced harmonic relationships — Pro" or "7 additional
-voicings available with Pro". Free must deliver the product's aha moment before any payment ask.
+*(Revised R1 — the previous Zoom-tier paywall example is obsolete; there is no permanent Free tier
+to "experience fully" before a paywall. See §19/§25.)*
+
+The trial itself IS the natural pre-payment experience: 72 hours of the complete, uncrippled
+product (§19), not a feature-limited teaser. The "paywall" moment, when it exists, is the
+end-of-trial (or end-of-license) transition — reactivating access, not discovering a locked
+feature mid-session. Never abruptly interrupt an in-progress action; when access lapses, communicate
+clearly what remains available (login, viewing saved work) versus what requires reactivating a
+license (§20), and let the user reactivate without losing anything they built.
 
 ## 32. V1.0 Scope
 
-In scope: project architecture; authentication; bilingual infrastructure; music engine; harmonic
-graph; harmonic map; Zoom 1–4; entitlement system; progression builder; guitar/bass/piano;
-basic/full voicing distinction; browser audio; project storage; 3-project Free limit;
-Annual/Lifetime billing; marketing site; responsive UX; basic text/image export.
+*(Revised R1 — drops the obsolete 3-project Free limit and Annual/Lifetime billing framing; adds
+PDF/TAB export, previously deferred, now planned via Phase R4 — see the contradiction note in this
+revision's R1 report.)*
+
+In scope: project architecture; authentication; the 72-hour trial; bilingual infrastructure; music
+engine; harmonic graph; harmonic map as a progressive path explorer; Zoom 1–4 (available to any
+account with active access); central entitlement system (trialing/active/expired); progression
+builder; guitar/bass/piano; basic/extended catalogue distinction (not a commercial gate — see
+§13–15); browser audio; project storage; Annual license billing; marketing site; responsive UX;
+PDF/TAB export system (§20, Phase R4).
 
 Explicitly deferred: sophisticated reharmonisation; automatic advanced voice-leading
-optimisation; advanced fingering optimiser; complex route generation; MIDI export; PDF export;
-DAW-like arrangement; collaboration; social/community features; realistic premium sample
-libraries; native apps.
+optimisation; advanced fingering optimiser; complex route generation; MIDI export; DAW-like
+arrangement; collaboration; social/community features; realistic premium sample libraries; native
+apps.
 
 ## 33. Future Roadmap
 
 Architecture should accommodate (not implement now): advanced harmonic path finding,
 voice-leading visualisation/optimisation, advanced substitution tools, harmonic-character
 transformations, smarter guitar/piano voicing selection, bass-line connection suggestions, MIDI
-export, PDF export, song sections/repetitions/arrangement, more instruments, more chord families,
-custom tunings, teacher functionality, more languages.
+export, song sections/repetitions/arrangement, more instruments, more chord families, custom
+tunings, teacher functionality, more languages. *(Revised R1: PDF export removed from this
+"not yet" list — it moved to explicitly-planned V1 scope via Phase R4, §20/§32. MIDI export
+remains future/deferred.)*
 
 ## 34. Public Website
 
-Polished, minimal, commercial. Goal: musicians understand the product quickly and create a free
-account. Hero direction: "See where your chords can go." Supporting line: "Explore harmony. Hear
-every path. Play it on your instrument. Build your progression." Primary CTA: "Start Free."
+Polished, minimal, commercial. Goal: musicians understand the product quickly and register for the
+72-hour trial (§19). Hero direction: "See where your chords can go." Supporting line: "Explore
+harmony. Hear every path. Play it on your instrument. Build your progression." Primary CTA
+copy is a decision for Phase 14 (marketing website, not yet built) to make explicitly — *(Revised
+R1: the previous "Start Free" CTA text predates this revision and should be re-evaluated then,
+since "Free" is no longer a commercial tier name; e.g. "Start your free trial" more accurately
+reflects §19/§25 without implying a permanent free plan. Not decided or implemented here.)*
 Visually demonstrate the harmonic map, relationship explanation, instrument representation,
 progression builder, and the Explore→Understand→Hear→Play→Compose loop. Show Guitar/Bass/Piano
-support. Pricing as in §25. Never fabricate testimonials, users, reviews, awards, endorsements.
+support. Pricing/trial terms as in §19/§25 (no price to display until §25's price is decided).
+Never fabricate testimonials, users, reviews, awards, endorsements.
 
 ## 35. Accessibility
 
@@ -371,9 +503,12 @@ intelligently.
 
 Musical correctness is mission-critical. Strong automated coverage: chord generation/parsing,
 intervals, scale/key generation, enharmonic spelling, transposition, harmonic relationships, Zoom
-classification, entitlement logic, project limitations, instrument-note generation, voicing
-algorithms. Integration/E2E eventually covers: registration, login, project creation,
-adding/reordering chords, playback, saving, Free project limit, upgrading, Pro access.
+classification, entitlement logic, instrument-note generation, voicing algorithms. Integration/E2E
+eventually covers: registration (including trial start), login, project creation,
+adding/reordering chords, playback, saving, trial-to-expired transition, license activation
+(`expired` → `active`), post-expiry access locking and reactivation. *(Revised R1: previously
+"Free project limit, upgrading, Pro access" — reworded for the trial/entitlement-status model;
+see §26.)*
 
 ## 40. Implementation Strategy
 
@@ -388,12 +523,24 @@ Work in controlled phases, verifying at the end of each:
 7. Piano representation
 8. Guitar representation and voicing engine
 9. Bass representation
-10. Authentication and project persistence
-11. Free/Pro entitlement system
-12. Stripe Annual + Lifetime
+- **R1 — Product/business-model documentation revision** (this revision — no application behavior
+  change)
+- **R2 — Instrument audio quality**
+- **R3 — Progressive contextual harmonic navigation** (implements §0/§30's path-explorer model on
+  the existing harmonic graph engine)
+- **R4 — Export system** (implements §20's export policy)
+10A. Authentication + 72-hour trial foundation
+10B. Project persistence
+11. Entitlement enforcement (central `trialing`/`active`/`expired` states — §26)
+12. Annual Stripe billing (single Annual license product — no Lifetime, §25)
 13. Complete English/Spanish UI
 14. Marketing website
 15. Responsive UX, accessibility, testing, production polish
+
+*(Revised R1: inserted R1–R4 before authentication per this revision's product refinement; split
+the previous single "Phase 10 — Authentication and project persistence" into 10A/10B since they're
+now distinct, sequenced pieces of infrastructure; renamed 11/12 to match the revised entitlement
+and billing model — no Lifetime license, no permanent Free/Pro split.)*
 
 Sequence may adjust for compelling technical dependencies (see `docs/roadmap.md` for current
 status and any adjustments).

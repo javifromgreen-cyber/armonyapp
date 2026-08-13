@@ -21,10 +21,16 @@ is a navigation metaphor only — the UI must not look like a geographic map.
 - No giant catch-all files (no single `musicTheory.ts`) — split by music domain per
   `architecture.md`.
 - Entitlements are centralized in `src/domain/entitlements`; never scatter
-  `if (user.plan === "pro")` checks through the app. Gate by named capability
-  (`canAccessZoom3`, `maxCloudProjects`, etc.), not by plan string.
-- Harmonic "Zoom" (1–4) is harmonic depth (which relationship types are shown), not visual scale.
-  Every graph edge must carry a real musical relationship — never add chords just to fill space.
+  `if (user.plan === "pro")` or ad-hoc trial-timer checks through the app. Gate by named
+  capability (`canUseApp`, `canSaveProjects`, `canExport`) derived from entitlement status
+  (`trialing`/`active`/`expired`), not by plan string. There is no permanent Free/Pro tier and no
+  Lifetime license — see `docs/product-spec.md` §9/§19/§20/§25/§26 (revised R1).
+- Harmonic "Zoom" (1–4) is harmonic depth (which relationship types are shown), not visual scale,
+  and is cumulative (Zoom N = Zoom 1..N's families combined). Every graph edge must carry a real
+  musical relationship — never add chords just to fill space. **Within an active depth, every
+  valid modeled relationship must stay reachable — ranking may reorder, group, or visually
+  emphasize possibilities, but must never delete one from what the user can reach** (see
+  `docs/product-spec.md` §8/§30, revised R1; implemented in Phase R3).
 - Three distinct user actions must stay distinct in code and UI: selecting a chord, recentring the
   map on a chord, and adding a chord to the progression. Selection must never mutate the
   progression.
@@ -36,9 +42,10 @@ is a navigation metaphor only — the UI must not look like a geographic map.
 
 ## Workflow
 
-- Work in the phases defined in `docs/roadmap.md`. Don't jump ahead to later-phase functionality
-  (MIDI/PDF export, voice-leading optimisation, arrangement/sections, etc. — see product-spec §32,
-  §33) unless explicitly asked.
+- Work in the phases defined in `docs/roadmap.md` (now including refinement phases R1–R4 before
+  the infrastructure phases 10A/10B/11/12). Don't jump ahead to later-phase functionality (MIDI
+  export, voice-leading optimisation, arrangement/sections, PDF/TAB export before Phase R4, etc. —
+  see product-spec §32, §33) unless explicitly asked.
 - At the end of each phase: run tests, typecheck, lint, build; fix failures; update
   `docs/roadmap.md` status before moving on. Don't build on a known-broken foundation.
 - When uncertain about a music-theory rule: don't guess — write the rule down explicitly, add a
