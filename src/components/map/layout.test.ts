@@ -14,7 +14,7 @@ function buildRankedOptions(symbol: string) {
   return rankOptions(options, history);
 }
 
-describe("computeRadialLayout", () => {
+describe("computeRadialLayout — single adaptive ring (Phase R3.1 §16-23)", () => {
   it("positions every option exactly once", () => {
     const options = buildRankedOptions("C");
     const layout = computeRadialLayout(options);
@@ -30,26 +30,38 @@ describe("computeRadialLayout", () => {
     );
   });
 
-  it("Depth-1 options sit on a smaller ring than Depth-2 options", () => {
-    const options = buildRankedOptions("C");
+  it("every option sits on the SAME ring — depth never determines radial distance (no false parentage)", () => {
+    // F#dim from Dm has options across multiple depths (Phase R3.1's own
+    // reported example) — all of them must be equidistant from the center.
+    const options = buildRankedOptions("Dm");
+    const depths = new Set(options.map((o) => o.depth));
+    expect(depths.size).toBeGreaterThan(1); // sanity: this chord really does span depths
     const layout = computeRadialLayout(options);
-    const depth1Radii = layout.nodes.filter((n) => n.option.depth === 1).map((n) => n.radius);
-    const depth2Radii = layout.nodes.filter((n) => n.option.depth === 2).map((n) => n.radius);
-    expect(depth1Radii.length).toBeGreaterThan(0);
-    expect(depth2Radii.length).toBeGreaterThan(0);
-    expect(Math.max(...depth1Radii)).toBeLessThan(Math.min(...depth2Radii));
+    const distances = layout.nodes.map((n) =>
+      Math.hypot(n.x - layout.center.x, n.y - layout.center.y),
+    );
+    for (const d of distances) {
+      expect(d).toBeCloseTo(layout.radius, 3);
+    }
   });
 
-  it("a node's ring matches its OWN move's depth, not some other chord's shallowest relationship (Phase R3 §6)", () => {
-    const options = buildRankedOptions("C");
-    const layout = computeRadialLayout(options);
-    for (const positioned of layout.nodes) {
-      const expectedRadius = computeRadialLayout([positioned.option]).nodes[0].radius;
-      // same depth => same ring radius constant, regardless of which other options are present
-      const sameDepthAnyLayout = layout.nodes.find((n) => n.option.depth === positioned.option.depth)!;
-      expect(positioned.radius).toBe(sameDepthAnyLayout.radius);
-      expect(expectedRadius).toBeGreaterThan(0);
-    }
+  it("the ring radius stays within a bounded, readable range even for a chord with many options", () => {
+    const layout = computeRadialLayout(buildRankedOptions("C"));
+    expect(layout.radius).toBeGreaterThanOrEqual(160);
+    expect(layout.radius).toBeLessThanOrEqual(300);
+  });
+
+  it("a small option set doesn't collapse toward the center — it still gets the minimum readable radius", () => {
+    // A single synthetic option — the layout must not divide by ~0 or shrink unreasonably.
+    const [oneOption] = buildRankedOptions("C");
+    const layout = computeRadialLayout([oneOption]);
+    expect(layout.radius).toBeGreaterThanOrEqual(160);
+  });
+
+  it("viewBox scales with the actual ring, not a fixed worst-case box", () => {
+    const small = computeRadialLayout(buildRankedOptions("C").slice(0, 3));
+    const large = computeRadialLayout(buildRankedOptions("C"));
+    expect(large.size).toBeGreaterThanOrEqual(small.size);
   });
 
   it("all positions fall within the declared viewBox", () => {

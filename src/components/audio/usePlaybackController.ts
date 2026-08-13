@@ -76,13 +76,21 @@ export function usePlaybackController(): PlaybackController {
     });
   }, []);
 
+  // hearTransition/hearPath cancel any in-flight Transport-scheduled audio
+  // at the audio layer (player.ts's hearPath calls stopProgression() first)
+  // — if that preempted an actual "Play progression" run, this keeps the
+  // Play/Stop UI honest rather than showing "playing" over silence.
   const hearTransition = useCallback((from: Chord, to: Chord) => {
+    setIsPlaying(false);
+    setPlayingItemId(null);
     return hearTransitionAudio(from, to).catch((cause: unknown) => {
       if (cause instanceof AudioInitError) setError("init");
     });
   }, []);
 
   const hearPath = useCallback((chords: Chord[]) => {
+    setIsPlaying(false);
+    setPlayingItemId(null);
     return hearPathAudio(chords).catch((cause: unknown) => {
       if (cause instanceof AudioInitError) setError("init");
     });

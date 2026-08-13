@@ -31,14 +31,16 @@ is a navigation metaphor only — the UI must not look like a geographic map.
   valid modeled relationship must stay reachable — ranking may reorder, group, or visually
   emphasize possibilities, but must never delete one from what the user can reach** (see
   `docs/product-spec.md` §8/§30, revised R1; implemented in Phase R3).
-- Three distinct user actions must stay distinct in code and UI: inspecting a chord, advancing the
-  exploration path to a chord, and adding a chord to the progression. Adding to the progression
-  always stays a fully separate, explicit action — never triggered by inspecting or navigating.
-  **Revised R3**: inspecting and advancing are no longer two separately-clicked steps (the old
-  "select, then a separate Explore-from-here click" pattern) — clicking a valid next-chord node
-  advances the path directly (`docs/product-spec.md` §30, revised R3), and inspection-without-
-  advancing survives as hover/keyboard-focus (desktop) previewing the chord in the side panel
-  before a click/tap commits it. See `docs/product-spec.md` §7 for the full revision.
+- Three distinct user actions must stay distinct in code and UI: inspecting a chord silently,
+  navigating to a chord, and adding a chord to the progression. Adding to the progression always
+  stays a fully separate, explicit action — never triggered by inspecting or navigating.
+  **Revised R3.1** (superseding R3's own hover-then-second-click model): a single click/tap/Enter
+  on a valid next-chord node is the whole navigation action — it stops any in-flight navigation
+  audio, plays the transition, and commits the chord as the new current one, all at once, never a
+  separate "Hear Transition" step. Hover/keyboard-focus is purely silent, informational preview —
+  it never sounds anything and never moves the map. Navigation history is kept internally (Back,
+  contextual ranking) but must never render as a long visible chain that could be mistaken for an
+  authored progression — see `docs/product-spec.md` §7/§30 for the full revision.
 - No hard-coded user-facing copy in components — use the `next-intl` message namespaces
   (`en`/`es`). Adding a language later must not require refactoring components.
 - No runtime LLM dependency for product features.

@@ -1,5 +1,4 @@
 import { noteToPitchClass } from "@/domain/notes";
-import type { ZoomLevel } from "@/domain/harmony";
 import type { RankedNavigationOption } from "@/domain/navigation";
 
 export interface PositionedNode {
@@ -7,105 +6,83 @@ export interface PositionedNode {
   x: number;
   y: number;
   angleDeg: number;
-  radius: number;
 }
 
 export interface RadialLayout {
   /** SVG viewBox is `0 0 size size`. */
   size: number;
   center: { x: number; y: number };
+  radius: number;
   nodes: PositionedNode[];
 }
 
-/** Rendered node radii — shared with HarmonicMap.tsx so the layout's viewBox margin always matches what's actually drawn. */
-export const SOURCE_NODE_RADIUS = 54;
-export const NEIGHBOR_NODE_RADIUS = 30;
+/** Rendered node radii — shared with HarmonicMap.tsx so the layout's viewBox margin always matches what's actually drawn. Bumped up from Phase R3 for readability (Phase R3.1 §22) and a stronger current-chord size hierarchy (§15). */
+export const CURRENT_NODE_RADIUS = 60;
+export const CANDIDATE_NODE_RADIUS = 36;
 
-/** Ring radius per move depth — a deeper (more distant/colourful) move sits further out, visually reinforcing depth as distance (Phase R3 §16). */
-const RING_RADIUS: Record<ZoomLevel, number> = { 1: 150, 2: 235, 3: 315, 4: 390 };
+const MIN_RING_RADIUS = 160;
+const MAX_RING_RADIUS = 300;
+/** Minimum gap between two adjacent candidate nodes' edges, so dense option sets never visually touch. */
+const NODE_GAP = 12;
+const VIEWBOX_MARGIN = 30;
 
-const VIEWBOX_MARGIN = 28;
+/**
+ * The ring radius that gives `count` evenly-spaced nodes at least
+ * `NODE_GAP` of breathing room between their edges, clamped to
+ * [MIN_RING_RADIUS, MAX_RING_RADIUS]. Solved from the chord-length
+ * formula for two adjacent points on a circle: distance = 2R·sin(π/n).
+ */
+function adaptiveRadius(count: number): number {
+  if (count <= 1) return MIN_RING_RADIUS;
+  const minSpacing = 2 * CANDIDATE_NODE_RADIUS + NODE_GAP;
+  const required = minSpacing / (2 * Math.sin(Math.PI / count));
+  return Math.min(MAX_RING_RADIUS, Math.max(MIN_RING_RADIUS, required));
+}
 
-/** 3 decimal places — far more precision than the pixel-level rendering needs, while collapsing any cross-platform floating-point last-bit divergence in `Math.cos`/`Math.sin`. */
+/** 3 decimal places — far more precision than the pixel-level rendering needs, while collapsing any cross-platform floating-point last-bit divergence in `Math.cos`/`Math.sin` (avoids a React hydration mismatch). */
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
 /**
- * Deterministic radial layout: the current path endpoint is implicitly at
- * the center (callers render it separately); every outgoing option is
- * placed on the ring for ITS OWN move's depth — `option.depth`, i.e. the
- * depth of `option.primaryRelationship`, the same relationship whose
- * explanation/character the UI displays for that option (Phase R3 §6:
- * "depth belongs to the move"). This is a deliberate R3 revision of the
- * Phase 4 layout, which keyed rings by a chord's SHALLOWEST depth across
- * all its relationships (`introducedAtDepth`) — that could show a node on
- * an inner ring while its displayed (strongest) relationship badge/
- * explanation described a deeper move, which read as inconsistent once
- * every depth is always visible at once (no more manual Zoom selector to
- * hide the mismatch). See docs/architecture.md's R3 deviation note.
- *
- * Since Phase R3 removes the manual Zoom selector, ALL depths 1-4 are
- * always present together — ordering within a ring is by root pitch class
- * then quality id for a stable, non-jittery layout across re-renders
- * (ranking changes prominence via visual treatment elsewhere, not position
- * — position only encodes depth, per §9's "combination of number/edge
- * treatment/badge" guidance rather than relying on order alone).
- *
- * The viewBox is sized to whatever depths are actually populated (never a
- * fixed worst-case box), so a chord with only Zoom 1-2 options still fills
- * its available space instead of sitting small inside an oversized box.
+ * Every immediate outgoing option sits on ONE shared ring around the
+ * current chord, at a radius that adapts to how many options there are
+ * (Phase R3.1 §16-23). This deliberately replaces Phase R3's depth-keyed
+ * concentric rings: placing deeper-depth options on a visually more
+ * distant ring made them read as descendants of the inner-ring options
+ * ("F#dim -> C -> Cmaj7 -> Dm..." looked like a chain) rather than as
+ * equally-direct siblings of the current chord — exactly the false
+ * parentage Phase R3.1 corrects. Depth stays real, visible metadata (a
+ * badge on each node, per `MapNode`) — it's just never expressed as radial
+ * distance anymore. Ordering within the ring is by root pitch class then
+ * quality id for a stable, non-jittery layout across re-renders (rank/
+ * context can change which option a screen reader announces first without
+ * the whole ring visually reshuffling).
  */
 export function computeRadialLayout(options: RankedNavigationOption[]): RadialLayout {
-  const byDepth = new Map<ZoomLevel, RankedNavigationOption[]>();
-  for (const option of options) {
-    const ring = byDepth.get(option.depth);
-    if (ring) {
-      ring.push(option);
-    } else {
-      byDepth.set(option.depth, [option]);
-    }
-  }
-
-  const depths = [...byDepth.keys()].sort((a, b) => a - b);
-  const maxRadiusUsed = depths.reduce((max, depth) => Math.max(max, RING_RADIUS[depth]), 0);
-
-  const halfSize =
-    Math.max(maxRadiusUsed + NEIGHBOR_NODE_RADIUS, SOURCE_NODE_RADIUS) + VIEWBOX_MARGIN;
+  const radius = adaptiveRadius(options.length);
+  const halfSize = Math.max(radius + CANDIDATE_NODE_RADIUS, CURRENT_NODE_RADIUS) + VIEWBOX_MARGIN;
   const size = halfSize * 2;
   const center = { x: halfSize, y: halfSize };
 
-  const positioned: PositionedNode[] = [];
+  const sorted = [...options].sort((a, b) => {
+    const pcA = noteToPitchClass(a.chord.root);
+    const pcB = noteToPitchClass(b.chord.root);
+    if (pcA !== pcB) return pcA - pcB;
+    return a.chord.qualityId.localeCompare(b.chord.qualityId);
+  });
 
-  for (const depth of depths) {
-    const ring = byDepth.get(depth)!;
-    const sorted = [...ring].sort((a, b) => {
-      const pcA = noteToPitchClass(a.chord.root);
-      const pcB = noteToPitchClass(b.chord.root);
-      if (pcA !== pcB) return pcA - pcB;
-      return a.chord.qualityId.localeCompare(b.chord.qualityId);
-    });
+  const angleStep = 360 / sorted.length;
+  const nodes: PositionedNode[] = sorted.map((option, index) => {
+    const angleDeg = -90 + index * angleStep;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    return {
+      option,
+      x: round(center.x + radius * Math.cos(angleRad)),
+      y: round(center.y + radius * Math.sin(angleRad)),
+      angleDeg,
+    };
+  });
 
-    const radius = RING_RADIUS[depth];
-    const angleStep = 360 / sorted.length;
-
-    sorted.forEach((option, index) => {
-      const angleDeg = -90 + index * angleStep;
-      const angleRad = (angleDeg * Math.PI) / 180;
-      positioned.push({
-        option,
-        // Rounded to avoid a React hydration mismatch: Math.cos/Math.sin can
-        // differ in their very last bit between the server (Node) and
-        // client (browser) V8 builds for the same input, which otherwise
-        // renders two different (though visually identical) SVG coordinate
-        // strings for the same node.
-        x: round(center.x + radius * Math.cos(angleRad)),
-        y: round(center.y + radius * Math.sin(angleRad)),
-        angleDeg,
-        radius,
-      });
-    });
-  }
-
-  return { size, center, nodes: positioned };
+  return { size, center, radius, nodes };
 }

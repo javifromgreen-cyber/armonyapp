@@ -30,12 +30,9 @@
     },
     "navigation": {
       "back": "Back",
+      "backTo": "Back to {chord}",
       "reset": "Reset exploration",
       "hearPath": "Hear path",
-      "hearTransition": "Hear transition",
-      "continueHere": "Continue path here",
-      "pathLabel": "Exploration path",
-      "jumpToStep": "Jump back to {chord}",
       "currentMove": "Current move",
       "pathDepth": "Path depth",
       "depth": {
@@ -65,7 +62,7 @@
       "notes": "Notes",
       "intervalFormula": "Interval formula",
       "contextualRole": "Contextual role",
-      "relationshipToSource": "Relationship to {chord}",
+      "arrivedVia": "Arrived via {chord}",
       "addToProgression": "Add to progression",
       "hearChord": "Hear chord",
       "instrument": "Instrument",

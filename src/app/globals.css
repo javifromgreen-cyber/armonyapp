@@ -80,3 +80,50 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The harmonic map's "arrival" transition (Phase R3.1 §13/§24/§37) — the
+ * feeling that navigating moved the viewport to a new local neighborhood,
+ * not an instant swap of one radial diagram for another. Deliberately
+ * plain CSS (no animation library, no physics): each new candidate ring
+ * mounts fresh (React remounts it, keyed by the current chord's identity)
+ * and scales/fades in from slightly-below-full-size; the current-chord
+ * node gets a touch more emphasis (a small overshoot) since it's the "you
+ * are here" anchor (§15). Automatically neutralized for
+ * prefers-reduced-motion by the blanket rule above — no separate
+ * motion-safe/motion-reduce variant needed.
+ */
+@keyframes map-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes current-chord-arrive {
+  0% {
+    transform: scale(0.82);
+  }
+  65% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-map-arrive {
+  animation: map-arrive 260ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.animate-current-arrive {
+  animation: current-chord-arrive 340ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+}

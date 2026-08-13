@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { chordsEqual, type Explanation } from "@/domain/harmony";
+import { type Explanation } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import type { PlayablePitch } from "@/domain/instruments";
@@ -17,34 +17,22 @@ import { InstrumentSelector } from "./InstrumentSelector";
 import type { Instrument } from "./instrument";
 
 export interface ChordContextPanelProps {
-  /** The chord currently shown — the previewed candidate if any, otherwise the path's current endpoint (Phase R3 §12). */
+  /** The current chord — always the navigation history's endpoint (Phase R3.1: there is no separate previewed-candidate state, the panel simply follows navigation). */
   chord: Chord;
-  /** The map's current path endpoint (Phase R3) — what `chord` is shown relative to. */
-  endpointChord: Chord;
+  /** The chord immediately before `chord` in navigation history, if any (undefined only at the very start) — used to show how we arrived here. */
+  previousChord: Chord | undefined;
   context: Key;
   isDesktop: boolean;
   activeInstrument: Instrument;
   onInstrumentChange: (instrument: Instrument) => void;
   /** The progression's current BPM (Phase 9 §24) — reused as-is for bass pattern step timing rather than introducing a second, unrelated tempo state. */
   bpm: number;
-  /**
-   * Commits `chord` as the new path endpoint — normal navigation happens by
-   * clicking the map directly (Phase R3 §10), so this is only surfaced here
-   * as a lightweight fallback for committing an already-previewed candidate
-   * from the panel itself (useful on mobile, where the map may be out of
-   * view once the panel/bottom sheet is open). Never shown for the endpoint
-   * itself. Not the old "Explore from here" — that unconditional
-   * second-click step is removed (§11).
-   */
-  onAdvance: (chord: Chord) => void;
-  /** Adds `chord` — the panel's currently displayed chord, never `endpointChord` — to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from navigating/previewing). */
+  /** Adds `chord` to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from navigating). */
   onAddToProgression: (chord: Chord) => void;
-  /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
+  /** Purely auditory preview (Phase 6 §4) — must never navigate or mutate the progression. */
   onHearChord: (chord: Chord) => void;
   /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
   onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
-  /** Auditions the move from the current endpoint to a previewed candidate, without committing it (Phase R3 §25/§26). Only meaningful (and only shown) when `chord` isn't already the endpoint. */
-  onHearTransition: (from: Chord, to: Chord) => Promise<void>;
 }
 
 /** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
@@ -60,26 +48,25 @@ function explanationText(
 }
 
 /**
- * The selected/previewed-chord panel (product-spec.md §11, revised Phase
- * R3): identity, notes, interval formula, contextual role, and — when
- * `chord` isn't the path endpoint itself — its relationship to the
- * endpoint, including the move's depth and harmonic character (§7/§23/§24).
- * Deliberately has no "Explore from here" button (§11); normal path
- * navigation happens by clicking the map (§10).
+ * The current-chord panel (product-spec.md §11, revised Phase R3.1):
+ * identity, notes, interval formula, contextual role, and — when there is a
+ * previous chord in navigation history — how we arrived here (depth,
+ * character, explanation). No navigation controls live here anymore
+ * (Phase R3.1 §5/§28): the map is the sole place clicking navigates, and
+ * the transition is already heard automatically as part of that click, so
+ * there is nothing left for this panel to trigger.
  */
 export function ChordContextPanel({
   chord,
-  endpointChord,
+  previousChord,
   context,
   isDesktop,
   activeInstrument,
   onInstrumentChange,
   bpm,
-  onAdvance,
   onAddToProgression,
   onHearChord,
   onHearPitches,
-  onHearTransition,
 }: ChordContextPanelProps) {
   const t = useTranslations();
   const tPanel = useTranslations("app.panel");
@@ -88,13 +75,12 @@ export function ChordContextPanel({
   const tCharacter = useTranslations("app.navigation.character");
 
   const info = useMemo(
-    () => getChordDisplayInfo(chord, endpointChord, context),
-    [chord, endpointChord, context],
+    () => getChordDisplayInfo(chord, previousChord, context),
+    [chord, previousChord, context],
   );
   const functionDisplay = useMemo(() => functionDisplayInfo(chord, context), [chord, context]);
 
-  const isEndpoint = chordsEqual(chord, endpointChord);
-  const [primaryRelationship, ...additionalRelationships] = info.relationshipsFromSource;
+  const [primaryArrival, ...additionalArrivals] = info.arrivalRelationships;
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
@@ -126,27 +112,25 @@ export function ChordContextPanel({
         </p>
       </section>
 
-      {!isEndpoint && primaryRelationship && (
+      {primaryArrival && previousChord && (
         <section>
           <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
-            {tPanel("relationshipToSource", { chord: chordSymbol(endpointChord) })}
+            {tPanel("arrivedVia", { chord: chordSymbol(previousChord) })}
           </h3>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
-              {primaryRelationship.harmonicDepth} · {tDepth(DEPTH_LABEL_KEY[primaryRelationship.harmonicDepth])}
+              {primaryArrival.harmonicDepth} · {tDepth(DEPTH_LABEL_KEY[primaryArrival.harmonicDepth])}
             </span>
             <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
-              {tCharacter(harmonicCharacterFor(primaryRelationship))}
+              {tCharacter(harmonicCharacterFor(primaryArrival))}
             </span>
           </div>
-          <p className="mt-1.5 text-sm text-foreground">
-            {explanationText(t, primaryRelationship.explanation)}
-          </p>
-          {additionalRelationships.length > 0 && (
+          <p className="mt-1.5 text-sm text-foreground">{explanationText(t, primaryArrival.explanation)}</p>
+          {additionalArrivals.length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-foreground-muted">{tPanel("additionalRelationships")}</p>
               <ul className="mt-1 flex flex-col gap-1">
-                {additionalRelationships.map((relationship) => (
+                {additionalArrivals.map((relationship) => (
                   <li key={relationship.relationshipType} className="text-sm text-foreground-muted">
                     {explanationText(t, relationship.explanation)}
                   </li>
@@ -211,24 +195,6 @@ export function ChordContextPanel({
         >
           {tPanel("hearChord")}
         </button>
-        {!isEndpoint && (
-          <button
-            type="button"
-            onClick={() => onHearTransition(endpointChord, chord)}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
-          >
-            {t("app.navigation.hearTransition")}
-          </button>
-        )}
-        {!isEndpoint && (
-          <button
-            type="button"
-            onClick={() => onAdvance(chord)}
-            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
-          >
-            {t("app.navigation.continueHere")}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => onAddToProgression(chord)}

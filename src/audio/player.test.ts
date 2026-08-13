@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type Mock } from "vitest";
 import type { PlayablePitch } from "@/domain/instruments/playablePitch";
 
 /**
@@ -50,13 +50,30 @@ vi.mock("tone", () => {
     }
   }
 
+  // A single shared transport mock per module instance (not a fresh object
+  // per `getTransport()` call) — real `Tone.getTransport()` always returns
+  // the same underlying transport, and cancellation tests (Phase R3.1 §33)
+  // need to observe `cancel()`/`schedule()` calls made from WITHIN
+  // player.ts's own logic, not just from test code calling it separately.
+  const transportMock = {
+    schedule: vi.fn((callback: (time: number) => void, time: number) => {
+      transportMock.scheduled.push({ callback, time });
+    }),
+    scheduled: [] as { callback: (time: number) => void; time: number }[],
+    start: vi.fn(),
+    stop: vi.fn(),
+    cancel: vi.fn(() => {
+      transportMock.scheduled = [];
+    }),
+  };
+
   return {
     start: vi.fn().mockResolvedValue(undefined),
     now: vi.fn(() => 0),
     PolySynth,
     Sampler,
     Synth: class {},
-    getTransport: () => ({ schedule: vi.fn(), start: vi.fn(), stop: vi.fn(), cancel: vi.fn() }),
+    getTransport: () => transportMock,
     getDraw: () => ({ schedule: (cb: () => void) => cb() }),
   };
 });
@@ -71,16 +88,44 @@ interface FakeVoiceLike {
   calls: { method: string; args: unknown[] }[];
 }
 
+interface TransportMock {
+  schedule: Mock;
+  scheduled: { callback: (time: number) => void; time: number }[];
+  start: Mock;
+  stop: Mock;
+  cancel: Mock;
+}
+
+// Fresh module + fresh fake-Tone instance/transport tracking per test — the
+// "tone" mock module itself is only evaluated once per test file (its
+// factory doesn't re-run on `vi.resetModules()`), so every piece of
+// recorded state (constructed instances, transport mock call history) must
+// be manually cleared here, mirroring the existing PolySynth/Sampler reset.
 async function freshPlayer() {
   vi.resetModules();
   const Tone = (await import("tone")) as unknown as {
     PolySynth: { instances: FakeVoiceLike[] };
     Sampler: { instances: (FakeVoiceLike & { options: { baseUrl?: string } })[] };
+    getTransport: () => TransportMock;
   };
   Tone.PolySynth.instances = [];
   Tone.Sampler.instances = [];
+  const transport = Tone.getTransport();
+  transport.schedule.mockClear();
+  transport.start.mockClear();
+  transport.stop.mockClear();
+  transport.cancel.mockClear();
+  transport.scheduled = [];
   const player = await import("./player");
   return { player, Tone };
+}
+
+/** Simulates the transport actually reaching each currently-scheduled event's time — the mock's `schedule()` only records events, it doesn't fire them on its own. */
+function flushTransport(Tone: { getTransport: () => TransportMock }) {
+  const transport = Tone.getTransport();
+  const pending = [...transport.scheduled];
+  transport.scheduled = [];
+  pending.forEach(({ callback, time }) => callback(time));
 }
 
 describe("hearPitches — instrument routing (Phase R2 §23)", () => {
@@ -206,14 +251,15 @@ describe("hearPitches — staggered playback order and timing (Guitar strum / Ba
   });
 });
 
-describe("hearPath / hearTransition — neutral sequential chord playback (Phase R3 §25/§26/§27)", () => {
-  it("hearPath triggers one call per chord, in order, at increasing times, on the neutral synth", async () => {
+describe("hearPath / hearTransition — neutral sequential chord playback (Phase R3.1 §5/§6/§8)", () => {
+  it("hearPath schedules one Transport event per chord, in order, at increasing times, on the neutral synth", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
     await player.hearPath([parseChordSymbol("C"), parseChordSymbol("Am"), parseChordSymbol("Dm")]);
 
     expect(Tone.PolySynth.instances).toHaveLength(1);
     expect(Tone.Sampler.instances).toHaveLength(0); // neutral voice only, never an instrument sampler
+    flushTransport(Tone);
     const calls = Tone.PolySynth.instances[0].calls;
     expect(calls).toHaveLength(3);
     for (let i = 1; i < calls.length; i++) {
@@ -235,11 +281,62 @@ describe("hearPath / hearTransition — neutral sequential chord playback (Phase
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
     await player.hearTransition(parseChordSymbol("Dm"), parseChordSymbol("G7"));
+    flushTransport(Tone);
 
     const calls = Tone.PolySynth.instances[0].calls;
     expect(calls).toHaveLength(2);
     const [firstTime, secondTime] = calls.map((c) => (c.args as [number[], number, number])[2]);
     expect(secondTime).toBeGreaterThan(firstTime);
+  });
+
+  it("mandatory audio-interruption test (Phase R3.1 §33): a rapid second navigation click cancels the first transition, only the second plays", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    const C = parseChordSymbol("C");
+    const Am = parseChordSymbol("Am");
+    const F = parseChordSymbol("F");
+
+    // Current C, click Am: C -> Am begins (2 note events + 1 auto-stop event, doesn't fire yet).
+    await player.hearTransition(C, Am);
+    const transport = Tone.getTransport();
+    expect(transport.scheduled).toHaveLength(3); // C, Am, and the auto-stop event
+
+    // Before that playback completes, click F from the new Am neighborhood.
+    await player.hearTransition(Am, F);
+
+    // The first transition's still-pending events must have been cancelled —
+    // cancel() fired once per hearTransition call (both the initial one and
+    // the interrupting one), and the pending queue now holds only the
+    // fresh Am -> F transition's 3 events, never C's leftover ones (which
+    // would make this 6 if cancellation weren't actually clearing the
+    // queue).
+    expect(transport.cancel).toHaveBeenCalledTimes(2);
+    expect(transport.scheduled).toHaveLength(3);
+
+    flushTransport(Tone);
+    // The second stopProgression() also released the still-sounding first
+    // chord (a real, separate `releaseAll` call) — filter to just the note
+    // triggers to check what actually sounded.
+    const noteCalls = Tone.PolySynth.instances[0].calls.filter(
+      (c) => c.method === "triggerAttackRelease",
+    );
+    // Only Am -> F actually sounds — never C, and Am only once (not twice).
+    expect(noteCalls).toHaveLength(2);
+    const [firstFreqs] = noteCalls[0].args as [number[], number, number];
+    const [secondFreqs] = noteCalls[1].args as [number[], number, number];
+    // Am's frequency set, then F's — the leftover C event from the
+    // cancelled first transition never fires.
+    expect(firstFreqs).not.toEqual(secondFreqs);
+  });
+
+  it("hearPath also cancels an in-flight progression/instrument voice via stopProgression (no overlapping audio sources)", async () => {
+    const { player, Tone } = await freshPlayer();
+    await player.hearPitches([pitch(440)], { voice: "piano" });
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("G")]);
+
+    const pianoSampler = Tone.Sampler.instances[0];
+    expect(pianoSampler.calls.some((c) => c.method === "releaseAll")).toBe(true);
   });
 });
 

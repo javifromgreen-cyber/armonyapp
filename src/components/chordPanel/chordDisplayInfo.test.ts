@@ -25,32 +25,35 @@ describe("getChordDisplayInfo", () => {
     expect(cInfo.contextualRole).toEqual({ kind: "tonic" });
   });
 
-  it("relationshipsFromSource is empty when the chord IS the source", () => {
-    const info = getChordDisplayInfo(parseChordSymbol("C"), parseChordSymbol("C"), cMajor);
-    expect(info.relationshipsFromSource).toEqual([]);
+  it("arrivalRelationships is empty when there is no previous chord (the very first chord)", () => {
+    const info = getChordDisplayInfo(parseChordSymbol("C"), undefined, cMajor);
+    expect(info.arrivalRelationships).toEqual([]);
   });
 
-  it("relationshipsFromSource lists every relationship connecting source to this chord, at any depth (Phase R3: no manual zoom cap)", () => {
+  it("arrivalRelationships is empty when the previous chord IS this chord (defensive — shouldn't happen via normal navigation)", () => {
+    const info = getChordDisplayInfo(parseChordSymbol("C"), parseChordSymbol("C"), cMajor);
+    expect(info.arrivalRelationships).toEqual([]);
+  });
+
+  it("arrivalRelationships lists every relationship connecting the previous chord to this one, at any depth", () => {
     // C -> Am is diatonic + relative + substitution simultaneously, but
     // substitution is a Zoom 2 relationship — Phase R3 always shows all four
     // depths at once (no manual Zoom selector), so all three show here too.
     const info = getChordDisplayInfo(parseChordSymbol("Am"), parseChordSymbol("C"), cMajor);
-    const types = info.relationshipsFromSource.map((r) => r.relationshipType).sort();
+    const types = info.arrivalRelationships.map((r) => r.relationshipType).sort();
     expect(types).toEqual(["diatonic", "relative", "substitution"].sort());
   });
 
   it("works the same for a minor-key functional dominant (E7 in A minor)", () => {
     const info = getChordDisplayInfo(parseChordSymbol("E7"), parseChordSymbol("Am"), aMinor);
     expect(info.contextualRole).toEqual({ kind: "functionalDominant" });
-    expect(info.relationshipsFromSource.map((r) => r.relationshipType)).toContain(
-      "functionalDominant",
-    );
+    expect(info.arrivalRelationships.map((r) => r.relationshipType)).toContain("functionalDominant");
   });
 
   it("includes even the deepest (Zoom 4) relationships, since Phase R3 has no depth cap", () => {
     // Dm -> D is a Zoom 4 commonTone relationship — verifies the panel
     // reaches all the way to Zoom 4 without a caller-supplied depth.
     const info = getChordDisplayInfo(parseChordSymbol("D"), parseChordSymbol("Dm"), cMajor);
-    expect(info.relationshipsFromSource.map((r) => r.relationshipType)).toContain("commonTone");
+    expect(info.arrivalRelationships.map((r) => r.relationshipType)).toContain("commonTone");
   });
 });

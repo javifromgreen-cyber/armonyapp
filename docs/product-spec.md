@@ -100,25 +100,29 @@ Mobile/tablet get purpose-designed responsive behavior, not a shrunk desktop UI.
 
 ## 7. Critical Interaction Rule
 
-*(Revised R3 — superseded the original "select, then a separate Explore-from-here click"
-two-step model per the harmonic-path-explorer redesign; §30 and `docs/roadmap.md`'s R3 entry have
-the full navigation-model detail.)*
+*(Revised R3.1 — corrects R3's own map interaction after the user tested the deployed R3 preview;
+supersedes R3's "hover previews, a second click on the already-previewed candidate commits"
+two-step model. §30 and `docs/roadmap.md`'s R3.1 entry have the full navigation-model detail.)*
 
 Three distinct operations, never conflated:
 
-1. Inspecting a chord (seeing its info without moving the exploration path).
-2. Advancing the exploration path to a chord (clicking a valid next-chord node on the map commits
-   it as the new path endpoint directly — no separate "Explore from here" step).
+1. Inspecting a chord silently (hover/keyboard-focus on a candidate — informational only, never
+   sounds anything, never moves anywhere).
+2. Navigating to a chord: a single click/tap/Enter on a valid next-chord node stops any in-flight
+   navigation audio, plays the current-endpoint-to-destination transition, and commits that chord
+   as the new endpoint — all as one action, with no separate "Hear Transition" or "Explore from
+   here" step. This is navigation HISTORY (kept internally for Back and contextual ranking), never
+   rendered as a visible chain that could be mistaken for an authored progression.
 3. Adding the chord to the progression.
 
-Inspecting and advancing are no longer two separately-clicked actions the way selecting and
-exploring used to be — on the map, hovering/keyboard-focusing a candidate previews it (inspection),
-and a click/tap on that same, already-previewed candidate commits it as the new endpoint (the
-literal example this section now codifies: exploring `Cmaj7`, the user clicks `F`, and
-`Cmaj7 -> F` immediately becomes the path with `F` as the new endpoint — no second click). What
-must stay true regardless: inspecting a chord must never silently modify the progression, and
-adding to the progression always stays a distinct, explicit action, never triggered by inspecting
-or advancing.
+The exploration/navigation history must never appear as a long visible sequence resembling a
+composed progression (the R3.1 correction's core finding — a musician idly exploring
+`Em -> C -> Bm -> C -> Em -> D#dim7 -> ...` must not see that read back as if it were an authored
+piece). A compact, local "Back" control near the current chord (showing only the immediately
+previous chord) is sufficient; the full history does not need permanent screen space. What must
+stay true regardless: inspecting a chord must never sound anything or move the map, and adding to
+the progression always stays a distinct, explicit action, never triggered by inspecting or
+navigating.
 
 ## 8. Harmonic Map — Harmonic Depth ("Zoom")
 
@@ -407,28 +411,39 @@ from explicit musical rules, not hand-authored per node. Correctness over clever
 
 ## 30. Map UX
 
-*(Revised R1 — the completeness rule below supersedes the previous "always emphasise the current
-chord and its most relevant nearby options" phrasing, which read as license to silently truncate.
-Implementation lands in `docs/roadmap.md`'s Phase R3, on top of the harmonic graph engine built in
-Phases 1–4.)*
+*(Revised R1, then R3.1 — the completeness rule below supersedes the previous "always emphasise
+the current chord and its most relevant nearby options" phrasing, which read as license to
+silently truncate. R3 implemented the harmonic-path-explorer model on top of the harmonic graph
+engine built in Phases 1–4; R3.1 corrected that implementation's own map interaction after the user
+tested the deployed R3 preview — see `docs/roadmap.md`'s R3 and R3.1 entries for the full history.)*
 
 The map is a **harmonic path explorer**, not a static neighborhood graph (§0). For the current
-chord, harmonic context, and active Zoom/depth, the map exposes **every valid outgoing harmonic
-possibility the engine currently models** — ranking, grouping, and visual emphasis organize that
-set, but never remove a member of it. If 14 unique valid next chords exist at the active depth, the
-user can reach all 14, not a curated top handful.
+chord and harmonic context, the map exposes **every valid immediate outgoing harmonic possibility
+the engine currently models, across all depths at once** — ranking, badges, and visual emphasis
+organize that set, but never remove a member of it. If 18 unique valid next chords exist, the user
+can reach all 18, not a curated top handful.
 
-This is NOT the same as rendering a full recursive tree: the map shows the CHOSEN harmonic path
-(the sequence of chords already navigated) plus ALL next-move options from the current path
-endpoint only. Choosing an option advances the endpoint, collapses the previous endpoint's
-unchosen sibling options, and reveals all next-move options from the new endpoint. Previous context
-(the path taken so far, or the actual progression when it corresponds to the current exploration
-point — see the precedence rule in `docs/roadmap.md`'s Phase R3) may shift ranking, prominence,
-placement, category, and explanation — never membership.
+This is NOT the same as rendering a full recursive tree: the map shows ONLY the current chord plus
+ALL immediate next-move options from it — never a candidate's own children. Every visible option
+sits on ONE shared ring at the same distance from the current chord, so it reads as a direct
+sibling destination, never as a descendant of another option (R3.1: R3's original depth-keyed
+concentric rings visually implied false parentage — e.g. a deeper-depth option positioned near a
+shallower one on an outer ring looked like it descended FROM that shallower option, rather than
+being an equally-direct move from the current chord — this is corrected). Depth is metadata about
+the move (a badge/label), never expressed as radial position or as a separate graph edge. A single
+click/tap/Enter on a valid option stops any in-flight navigation audio, plays the transition, and
+commits it as the new current chord, all as one action (R3.1 §5/§6/§8) — the map itself never
+requires a second click to navigate. Hovering/keyboard-focusing an option is purely silent,
+informational preview (never sounds anything, never moves the map). Chosen navigation history is
+kept internally (for Back and contextual ranking) but is never rendered as a long visible chain
+that could be mistaken for an authored progression — a compact, local Back control near the current
+chord is sufficient. Previous context (the navigation history so far, or the actual progression
+when it corresponds to the current point — see the precedence rule in `docs/roadmap.md`'s Phase R3)
+may shift ranking, prominence, and explanation — never membership.
 
-Users can select, inspect, hear (including a chord-to-chord "hear transition"), understand,
-navigate forward/backward along the path, reset to a new starting chord, and explicitly add to the
-progression. Relationships must be distinguishable by more than colour alone.
+Users can inspect silently, navigate (which also hears the transition), understand, step backward
+along navigation history, reset to a new starting chord, and explicitly add to the progression.
+Relationships must be distinguishable by more than colour alone.
 
 ## 31. Paywall UX
 

@@ -7,30 +7,30 @@ export interface MapNodeProps {
   y: number;
   radius: number;
   label: string;
-  variant: "endpoint" | "candidate";
-  /** True while this candidate is the panel's current inspection target (Phase R3 §12) — never true for `variant="endpoint"`. */
-  isPreviewed: boolean;
+  variant: "current" | "candidate";
+  /** Silent, visual-only hover/focus state (Phase R3.1 §29/§31) — never triggers audio or navigation, purely informational. Always false for `variant="current"`. */
+  isHovered: boolean;
+  /** A light visual accent for the single most contextually relevant candidate (Phase R3.1 §21's "ranking organizes" preserved as emphasis, never as position). */
+  isTopRanked?: boolean;
   relationshipCount?: number;
-  /** Depth badge (Phase R3 §9) — omitted for the endpoint, which has no incoming move of its own. */
+  /** Depth badge (Phase R3.1 §19) — metadata about the move, never expressed as radial position. Omitted for the current chord, which has no incoming move of its own to badge. */
   depth?: number;
-  depthLabel?: string;
   colorVar: string;
   ariaLabel: string;
-  /** Hover/focus — previews this candidate in the side panel without moving the path (Phase R3 §12). No-op for the endpoint. */
-  onPreview: () => void;
-  /** Mouse-leave/blur — returns the panel to the endpoint if this candidate was the preview. */
-  onLeavePreview: () => void;
-  /** Click/Enter/Space — advances the path directly if already previewed, otherwise previews (Phase R3 §10). For the endpoint, just clears any active preview. */
+  /** Hover/focus — silent, informational only (Phase R3.1 §29). No-op for the current chord. */
+  onHoverStart: () => void;
+  onHoverEnd: () => void;
+  /** Click/tap/Enter/Space on a candidate — plays the transition and navigates there in one action (Phase R3.1 §5/§6/§31). No-op for the current chord (it isn't a destination). */
   onActivate: () => void;
 }
 
 /**
  * A single chord node — one per unique chord identity (never one per
  * relationship; see ../../domain/navigation/options.ts). Rendered as a
- * keyboard-accessible SVG `<g role="button">`, since SVG has no native
- * interactive circle element. The relationship-count badge is how "multiple
- * relationships connect to the same chord" stays visible without duplicating
- * the node (product-spec.md / architecture.md's "one node per chord" rule).
+ * keyboard-accessible SVG `<g role="button">` for candidates (the current
+ * chord is a status display, not a control). The relationship-count badge
+ * is how "multiple relationships connect to the same chord" stays visible
+ * without duplicating the node.
  */
 export function MapNode({
   x,
@@ -38,20 +38,20 @@ export function MapNode({
   radius,
   label,
   variant,
-  isPreviewed,
+  isHovered,
+  isTopRanked,
   relationshipCount,
   depth,
-  depthLabel,
   colorVar,
   ariaLabel,
-  onPreview,
-  onLeavePreview,
+  onHoverStart,
+  onHoverEnd,
   onActivate,
 }: MapNodeProps) {
-  const isEndpoint = variant === "endpoint";
+  const isCurrent = variant === "current";
 
   function handleKeyDown(event: KeyboardEvent<SVGGElement>) {
-    if (event.key === "Enter" || event.key === " ") {
+    if (!isCurrent && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
       onActivate();
     }
@@ -60,47 +60,39 @@ export function MapNode({
   return (
     <g
       transform={`translate(${x} ${y})`}
-      tabIndex={0}
-      role="button"
+      tabIndex={isCurrent ? -1 : 0}
+      role={isCurrent ? "status" : "button"}
       aria-label={ariaLabel}
-      aria-pressed={isPreviewed}
-      onClick={onActivate}
-      onMouseEnter={onPreview}
-      onMouseLeave={onLeavePreview}
-      onFocus={onPreview}
-      onBlur={onLeavePreview}
+      onClick={isCurrent ? undefined : onActivate}
+      onMouseEnter={isCurrent ? undefined : onHoverStart}
+      onMouseLeave={isCurrent ? undefined : onHoverEnd}
+      onFocus={isCurrent ? undefined : onHoverStart}
+      onBlur={isCurrent ? undefined : onHoverEnd}
       onKeyDown={handleKeyDown}
-      className="group cursor-pointer outline-none"
-      style={{ transition: "transform 300ms ease" }}
+      className={isCurrent ? "select-none" : "group cursor-pointer select-none outline-none"}
     >
       <title>{ariaLabel}</title>
 
-      {/* focus ring — SVG has no native focus-visible outline, so this
-          circle is invisible until the parent <g> receives keyboard focus */}
-      <circle
-        r={radius + 6}
-        fill="none"
-        strokeWidth={2}
-        className="stroke-transparent transition-colors group-focus-visible:stroke-accent"
-      />
-
-      {isPreviewed && !isEndpoint && (
+      {!isCurrent && (
         <circle
           r={radius + 6}
           fill="none"
-          stroke="var(--color-accent)"
           strokeWidth={2}
-          strokeDasharray="3 3"
+          className="stroke-transparent transition-colors group-focus-visible:stroke-accent"
         />
+      )}
+
+      {isHovered && !isCurrent && (
+        <circle r={radius + 6} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeDasharray="3 3" />
       )}
 
       <circle
         r={radius}
-        className="transition-[filter] duration-150 group-hover:brightness-110"
+        className={isCurrent ? "" : "transition-[filter] duration-150 group-hover:brightness-110"}
         style={{
-          fill: isEndpoint ? "var(--color-accent)" : "var(--color-surface-raised)",
-          stroke: isEndpoint ? "var(--color-accent)" : colorVar,
-          strokeWidth: isEndpoint ? 0 : 2,
+          fill: isCurrent ? "var(--color-accent)" : "var(--color-surface-raised)",
+          stroke: isCurrent ? "var(--color-accent)" : colorVar,
+          strokeWidth: isCurrent ? 0 : isTopRanked ? 3 : 2,
         }}
       />
 
@@ -109,8 +101,9 @@ export function MapNode({
         dominantBaseline="central"
         className="pointer-events-none select-none font-medium"
         style={{
-          fill: isEndpoint ? "var(--color-accent-foreground)" : "var(--color-foreground)",
-          fontSize: isEndpoint ? 16 : 13,
+          fill: isCurrent ? "var(--color-accent-foreground)" : "var(--color-foreground)",
+          fontSize: isCurrent ? 18 : 13,
+          fontWeight: isCurrent ? 700 : undefined,
         }}
       >
         {label}
@@ -132,7 +125,6 @@ export function MapNode({
 
       {depth !== undefined && (
         <g transform={`translate(${-radius + 2} ${radius - 2})`}>
-          <title>{depthLabel}</title>
           <circle r={9} style={{ fill: "var(--color-surface)", stroke: colorVar, strokeWidth: 1.5 }} />
           <text
             textAnchor="middle"

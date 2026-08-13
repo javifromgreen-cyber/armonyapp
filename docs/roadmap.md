@@ -713,6 +713,87 @@ preview-then-commit is effectively a desktop/keyboard-focus refinement, document
 `ExplorerApp.tsx` rather than forcing an extra dedicated tap target onto small map nodes, which
 would work against §12's own "don't make the interaction cumbersome" instruction.
 
+## Phase R3.1 — Harmonic map navigation UX correction
+- [x] Remove the long visible exploration breadcrumb; navigation history stays internal (Back,
+      ranking) but never renders as a progression-like chain
+- [x] Single click/tap/Enter on a candidate: stop any in-flight audio, play the transition, and
+      navigate, all as one action — no separate "Hear Transition"/"Continue path here" step
+- [x] No audio on hover/focus — hover/focus is silent, informational-only, never navigates
+- [x] Fix transition-audio cancellation (Transport-based scheduling) so a rapid second click
+      actually cancels the first transition's still-pending notes, never overlapping
+- [x] Local Back control anchored next to the current chord, not the top toolbar; Reset stays
+      available but secondary
+- [x] Redesign the map layout: one shared adaptive-radius ring for all immediate outgoing options
+      (never depth-keyed concentric rings) — every candidate reads as a direct sibling of the
+      current chord, not a descendant of another candidate
+- [x] Completeness guarantee preserved — all outgoing options still shown, never truncated for
+      readability
+- [x] Readability: ring radius adapts to option count within a bounded, legible range instead of
+      shrinking the whole map to fit a fixed worst-case depth-4 box
+- [x] Stronger current-chord visual identity + a CSS arrival transition (respecting
+      prefers-reduced-motion) so navigating visibly feels like moving, not an instant swap
+- [x] Progression Builder untouched by exploration — verified with a dedicated regression test
+- [x] R2 instrument sample audio unaffected — navigation preview stays on the neutral synth
+
+This was a **corrective pass on R3's own map interaction**, prompted by the user's own testing of
+the deployed R3 preview — R3's underlying navigation/domain architecture (`src/domain/navigation`,
+completeness invariant, contextual ranking, automatic depth classification) was explicitly approved
+and is untouched here (`git diff --stat HEAD -- src/domain` is empty for this phase); only
+`src/components/map/**`, `src/components/chordPanel/ChordContextPanel.tsx`, `src/components/
+ExplorerApp.tsx`, and `src/audio/player.ts`'s `hearPath`/`hearTransition` scheduling changed.
+
+Two real UX problems were found in production testing: (1) the visible exploration breadcrumb
+(`Em → C → Bm → C → Em → D#dim7 → ...`) read as an authored second progression rather than
+incidental map history, and (2) depth-keyed concentric rings made deeper-depth options look like
+descendants of shallower ones (e.g. "F#dim → C → Cmaj7 → Dm" appeared to be a chain) rather than
+equally-direct siblings of the current chord. Both are fixed structurally, not cosmetically:
+`explorerState.ts` no longer has a `previewChord`/two-step advance concept at all — a single
+`ADVANCE` action is the whole interaction, and `layout.ts`'s `computeRadialLayout` places every
+option on one ring sized by `adaptiveRadius(count)` (clamped 160-300px) rather than keying rings by
+`NavigationOption.depth`.
+
+The transition-audio cancellation bug (§7/§33's mandatory test) was a genuine latent issue in R3's
+original `hearPath`: it scheduled notes via raw `Tone.now()`-relative offsets, which cannot be
+cancelled once scheduled — a rapid second click could let both transitions' notes sound together.
+Fixed by scheduling on `Tone.Transport` (reusing `playProgression`'s existing mechanism) and calling
+`stopProgression()` first, so `Transport.cancel()` actually clears pending events; a dedicated
+regression test (`player.test.ts`) reproduces the exact click-Am-then-quickly-click-F scenario and
+asserts only the second transition's notes fire.
+
+Documentation updated for the corrected model: navigation history is explicitly NAVIGATION STATE,
+not a visible progression (`product-spec.md` §7/§30's revision now reflects the single click-to-
+navigate gesture rather than R3's separate preview-then-commit description); `docs/architecture.md`
+logs the layout-ring and interaction-rule deviations.
+
+Verified 2026-08-13: `npm run test` (673 tests, up from 671 — 2 more interruption/cancellation
+tests in `player.test.ts`; `explorerState.test.ts`/`layout.test.ts` rewritten for the single-ring/
+single-action model), `npm run typecheck`, `npm run lint`, `npm run build` all pass with zero
+regressions. `music-theory-review`: no `src/domain` changes in this phase, nothing new to verify.
+`product-scope-review`: verdict aligned, with explicit answers to the phase's three required
+questions — (1) navigating now reads as map movement, not progression-authoring (verified: the
+breadcrumb is gone, and a dedicated test confirms 5 random exploration clicks leave the real
+progression at 0 items, with exactly 1 item after one explicit "Add to progression"); (2) every
+visible candidate reads as an immediate destination (verified: Playwright-measured on-screen
+distances from the center for all 18 of G7's candidates were 266-267px — effectively identical); (3)
+the map stays readable rather than shrinking for artificial depth chains (verified: G7's 18
+candidates, the densest case tested, rendered with legible 36px nodes and clear labels, matching
+`outgoingOptions(G7, cMajor)`'s own count exactly, 18/18, confirmed via a direct domain-layer
+probe — no truncation). Live-browser verification (Playwright, desktop 1400×900 + mobile 390×844
+with real touch events + Spanish locale, `AudioContext.resume()` call-counting to verify audio
+timing precisely): hovering a candidate never called `resume()` (0 calls) and never changed the
+panel's displayed chord; clicking did (≥1 call) and updated the chord immediately; the full
+C→Am→Dm→G7 scenario advanced on every single click with the Local Back control appearing labeled
+with the correct previous chord after each step; Back correctly returned to the prior chord; R2's
+Guitar sample instrument audio still loaded and played (10 HTTP 200s) after switching instruments
+mid-exploration; zero console errors throughout, including under emulated `prefers-reduced-motion:
+reduce`.
+
+Known limitation carried over: on touch, a single tap both previews (silently) and advances in one
+gesture (browsers synthesize a compatibility `mouseenter` immediately before `click`) — this
+matches the required "tap = hear transition + navigate" behavior exactly, so it's not a gap, just a
+note that "hover-only preview" is inherently a desktop/keyboard-focus refinement on touch devices,
+same as documented in the R3 entry above.
+
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
       Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text

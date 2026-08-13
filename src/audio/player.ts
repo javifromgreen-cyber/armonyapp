@@ -190,34 +190,52 @@ export async function hearChord(chord: Chord): Promise<void> {
   playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
 }
 
-/** Seconds between successive chords in `hearPath`/`hearTransition` — enough space to actually hear each one land before the next starts (Phase R3 §25/§26/§27). */
-const PATH_CHORD_GAP_SECONDS = 0.65;
-const PATH_CHORD_DURATION_SECONDS = 0.55;
+/** Seconds between successive chords in `hearPath`/`hearTransition` — enough space to actually hear each one land, but concise since this fires on every navigation click (Phase R3.1 §32: exploring must stay quick, never a "long performance"). */
+const PATH_CHORD_GAP_SECONDS = 0.5;
+const PATH_CHORD_DURATION_SECONDS = 0.42;
 
 /**
  * Neutral harmonic playback (product-spec.md §18) of a sequence of whole
  * chords, one after another — the primitive both "Hear transition" (a
- * 2-chord sequence) and "Hear path" (the full exploration path) reuse
- * (Phase R3 §25/§27), rather than each having its own scheduling logic.
- * Deliberately simple: no voice-leading optimisation, same neutral voicing
- * `hearChord` already uses. A no-op for an empty/single-chord sequence —
- * there's nothing to sequence.
+ * 2-chord sequence, now played automatically as part of every navigation
+ * click, Phase R3.1 §5/§6/§8) and "Hear path" reuse, rather than each
+ * having its own scheduling logic. Deliberately simple: no voice-leading
+ * optimisation, same neutral voicing `hearChord` already uses. A no-op for
+ * an empty/single-chord sequence — there's nothing to sequence.
+ *
+ * Scheduled on `Tone.Transport` (the same mechanism `playProgression`
+ * already uses) rather than raw `Tone.now()`-relative offsets, and always
+ * starts by calling `stopProgression()` — this is what makes a rapid
+ * second navigation click actually cancel the first transition's
+ * not-yet-fired notes (Phase R3.1 §7/§33): a `Tone.now()`-relative
+ * `triggerAttackRelease` call, once scheduled, cannot be un-scheduled, but
+ * `Transport.cancel()` (part of `stopProgression`) clears everything still
+ * pending. Reuses the existing playback-cancellation architecture rather
+ * than inventing a second one.
  */
 export async function hearPath(chords: Chord[]): Promise<void> {
   if (chords.length < 2) return;
   await ensureAudioReady();
+  stopProgression();
+
+  const transport = Tone.getTransport();
   const synthInstance = getSynth();
-  const now = Tone.now();
   chords.forEach((chord, index) => {
-    synthInstance.triggerAttackRelease(
-      pitchesToFrequencies(neutralVoicing(chord)),
-      PATH_CHORD_DURATION_SECONDS,
-      now + index * PATH_CHORD_GAP_SECONDS,
-    );
+    transport.schedule((time) => {
+      synthInstance.triggerAttackRelease(
+        pitchesToFrequencies(neutralVoicing(chord)),
+        PATH_CHORD_DURATION_SECONDS,
+        time,
+      );
+    }, index * PATH_CHORD_GAP_SECONDS);
   });
+
+  const totalSeconds = (chords.length - 1) * PATH_CHORD_GAP_SECONDS + PATH_CHORD_DURATION_SECONDS;
+  transport.schedule(() => transport.stop(), totalSeconds);
+  transport.start();
 }
 
-/** "Hear transition" (Phase R3 §25/§26) — auditions a candidate move (current endpoint -> a previewed chord) before committing it to the path, without requiring the user to advance first. */
+/** "Hear transition" (Phase R3.1 §5/§6/§8) — plays automatically as part of a single navigation click (current endpoint -> the clicked destination), never a separate manual step. */
 export function hearTransition(from: Chord, to: Chord): Promise<void> {
   return hearPath([from, to]);
 }

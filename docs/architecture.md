@@ -145,26 +145,37 @@ flatten that back into one-node-per-edge.
   72-hour full trial followed by a required Annual license; see `docs/product-spec.md` §9/§19/§20/
   §25/§26 and `docs/roadmap.md`'s R1 entry for the full revision and rationale. This is
   documentation-only as of R1 — no application code changed.
-- **R3 interaction-rule revision: inspecting and advancing are no longer two separately-clicked
-  steps.** Phase 4's "select vs. explore" two-click model (select a node, then press a separate
-  "Explore from here" button) is superseded by the harmonic-path-explorer redesign
-  (`docs/product-spec.md` §0/§7/§30, revised R3): hovering/keyboard-focusing a map candidate
-  previews it in the side panel (inspection, still never touching the progression), and a
-  click/tap on that same already-previewed candidate commits it as the new path endpoint directly.
-  "Add to progression" remains a fully separate, explicit action throughout — this revision only
-  merges inspect+advance's UI steps, never folds in progression mutation. Implemented in
-  `src/components/map/explorerState.ts` (`PREVIEW`/`ADVANCE` actions) and
-  `src/components/map/MapNode.tsx`/`HarmonicMap.tsx` (hover/focus = preview, click = advance-if-
-  already-previewed-else-preview).
-- **R3 map layout: rings key by move depth, not a chord's shallowest depth.** Phase 4's
-  `computeRadialLayout` placed a chord on the ring of its SHALLOWEST relationship
-  (`MapGraphNode.introducedAtDepth`), so it never "retreated" outward just because a deeper
-  relationship also applied. R3 removes the manual Zoom selector (product-spec.md §4/§34) — every
-  depth is always shown at once — so that mismatch became visible: a node could sit on an inner
-  ring while the relationship/depth badge actually displayed for it (the strongest one, i.e.
-  `NavigationOption.primaryRelationship`) described a deeper move. R3's `computeRadialLayout`
-  (`src/components/map/layout.ts`) now keys rings by `NavigationOption.depth` — the same
-  relationship whose depth/character/explanation the UI shows — so ring position and displayed
-  depth always agree. `src/domain/graph/mapGraph.ts`'s `MapGraphNode.introducedAtDepth` is
-  unchanged and still correct for what it documents (a chord's shallowest depth); it's just no
-  longer what the R3 map's layout keys off.
+- **R3 interaction-rule revision (superseded by R3.1, see below).** Phase 4's "select vs. explore"
+  two-click model was first revised in R3 to a hover-previews/click-on-already-previewed-candidate-
+  advances model. R3.1 replaced that with a simpler single-click-does-everything model after user
+  testing found the two-step model still didn't feel direct enough — see the R3.1 entry below for
+  the current behavior. Kept here for history; `PREVIEW`/`CLEAR_PREVIEW` no longer exist in
+  `src/components/map/explorerState.ts`.
+- **R3 map layout: rings key by move depth, not a chord's shallowest depth (superseded by R3.1,
+  see below).** R3 changed `computeRadialLayout` to key concentric rings by `NavigationOption.depth`
+  instead of `MapGraphNode.introducedAtDepth`, fixing a ring/badge mismatch — but concentric rings
+  themselves turned out to have a bigger problem, fixed in R3.1. Kept here for history.
+- **R3.1 map interaction correction: single click/tap/Enter does everything, one shared ring, no
+  visible breadcrumb.** Prompted by the user testing the deployed R3 preview and finding two real
+  problems: (1) R3's hover-then-second-click model still required an extra step to actually
+  navigate, and its visible top-of-screen exploration breadcrumb read as an authored second
+  progression rather than incidental map history; (2) R3's depth-keyed concentric rings visually
+  implied false parentage — a Zoom-3 option positioned near a Zoom-1 option on an outer ring looked
+  like it descended FROM that Zoom-1 option, rather than being an equally-direct move from the
+  current chord. Both are fixed structurally: `src/components/map/explorerState.ts` has no
+  preview/two-step concept at all now (`ADVANCE`/`BACK`/`RESET`/`SET_CONTEXT` only) — a single
+  click/tap/Enter on a candidate calls `onNavigate`, which the parent (`ExplorerApp.tsx`) wires to
+  both `playback.hearTransition(...)` and `dispatch({ type: "ADVANCE", ... })` together; hover/
+  focus is local-only component state in `HarmonicMap.tsx` (`hoveredChord`) driving purely visual/
+  informational treatment, never audio or navigation. `src/components/map/layout.ts`'s
+  `computeRadialLayout` now places every outgoing option on ONE shared ring at a radius computed by
+  `adaptiveRadius(count)` (clamped to a readable 160-300px range) instead of keying rings by depth
+  at all — depth stays real, visible metadata (the existing per-node badge), just never expressed
+  as radial distance. The old top-of-screen `PathBreadcrumb` component is deleted; a new
+  `MapLocalBack.tsx` renders a compact "‹ PreviousChord" control anchored next to the map itself.
+  `src/audio/player.ts`'s `hearPath`/`hearTransition` were also fixed to schedule via
+  `Tone.Transport` (reusing `playProgression`'s existing mechanism) instead of raw
+  `Tone.now()`-relative offsets, so a rapid second navigation click actually cancels the first
+  transition's still-pending notes via `Transport.cancel()` rather than letting both sound
+  (previously latent since nothing exercised rapid re-triggering before R3.1's mandatory
+  interruption test).

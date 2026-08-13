@@ -7,8 +7,8 @@ import type { Key } from "@/domain/keys";
 import { currentEndpoint } from "@/domain/navigation";
 import { createProgressionItem, type TimeSignature } from "@/domain/progression";
 import { HarmonicMap } from "./map/HarmonicMap";
-import { explorerReducer, initialExplorerState, panelChord } from "./map/explorerState";
-import { PathBreadcrumb } from "./map/PathBreadcrumb";
+import { explorerReducer, initialExplorerState } from "./map/explorerState";
+import { MapLocalBack } from "./map/MapLocalBack";
 import { DepthIndicator } from "./map/DepthIndicator";
 import { ChordContextPanel } from "./chordPanel/ChordContextPanel";
 import { KeySelector } from "./controls/KeySelector";
@@ -86,13 +86,17 @@ export function ExplorerApp() {
     progressionDispatch(action);
   }
 
-  // Clicking an already-previewed candidate on the map (or the panel's
-  // fallback "Continue path here" button) commits it as the new path
-  // endpoint directly (product-spec.md §30/Phase R3 §10) — no separate
-  // "Explore from here" step. Opens the mobile bottom sheet so the result
-  // is actually visible there, without needlessly touching that state on
-  // desktop where it's unused.
-  function handleAdvance(chord: Chord) {
+  // A single click/tap/Enter on a valid destination chord performs the
+  // complete navigation action (Phase R3.1 §5/§6/§8/§10): stop whatever
+  // audio was playing, play the current-endpoint -> destination transition,
+  // and commit the destination as the new endpoint — all at once, never a
+  // separate preview step or a manual "Hear transition"/"Explore from
+  // here" click. `hearTransition` itself handles cancelling any in-flight
+  // audio (§7/§33) before starting the new transition. Opens the mobile
+  // bottom sheet so the result is actually visible there, without
+  // needlessly touching that state on desktop where it's unused.
+  function handleNavigate(chord: Chord) {
+    playback.hearTransition(currentEndpoint(state.navPath), chord);
     dispatch({ type: "ADVANCE", chord });
     if (!isDesktop) {
       setMobileTab("chord");
@@ -100,36 +104,10 @@ export function ExplorerApp() {
     }
   }
 
-  // Hover/keyboard-focus previews a candidate in the side panel WITHOUT
-  // moving the path (Phase R3 §12); a subsequent click/Enter on the same
-  // candidate is what actually advances (see MapNode's onActivate). On
-  // touch, this is effectively desktop/keyboard-only: mobile browsers
-  // synthesize a compatibility mouseenter immediately before the click for
-  // a single tap, so a tap previews-then-advances in one gesture rather
-  // than requiring a separate peek tap — which is fine, since that's
-  // exactly the direct "tap advances" behavior §10/§44 require, and
-  // forcing a distinct peek-only tap target onto small map nodes would cut
-  // against §12's own "don't make the interaction cumbersome" instruction.
-  // Mobile inspection instead happens after landing on a chord, via the
-  // bottom sheet this opens below.
-  function handlePreview(chord: Chord) {
-    dispatch({ type: "PREVIEW", chord });
-    if (!isDesktop) {
-      setMobileTab("chord");
-      setIsPanelOpenOnMobile(true);
-    }
-  }
-
-  function handleClearPreview() {
-    dispatch({ type: "CLEAR_PREVIEW" });
-  }
-
+  // Silent by default (§11) — Back never plays audio, it only steps
+  // navigation history back one move.
   function handleBack() {
     dispatch({ type: "BACK" });
-  }
-
-  function handleJumpToStep(index: number) {
-    dispatch({ type: "JUMP_TO", index });
   }
 
   function handleResetExploration() {
@@ -184,20 +162,23 @@ export function ExplorerApp() {
     dispatchProgression({ type: "TRANSPOSE", semitones });
   }
 
+  const previousChord =
+    state.navPath.steps.length > 1
+      ? state.navPath.steps[state.navPath.steps.length - 2].chord
+      : undefined;
+
   const chordPanel = !isFreeMode && (
     <ChordContextPanel
-      chord={panelChord(state)}
-      endpointChord={currentEndpoint(state.navPath)}
+      chord={currentEndpoint(state.navPath)}
+      previousChord={previousChord}
       context={state.context}
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
       onInstrumentChange={setActiveInstrument}
       bpm={progression.bpm}
-      onAdvance={handleAdvance}
       onAddToProgression={handleAddToProgression}
       onHearChord={playback.hearChord}
       onHearPitches={playback.hearVoicing}
-      onHearTransition={playback.hearTransition}
     />
   );
 
@@ -224,36 +205,33 @@ export function ExplorerApp() {
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-4 py-3 sm:px-6">
             <KeySelector value={isFreeMode ? null : state.context} onChange={handleKeyChange} />
-            {!isFreeMode && <DepthIndicator navPath={state.navPath} />}
+            {!isFreeMode && (
+              <div className="flex items-end gap-4">
+                <DepthIndicator navPath={state.navPath} />
+                <ExplorationSecondaryControls
+                  canHearPath={state.navPath.steps.length > 1}
+                  onHearPath={() => playback.hearPath(state.navPath.steps.map((step) => step.chord))}
+                  onReset={handleResetExploration}
+                />
+              </div>
+            )}
           </div>
-
-          {!isFreeMode && (
-            <div className="border-b border-border px-4 py-2 sm:px-6">
-              <PathBreadcrumb
-                navPath={state.navPath}
-                onJumpTo={handleJumpToStep}
-                onBack={handleBack}
-                onReset={handleResetExploration}
-                onHearPath={() => playback.hearPath(state.navPath.steps.map((step) => step.chord))}
-              />
-            </div>
-          )}
 
           {playback.error && <AudioErrorBanner onDismiss={playback.dismissError} />}
 
-          <div className="flex flex-1 items-center justify-center overflow-hidden p-4">
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
             {isFreeMode ? (
               <FreeModeEmptyState />
             ) : (
-              <HarmonicMap
-                context={state.context}
-                navPath={state.navPath}
-                progression={progression}
-                previewChord={state.previewChord}
-                onAdvance={handleAdvance}
-                onPreview={handlePreview}
-                onClearPreview={handleClearPreview}
-              />
+              <>
+                <MapLocalBack navPath={state.navPath} onBack={handleBack} />
+                <HarmonicMap
+                  context={state.context}
+                  navPath={state.navPath}
+                  progression={progression}
+                  onNavigate={handleNavigate}
+                />
+              </>
             )}
           </div>
         </div>
@@ -292,6 +270,43 @@ function AudioErrorBanner({ onDismiss }: { onDismiss: () => void }) {
         className="shrink-0 text-xs font-medium text-foreground-muted underline-offset-2 hover:text-foreground hover:underline"
       >
         {t("dismiss")}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Reset and "Hear path" (Phase R3.1 §12/§26/§27) — secondary, low-
+ * prominence controls, deliberately not competing visually with the local
+ * Back control (the frequently-used one, anchored next to the map itself)
+ * or with `DepthIndicator`'s explanatory metadata.
+ */
+function ExplorationSecondaryControls({
+  canHearPath,
+  onHearPath,
+  onReset,
+}: {
+  canHearPath: boolean;
+  onHearPath: () => void;
+  onReset: () => void;
+}) {
+  const t = useTranslations("app.navigation");
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onHearPath}
+        disabled={!canHearPath}
+        className="rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        {t("hearPath")}
+      </button>
+      <button
+        type="button"
+        onClick={onReset}
+        className="rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground-muted transition-colors hover:text-foreground"
+      >
+        {t("reset")}
       </button>
     </div>
   );
