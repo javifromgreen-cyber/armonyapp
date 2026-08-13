@@ -1,11 +1,18 @@
 "use client";
 
-import { useReducer, useState, useSyncExternalStore } from "react";
+import { useMemo, useReducer, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { parseChordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import { currentEndpoint } from "@/domain/navigation";
-import { createProgressionItem, type TimeSignature } from "@/domain/progression";
+import type { InstrumentName } from "@/domain/instruments";
+import {
+  progressionFromPath,
+  clampBpm,
+  DEFAULT_BPM,
+  DEFAULT_TIME_SIGNATURE,
+  type TimeSignature,
+} from "@/domain/progression";
 import { HarmonicMap } from "./map/HarmonicMap";
 import { explorerReducer, initialExplorerState } from "./map/explorerState";
 import { MapLocalBack } from "./map/MapLocalBack";
@@ -13,14 +20,11 @@ import { MapLegend } from "./map/MapLegend";
 import { DepthIndicator } from "./map/DepthIndicator";
 import { ChordContextPanel, type PanelMode } from "./chordPanel/ChordContextPanel";
 import { KeySelector } from "./controls/KeySelector";
+import { InstrumentSelector } from "./controls/InstrumentSelector";
 import { ProgressionEditor } from "./progression/ProgressionEditor";
-import {
-  progressionReducer,
-  initialProgressionState,
-  type ProgressionAction,
-} from "./progression/progressionReducer";
 import { usePlaybackController } from "./audio/usePlaybackController";
-import type { Instrument } from "./chordPanel/instrument";
+
+const DEFAULT_INSTRUMENT: InstrumentName = "piano";
 
 const DEFAULT_CONTEXT: Key = { tonic: { letter: "C", accidental: 0 }, mode: "major" };
 const DEFAULT_CHORD: Chord = parseChordSymbol("Cmaj7");
@@ -66,15 +70,21 @@ export function ExplorerApp() {
     undefined,
     () => initialExplorerState(DEFAULT_CONTEXT, DEFAULT_CHORD),
   );
-  const [progression, progressionDispatch] = useReducer(
-    progressionReducer,
-    undefined,
-    initialProgressionState,
-  );
+  // BPM/time signature are the only progression state that ISN'T derived
+  // from `state.navPath` (Phase R3.3 §22/§33/§65) — tempo/meter are
+  // performance preferences orthogonal to harmonic content, so they
+  // deliberately survive Back/Reset/root-context changes rather than
+  // resetting alongside the path.
+  const [bpm, setBpmValue] = useState(DEFAULT_BPM);
+  const [timeSignature, setTimeSignature] = useState<TimeSignature>(DEFAULT_TIME_SIGNATURE);
   const [isFreeMode, setIsFreeMode] = useState(false);
   const [isPanelOpenOnMobile, setIsPanelOpenOnMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chord");
-  const [activeInstrument, setActiveInstrument] = useState<Instrument>("piano");
+  // The ONE global instrument (Phase R3.3 §6-8): drives both map/path
+  // audition and the right panel's execution representation. Never reset
+  // by navigation/Back/root changes (§50-51) — only the toolbar selector
+  // itself changes it.
+  const [activeInstrument, setActiveInstrument] = useState<InstrumentName>(DEFAULT_INSTRUMENT);
   // Silent, informational-only — never affects navigation history or audio
   // (Phase R3.2 §11-13). Lifted here (not in the reducer) because it's
   // purely ephemeral and must be shared between the map and the panel.
@@ -82,13 +92,35 @@ export function ExplorerApp() {
   const isDesktop = useIsDesktop();
   const playback = usePlaybackController();
 
-  // Any progression edit while playing invalidates what's currently
+  // The progression IS the confirmed exploration path (Phase R3.3 §22/§33/
+  // §65) — a pure projection of `state.navPath`, never independently
+  // mutated state that could drift from it. See
+  // `domain/progression/fromNavigationPath.ts` for why this alone gives
+  // auto-root-insertion, confirm-appends, Back-removes, and root-change-
+  // resets for free, structurally.
+  const progression = useMemo(
+    () => progressionFromPath(state.navPath, bpm, timeSignature),
+    [state.navPath, bpm, timeSignature],
+  );
+
+  // BPM/time-signature edits mid-playback invalidate what's currently
   // sounding (Phase 6 §8/§9) — stopping is the simplest reliable choice the
-  // brief explicitly allows, applied uniformly through this single wrapper
-  // rather than repeated in every handler below.
-  function dispatchProgression(action: ProgressionAction) {
+  // brief explicitly allows.
+  function handleSetBpm(nextBpm: number) {
     if (playback.isPlaying) playback.stop();
-    progressionDispatch(action);
+    setBpmValue(clampBpm(nextBpm));
+  }
+
+  function handleSetTimeSignature(nextTimeSignature: TimeSignature) {
+    if (playback.isPlaying) playback.stop();
+    setTimeSignature(nextTimeSignature);
+  }
+
+  // Purely a preference switch (Phase R3.3 §8): never touches the current
+  // chord, confirmed path, preview candidate, key/context, or the
+  // progression it derives from.
+  function handleInstrumentChange(instrument: InstrumentName) {
+    setActiveInstrument(instrument);
   }
 
   // First activation of a candidate (or switching preview to a different
@@ -104,7 +136,7 @@ export function ExplorerApp() {
   function handlePreviewCandidate(chord: Chord) {
     dispatch({ type: "PREVIEW", chord });
     const confirmedChords = state.navPath.steps.map((step) => step.chord);
-    playback.hearPath([...confirmedChords, chord]);
+    playback.hearPath([...confirmedChords, chord], activeInstrument);
     if (!isDesktop) {
       setMobileTab("chord");
     }
@@ -127,7 +159,10 @@ export function ExplorerApp() {
   // stray preview state, since re-hearing the confirmed path supersedes it.
   function handleReplayCurrent() {
     dispatch({ type: "CLEAR_PREVIEW" });
-    playback.hearPath(state.navPath.steps.map((step) => step.chord));
+    playback.hearPath(
+      state.navPath.steps.map((step) => step.chord),
+      activeInstrument,
+    );
   }
 
   // Local Back (Phase R3.2 §6): cancels any preview/audio, drops the latest
@@ -139,7 +174,7 @@ export function ExplorerApp() {
     const shortened = state.navPath.steps.slice(0, -1).map((step) => step.chord);
     dispatch({ type: "BACK" });
     setHoveredChord(null);
-    playback.hearPath(shortened);
+    playback.hearPath(shortened, activeInstrument);
   }
 
   function handleResetExploration() {
@@ -162,44 +197,6 @@ export function ExplorerApp() {
   // navigation state, never plays audio.
   function handleHoverChord(chord: Chord | null) {
     setHoveredChord(chord);
-  }
-
-  // Explicit "Add to progression" action (product-spec.md Phase 5 §2/§5):
-  // uses the panel's chord (the SELECTED chord, not necessarily the
-  // explored/central one) — never triggered by SELECT or EXPLORE, which
-  // dispatch to `explorerReducer` only. Progression state lives in its own
-  // reducer, so there is no code path from selecting/exploring a chord to
-  // mutating the progression.
-  function handleAddToProgression(chord: Chord) {
-    dispatchProgression({ type: "ADD", item: createProgressionItem(chord) });
-  }
-
-  function handleRemoveFromProgression(id: string) {
-    dispatchProgression({ type: "REMOVE", id });
-  }
-
-  function handleReorderProgression(fromIndex: number, toIndex: number) {
-    dispatchProgression({ type: "REORDER", fromIndex, toIndex });
-  }
-
-  function handleSetDuration(id: string, durationBeats: number) {
-    dispatchProgression({ type: "SET_DURATION", id, durationBeats });
-  }
-
-  function handleSetBpm(bpm: number) {
-    dispatchProgression({ type: "SET_BPM", bpm });
-  }
-
-  function handleSetTimeSignature(timeSignature: TimeSignature) {
-    dispatchProgression({ type: "SET_TIME_SIGNATURE", timeSignature });
-  }
-
-  function handleClearProgression() {
-    dispatchProgression({ type: "CLEAR" });
-  }
-
-  function handleTransposeProgression(semitones: number) {
-    dispatchProgression({ type: "TRANSPOSE", semitones });
   }
 
   // What the panel shows: a silently-hovered candidate takes priority, then
@@ -235,10 +232,8 @@ export function ExplorerApp() {
       context={state.context}
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
-      onInstrumentChange={setActiveInstrument}
       bpm={progression.bpm}
-      onAddToProgression={handleAddToProgression}
-      onHearChord={playback.hearChord}
+      onHearChord={(chord) => playback.hearChord(chord, activeInstrument)}
       onHearPitches={playback.hearVoicing}
     />
   );
@@ -246,16 +241,11 @@ export function ExplorerApp() {
   const progressionEditor = (
     <ProgressionEditor
       progression={progression}
-      onRemove={handleRemoveFromProgression}
-      onReorder={handleReorderProgression}
-      onSetDuration={handleSetDuration}
       onSetBpm={handleSetBpm}
       onSetTimeSignature={handleSetTimeSignature}
-      onClear={handleClearProgression}
-      onTranspose={handleTransposeProgression}
       isPlaying={playback.isPlaying}
       playingItemId={playback.playingItemId}
-      onPlay={() => playback.playProgression(progression)}
+      onPlay={() => playback.playProgression(progression, activeInstrument)}
       onStop={playback.stop}
     />
   );
@@ -267,8 +257,9 @@ export function ExplorerApp() {
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border px-4 py-3 sm:px-6">
             <KeySelector value={isFreeMode ? null : state.context} onChange={handleKeyChange} />
             {!isFreeMode && (
-              <div className="flex items-end gap-4">
+              <div className="flex flex-wrap items-end gap-4">
                 <DepthIndicator navPath={state.navPath} />
+                <InstrumentSelector value={activeInstrument} onChange={handleInstrumentChange} />
                 <ExplorationSecondaryControls
                   canHearPath={state.navPath.steps.length > 1}
                   onHearPath={handleReplayCurrent}

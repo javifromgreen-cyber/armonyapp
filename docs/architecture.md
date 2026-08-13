@@ -231,3 +231,103 @@ flatten that back into one-node-per-edge.
     cover Back once the sheet was open from an earlier confirm — was fixed by bumping Back to
     `z-20`. Both are layout-only fixes to pre-existing R3.1 behavior, made necessary by R3.2's
     interaction changes; no new UI system was introduced.
+- **R3.3: global instrument-aware audio + auto-synced progression + legend viewport fix.**
+  Prompted by the user personally testing the deployed R3.2 preview. Three independent product
+  problems, three independent fixes, all layered on R3.2's approved territory/preview-confirm
+  model without touching it:
+  - **Legend clipping (root cause + fix).** R3.2's `MapLegend` popover was `position: absolute`,
+    anchored to its own toggle button, nested inside `ExplorerApp`'s
+    `<div className="flex flex-1 flex-col overflow-hidden">` map-area container. CSS
+    `overflow: hidden` clips ALL rendered descendants to that box regardless of a descendant's own
+    `position` value (unless the descendant escapes the DOM subtree via a portal) — so on any
+    viewport where the popover's content exceeded the map area's own height, its lower rows (Depth
+    3/4) were silently clipped at roughly the same vertical position the Progression strip sits at
+    below, which read as "the progression covers the legend" even though the real cause was the
+    ancestor's `overflow-hidden`, not z-index/stacking order. Fixed in
+    `src/components/map/MapLegend.tsx` by switching to a `position: fixed`, viewport-centered
+    modal-style overlay (`fixed inset-0` backdrop + a centered panel) — `position: fixed` escapes
+    an ancestor's `overflow: hidden` clipping in modern browsers (its containing block is the
+    viewport, not the clipped box, absent an intervening `transform`/`filter`/`contain` ancestor,
+    and none exists here) — with `max-h-[85vh]` and an internal `overflow-y-auto` region so content
+    always stays reachable by scrolling regardless of actual viewport height, rather than a fixed
+    pixel height that could still overflow on a short window. Verified via Playwright at three
+    viewport heights (900px, 844px mobile, and a deliberately short 650px) in both languages —
+    Depth 4 reachable by scrolling in every case.
+  - **Global instrument selection.** `src/domain/instruments/instrumentName.ts` (new) hoists the
+    `"piano" | "guitar" | "bass"` union (previously three separately-declared local copies — one
+    each in `src/audio/player.ts`, `src/components/chordPanel/instrument.ts`) into one canonical
+    `InstrumentName` type/`INSTRUMENT_NAMES` const, re-exported from `src/domain/instruments`'s
+    barrel. `src/components/chordPanel/instrument.ts` is deleted; `InstrumentSelector.tsx` moves
+    from `chordPanel/` to `components/controls/` (it's no longer chord-panel-scoped) and now reads
+    the shared domain type. `ExplorerApp.tsx`'s existing `activeInstrument` state (already the
+    single source of truth — R3.2's right-panel selector already read/wrote it) is now ALSO
+    rendered as a toolbar control (`ExplorerApp.tsx`'s header row, alongside Hear Path/Reset/
+    Legend) instead of only inside `ChordContextPanel`; `ChordContextPanel` loses its own
+    `InstrumentSelector` render and its `onInstrumentChange` prop entirely — it only reads
+    `activeInstrument` now, to decide which of Piano/Guitar/Bass to render. No new state was
+    introduced; this is a UI-placement change plus a type consolidation, not an architecture change.
+  - **Instrument-aware map/path audio.** `src/audio/instrumentVoicing.ts` (new) adds
+    `representativePitchesFor(chord, instrument)` (Piano: `pianoVoicingsFor(chord)[0].pitches`;
+    Guitar: `guitarVoicingsFor(chord)[0]`'s sounding string pitches) and
+    `representativeBassSteps(chord, maxSteps = 2)` (the first 2 steps of
+    `bassPatternsFor(chord)[0]`, played as a short sequential excerpt rather than a simultaneous
+    block chord — Bass stays a melodic/sequential instrument even here, never "converted into
+    Piano-style chords", per the governing spec). All three reuse the EXISTING, already-reviewed
+    domain catalogues verbatim — no new voicing/pattern generation logic, confirmed via
+    `music-theory-review`. `src/audio/player.ts`'s `hearChord`, `hearPath`, and `playProgression`
+    all gain a required `instrument: InstrumentName` parameter and now trigger that instrument's
+    real `Tone.Sampler` (via the existing `getInstrumentVoice`/lazy-load/cache machinery from Phase
+    R2) instead of the neutral `PolySynth`; a shared `scheduleInstrumentChord` helper handles the
+    Piano/Guitar (one block-chord `Tone.Transport` event) vs. Bass (steps spread across the same
+    slot) branching once, reused by both `hearPath` and `playProgression`. The neutral synth
+    (`getSynth()`) survives only as `hearPitches`'s unused `voice: "default"` fallback — every
+    actual caller in the app is now instrument-routed. The R3.1/R3.2 `Tone.Transport`-based
+    cancellation architecture (`stopProgression()` first, `Transport.cancel()` clears pending
+    events) is completely unchanged — only which sampler/pitches get scheduled changed, not how
+    scheduling/cancellation works. Verified both via updated `player.test.ts` (Sampler-routing,
+    Bass's 2-note-sequence-not-block-chord, interruption-still-cancels assertions) AND live
+    Playwright network-request interception confirming actual HTTP requests to
+    `/audio/guitar/*.mp3`/`/audio/bass/*.mp3` fire when previewing with those instruments selected
+    — not just UI/state assertions.
+  - **Progression auto-synced to the confirmed path.** The core architectural change:
+    `src/domain/progression/fromNavigationPath.ts` (new) adds `progressionFromPath(navPath, bpm,
+    timeSignature)`, a PURE PROJECTION from `NavigationPath.steps` to `ProgressionItem[]` (id
+    derived from position — safe specifically because `navPath.steps` only ever grows/shrinks at
+    its tail, never splices mid-array) — never a second, imperatively-mutated copy of the
+    progression that could drift from navigation state. `ExplorerApp.tsx` computes
+    `progression = useMemo(() => progressionFromPath(state.navPath, bpm, timeSignature), ...)`
+    instead of running a separate `progressionReducer`. This single change gives every one of the
+    spec's required behaviors for free, structurally, with no extra bookkeeping: the starting chord
+    is always item 1 (navPath always has ≥1 step); a previewed candidate is never included
+    (`previewChord` lives outside `navPath` entirely); confirming appends exactly once
+    (`advancePath` pushes exactly one step); Back removes exactly the last item (`goBack` pops
+    exactly one step, and — already true of `goBack` since Phase R3, unmodified — never below the
+    starting chord); a root/context change resets to just the new root (`SET_CONTEXT` rebuilds
+    `navPath` via `initialExplorerState`, a fresh single-step path). `src/domain/progression/
+    progression.ts` is trimmed to just the constants/`clampBpm` that survive (`createEmptyProgression`,
+    `createProgressionItem`, `addItem`, `removeItem`, `reorderItem`, `setItemDuration`,
+    `clearProgression`, `transposeProgression` are all deleted — genuinely unreachable once nothing
+    dispatches the actions that called them, confirmed via `git diff`/full-repo grep before
+    deletion). `src/components/progression/progressionReducer.ts` is deleted entirely; BPM/time
+    signature become plain `useState` in `ExplorerApp` (survives Back/Reset/root-changes
+    deliberately, since tempo/meter are orthogonal to harmonic content). `ProgressionEditor.tsx`/
+    `ProgressionChordCard.tsx` lose per-item reorder/remove controls and whole-progression
+    transpose — **a deliberate removal, not an oversight**: once an item's position/presence is
+    derived from navigation history, a control that could move/delete/relabel it independently
+    would silently violate "Progression === Confirmed Path" (transpose specifically mutates chord
+    identity via `transposeChord`, which would diverge the displayed/played progression from the
+    actual explored key permanently). `ChordContextPanel`'s "Add to progression" button is removed
+    entirely, along with its `onAddToProgression` prop — there is no code path left that mutates
+    the progression independently of navigation. `resolveHistoryContext`
+    (`src/domain/navigation/ranking.ts`) is UNCHANGED and still technically takes a separate
+    `Progression` argument for its R3 precedence rule (prefer the real progression's history when
+    its last chord matches the current endpoint) — that rule is now permanently a no-op in practice
+    (the progression's last chord always matches the endpoint by construction), but left as-is
+    rather than refactored, since it's still correct, low-risk, and out of this phase's stated
+    scope. `music-theory-review`/`product-scope-review` confirmed §70's question (is "Hear Path"
+    now redundant with "Progression Play"?) has a real answer, not just "keep both by default":
+    Hear Path always uses a fixed quick per-chord gap (exploratory pacing, instrument-aware since
+    this same phase) while Progression Play uses real BPM/time-signature/per-item-duration timing
+    (`buildProgressionSchedule`) — a quick route-check vs. a tempo-accurate performance of the same
+    chords, genuinely different purposes, not redundant.
+    interaction changes; no new UI system was introduced.

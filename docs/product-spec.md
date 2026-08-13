@@ -88,22 +88,24 @@ Harmonic map and chord progression coexist always — never separate "map mode" 
 mode". Conceptual desktop layout (may evolve for UX):
 
 - **Top**: project title, key/free mode (*"free mode" here is a TONAL concept — no locked key —
-  unrelated to any commercial plan; see the naming note in §25's revision history), active
-  instrument, account/settings.
+  unrelated to any commercial plan; see the naming note in §25's revision history), the ONE global
+  active-instrument selector (Phase R3.3 §18/§30 — Piano/Guitar/Bass, controlling both map/path
+  audition and the side panel's instrument representation), account/settings.
 - **Centre**: harmonic map — a chosen harmonic path plus all next-move options from its current
   endpoint (R3; see §30).
 - **Contextual side panel**: selected chord, harmonic info, relationship explanation, instrument
-  representation.
-- **Bottom**: persistent progression strip, transport/playback, BPM, time signature.
+  representation (Phase R3.3: follows the top's global instrument — no separate selector here).
+- **Bottom**: persistent progression strip (Phase R3.3: automatically mirrors the confirmed
+  exploration path, §16), transport/playback, BPM, time signature.
 
 Mobile/tablet get purpose-designed responsive behavior, not a shrunk desktop UI.
 
 ## 7. Critical Interaction Rule
 
-*(Revised R3.2 — reintroduces a two-step preview-before-navigation interaction on top of R3.1's
-foundations, after real Vercel testing found R3.1's single-click-does-everything model removed the
-ability to audition/compare a candidate before committing to it; supersedes R3.1's own
-single-click model. §30 and `docs/roadmap.md`'s R3.2 entry have the full navigation-model detail.)*
+*(Revised R3.2, then R3.3 — R3.2 reintroduced a two-step preview-before-navigation interaction on
+top of R3.1's foundations, after real Vercel testing found R3.1's single-click-does-everything
+model removed the ability to audition/compare a candidate before committing to it; R3.3 changed
+what CONFIRMING does to the progression — see item 2 below and `docs/roadmap.md`'s R3.3 entry.)*
 
 Three distinct operations, never conflated:
 
@@ -121,21 +123,26 @@ Three distinct operations, never conflated:
      HISTORY (kept internally for Back and contextual ranking, never rendered as a visible chain
      that could be mistaken for an authored progression), becomes the new current chord, clears
      the preview, recenters the map, and regenerates outgoing options. Plays no audio itself — the
-     candidate was already heard in full during preview.
+     candidate was already heard in full during preview. **Revised R3.3**: confirming ALSO
+     automatically appends the chord to the progression, exactly once (§16) — there is no longer a
+     separate manual "Add to progression" action.
    - Activating the current/center chord replays the confirmed path from the beginning without
      ever navigating or touching history.
    - A local Back control cancels any preview/audio, drops the latest confirmed step, recenters,
-     and replays the shortened confirmed path.
-3. Adding the chord to the progression.
+     replays the shortened confirmed path, AND removes the corresponding item from the progression
+     (§16, Revised R3.3) — it never removes the starting/root chord.
+3. *(Removed R3.3 — see item 2's Confirm/Back revisions above; adding to the progression is no
+   longer a separate operation from navigating.)*
 
 The exploration/navigation history must never appear as a long visible sequence resembling a
-composed progression (the R3.1 correction's original finding, still true under R3.2 — a musician
-idly exploring `Em -> C -> Bm -> C -> Em -> D#dim7 -> ...` must not see that read back as if it
-were an authored piece). A compact, local "Back" control near the current chord (showing only the
-immediately previous chord) is sufficient; the full history does not need permanent screen space.
-What must stay true regardless: inspecting a chord must never sound anything or move the map, and
-adding to the progression always stays a distinct, explicit action, never triggered by inspecting,
-previewing, or confirming.
+composed progression (the R3.1 correction's original finding, still true under R3.2/R3.3 — a
+musician idly exploring `Em -> C -> Bm -> C -> Em -> D#dim7 -> ...` must not see that read back as
+if it were an authored piece — this is now the SAME sequence as the progression strip, by design,
+per R3.3, rather than a second, independently-composed list). A compact, local "Back" control near
+the current chord (showing only the immediately previous chord) is sufficient; the full history
+does not need permanent screen space. What must stay true regardless: inspecting a chord must never
+sound anything or move the map, previewing a candidate must never touch the progression, and only
+confirming (or Back, symmetrically) changes it.
 
 ## 8. Harmonic Map — Harmonic Depth ("Zoom")
 
@@ -260,34 +267,65 @@ this chord?
 
 ## 16. Progression Builder
 
-Not a DAW — a lightweight, musically useful builder. Each progression chord: chord, duration in
-beats, order/index. Project has BPM and time signature.
+*(Revised R3.3 — supersedes the original "add/remove/reorder chords, transpose it" model. §63/§64's
+own instruction: remove/update any documentation still saying "only Add to progression changes the
+progression" — that rule no longer holds. See `docs/roadmap.md`'s R3.3 entry for the full
+rationale.)*
 
-Users can: add/remove/reorder chords, change durations, change BPM/time signature, play the
-progression, transpose it.
+Not a DAW — a lightweight, musically useful builder, and no longer an independently-edited list:
+**the progression automatically mirrors the confirmed exploration path** (§7/§30's preview/confirm
+model). Previewing a candidate never touches it; confirming a candidate appends it exactly once;
+Back removes exactly the item that corresponds to the confirmed step it undoes; changing the
+starting harmonic context/chord (the top-left control) resets the progression to just the new
+root. There is no manual "Add to progression" action — a musician's route through the harmonic map
+*is* their progression, without confirming the same musical decision twice.
+
+Each progression item still carries: chord, duration in beats (the domain default, §16's original
+per-item metadata), order (== the confirmed path's order). Project has BPM and time signature —
+both remain user-adjustable and survive Back/Reset/root changes (tempo/meter are performance
+preferences, orthogonal to harmonic content). Users can: change BPM/time signature, play the
+progression. Manual per-item reorder/remove and whole-progression transpose are REMOVED (see §17)
+— once the progression's identity/order is derived from confirmed navigation, editing it
+independently would silently diverge from the harmonic route the user actually navigated; Back and
+the top-left harmonic-context control are the coherent ways to change it now.
 
 Future architecture: sections, repetitions, verse/chorus, arrangement blocks, mini-sequencer
 behavior — not built yet.
 
 ## 17. Transposition
 
-Progression transposition is part of core product access (available during the trial and to any
-active license — see §25; not a separately-gated feature). Entire progression transposes while
-preserving harmonic relationships; instrument views update accordingly.
+*(Revised R3.3 — whole-progression transpose is REMOVED, not merely re-scoped.)* Transposing would
+change the displayed/played chords' identity without changing the confirmed exploration path they
+were derived from — a direct violation of §16's new "the progression IS the confirmed path"
+invariant (the domain layer never stores a second, independently-mutable copy of the progression's
+chords; see `docs/architecture.md`'s R3.3 deviation entry). If progression-level transposition
+returns as a feature later, it would need to re-explore/re-root the whole path in a transposed key
+context rather than relabeling already-computed chords — out of scope for this revision.
 
 ## 18. Audio
 
-Two playback concepts:
+*(Revised R3.3 — "neutral harmonic playback" as the primary map/preview sound is superseded by a
+GLOBAL instrument selection; see §30 and `docs/roadmap.md`'s R3.3 entry.)*
 
-- **Neutral harmonic playback**: neutral piano/synth-like sound for understanding harmonic
-  content ("Hear chord").
-- **Instrument/voicing playback**: reproduces the exact displayed representation ("Hear this
-  voicing") — guitar plays the selected voicing, piano the selected voicing, bass the selected
-  arpeggio/pattern.
+One global selected instrument (Piano/Guitar/Bass) drives BOTH of these, always through that
+instrument's real sampled sound (Phase R2), never a generic synth:
 
-Web Audio API and/or Tone.js. Simple synthesis / lightweight legally-usable sounds are enough for
-v1 — correctness of pitch, timing, voicing, and responsiveness matter more than realism. Avoid
-expensive external audio services.
+- **Map/path audition and "Hear this chord only"**: the confirmed path (plus an active preview
+  candidate), "Hear Path", the current chord's own replay, and the isolated single-chord preview
+  all use the globally selected instrument's own representative default voicing/pattern (reusing
+  each instrument's existing domain catalogue — never a new audio engine, never a redesign of
+  Piano/Guitar/Bass's own sampled playback). Switching the instrument never touches the current
+  chord, the confirmed path, a preview candidate, the key/context, or harmonic ranking — only which
+  sound and which right-panel representation are used.
+- **Instrument/voicing playback ("Hear this voicing"/"Hear this pattern")**: reproduces the EXACT
+  displayed representation the user is currently looking at (a specific inversion/shape/pattern) —
+  guitar plays the selected voicing, piano the selected voicing, bass the selected arpeggio/
+  pattern. Unchanged since Phase R2/R3.2; this is deliberately distinct from the representative
+  default the global-instrument audition above uses.
+
+Web Audio API and/or Tone.js. Sample-based instrument sounds (Phase R2) plus a lightweight neutral
+synth kept only as an internal fallback — correctness of pitch, timing, voicing, and responsiveness
+matter more than realism. Avoid expensive external audio services.
 
 ## 19. The 72-Hour Trial
 
@@ -431,13 +469,15 @@ from explicit musical rules, not hand-authored per node. Correctness over clever
 
 ## 30. Map UX
 
-*(Revised R1, then R3.1, then R3.2 — the completeness rule below supersedes the previous "always
-emphasise the current chord and its most relevant nearby options" phrasing, which read as license
-to silently truncate. R3 implemented the harmonic-path-explorer model on top of the harmonic graph
-engine built in Phases 1–4; R3.1 corrected that implementation's own map interaction after the user
-tested the deployed R3 preview; R3.2 added Harmonic Territories and reintroduced a
-preview-before-navigation interaction after further Vercel testing — see `docs/roadmap.md`'s R3,
-R3.1, and R3.2 entries for the full history.)*
+*(Revised R1, then R3.1, then R3.2, then R3.3 — the completeness rule below supersedes the previous
+"always emphasise the current chord and its most relevant nearby options" phrasing, which read as
+license to silently truncate. R3 implemented the harmonic-path-explorer model on top of the
+harmonic graph engine built in Phases 1–4; R3.1 corrected that implementation's own map interaction
+after the user tested the deployed R3 preview; R3.2 added Harmonic Territories and reintroduced a
+preview-before-navigation interaction after further Vercel testing; R3.3 made map/path audition
+instrument-aware (a single global instrument selector, superseding neutral-synth playback), made
+the progression automatically mirror the confirmed path, and fixed the legend's viewport clipping —
+see `docs/roadmap.md`'s R3, R3.1, R3.2, and R3.3 entries for the full history.)*
 
 The map is a **harmonic path explorer**, not a static neighborhood graph (§0). For the current
 chord and harmonic context, the map exposes **every valid immediate outgoing harmonic possibility
@@ -482,10 +522,25 @@ shortened path. Previous context (the navigation history so far, or the actual p
 corresponds to the current point — see the precedence rule in `docs/roadmap.md`'s Phase R3) may
 shift ranking, prominence, and explanation — never membership.
 
+**Global instrument audition (R3.3):** one selector (Piano/Guitar/Bass, in the main toolbar — never
+duplicated elsewhere in the UI) controls the sound used for every map/path audition (preview, "Hear
+Path", current-chord replay) AND the side panel's execution representation, always through that
+instrument's real sampled sound and existing voicing/pattern catalogue (§18) — never a separate
+neutral-synth map sound disconnected from what the panel visibly shows. Switching it is a pure
+preference change: it never touches the current chord, confirmed path, preview candidate, key/
+context, ranking, or the progression.
+
+**Legend accessibility (R3.3):** the "How to read the map" panel renders as a viewport-anchored
+overlay with an internal, viewport-relative scroll region (never a fixed pixel height, never
+clipped by a page-layout ancestor) — every territory and every depth explanation stays reachable by
+scrolling regardless of window height, and nothing else on the page (the progression strip
+included) can cover it.
+
 Users can inspect silently, preview (which auditions cumulatively without navigating), confirm
-(which navigates), understand, step backward along navigation history, reset to a new starting
-chord, and explicitly add to the progression. Relationships must be distinguishable by more than
-colour alone.
+(which navigates AND automatically appends to the progression — §16), understand, step backward
+along navigation history (which automatically removes the corresponding progression item), and
+reset to a new starting chord. There is no separate "add to the progression" action anymore (§16).
+Relationships must be distinguishable by more than colour alone.
 
 ## 31. Paywall UX
 

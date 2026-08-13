@@ -39,26 +39,50 @@ is a navigation metaphor only — the UI must not look like a geographic map.
   radial position or territory colour. Territory is data-driven and complete (union of all
   territories == full outgoing set, no chord in two territories, empty territories simply
   omitted) — see `docs/product-spec.md` §8/§30, revised R3.2.
-- Three distinct user actions must stay distinct in code and UI: inspecting a chord silently,
-  navigating to a chord, and adding a chord to the progression. Adding to the progression always
-  stays a fully separate, explicit action — never triggered by inspecting or navigating.
-  **Revised R3.2** (reintroducing a two-step interaction on top of R3.1's foundations, superseding
-  R3.1's own single-click-does-everything model): hover/keyboard-focus is purely silent,
-  informational preview — it never sounds anything and never moves the map. The FIRST
-  click/tap/Enter on a candidate PREVIEWS it — cancels any in-flight audio, plays the confirmed
-  path plus the candidate from the beginning, shows layered info in the panel — but does not
-  navigate, recenter, or touch history/progression. Switching preview to a different candidate
-  cancels the old audition and starts a new one, still without touching confirmed history. The
-  SECOND activation of the SAME already-previewed candidate CONFIRMS it — commits it to
-  navigation history, becomes the new current chord, clears preview, recenters the map, regenerates
-  outgoing options — but plays no audio itself (already heard during preview). This is persistent
-  UI state, never a double-click/timer — arbitrary time may elapse between the two activations.
-  Map/path audio is always cumulative: replayed from the first chord of the CONFIRMED path (plus
-  the active preview candidate when previewing), never an arbitrary append-only or truncated
-  window; only one audition may exist at a time, and every new preview/Back/replay cancels all
-  pending future notes. Navigation history is kept internally (Back, contextual ranking) but must
-  never render as a long visible chain that could be mistaken for an authored progression — see
-  `docs/product-spec.md` §7/§30 for the full revision.
+- Two distinct user actions must stay distinct in code and UI: inspecting a chord silently
+  (hover/keyboard-focus — informational only, never sounds anything, never moves the map, never
+  sets preview state) and navigating to a chord. **Revised R3.2, then R3.3** (R3.2 reintroduced a
+  two-step interaction on top of R3.1's foundations, superseding R3.1's own
+  single-click-does-everything model; R3.3 changed what CONFIRMING does to the progression — see
+  below): the FIRST click/tap/Enter on a candidate PREVIEWS it — cancels any in-flight audio, plays
+  the confirmed path plus the candidate from the beginning, shows layered info in the panel — but
+  does not navigate, recenter, or touch history/progression. Switching preview to a different
+  candidate cancels the old audition and starts a new one, still without touching confirmed
+  history. The SECOND activation of the SAME already-previewed candidate CONFIRMS it — commits it
+  to navigation history, becomes the new current chord, clears preview, recenters the map,
+  regenerates outgoing options, and (Revised R3.3) automatically appends it to the progression,
+  exactly once — but plays no audio itself (already heard during preview). This is persistent UI
+  state, never a double-click/timer — arbitrary time may elapse between the two activations. Map/
+  path audio is always cumulative: replayed from the first chord of the CONFIRMED path (plus the
+  active preview candidate when previewing), never an arbitrary append-only or truncated window;
+  only one audition may exist at a time, and every new preview/Back/replay cancels all pending
+  future notes. Navigation history is kept internally (Back, contextual ranking) but must never
+  render as a long visible chain that could be mistaken for an authored progression — because
+  (Revised R3.3) it IS the progression now — see `docs/product-spec.md` §7/§16/§30 for the full
+  revision.
+- **The progression is the confirmed exploration path — never a second, independently-edited list**
+  (Phase R3.3, `docs/product-spec.md` §16, revised): `Progression.items` is derived (a pure
+  projection, see `src/domain/progression/fromNavigationPath.ts`) from `navPath.steps`, never
+  imperatively appended/removed by a separate "Add to progression" action, which no longer exists.
+  Previewing a candidate never touches it; confirming appends exactly once; Back removes exactly
+  the corresponding item and never removes the starting/root chord; changing the starting harmonic
+  context (the top-left control) resets it to just the new root. Manual per-item reorder/remove and
+  whole-progression transpose are REMOVED, not merely hidden — they had no coherent meaning once
+  the progression's order/identity is derived from navigation rather than independently editable
+  (`docs/product-spec.md` §17, revised). BPM/time signature remain independently adjustable and
+  survive Back/Reset/root changes (tempo/meter are orthogonal to harmonic content).
+- **One global instrument selection drives all instrument-aware audio and the side panel's
+  execution representation** (Phase R3.3, `docs/product-spec.md` §18/§30): a single
+  `InstrumentName` (`"piano" | "guitar" | "bass"`, `src/domain/instruments/instrumentName.ts`) state
+  lives once, in the toolbar's `InstrumentSelector` — never duplicated in the side panel. It
+  controls BOTH map/path audition (preview, "Hear Path", current-chord replay, "Hear this chord
+  only" — all through that instrument's real sampler and existing voicing/pattern catalogue, reused
+  via `src/audio/instrumentVoicing.ts`, never a new audio engine) AND which of Piano/Guitar/Bass the
+  side panel renders. Switching it is a pure preference change: it must never touch the current
+  chord, confirmed path, preview candidate, key/context, ranking, or the progression. Distinct from
+  "Hear this voicing"/"Hear this pattern", which always reproduces the EXACT displayed
+  voicing/pattern (unchanged since Phase R2) rather than the representative default the
+  global-instrument audition uses.
 - No hard-coded user-facing copy in components — use the `next-intl` message namespaces
   (`en`/`es`). Adding a language later must not require refactoring components.
 - No runtime LLM dependency for product features.

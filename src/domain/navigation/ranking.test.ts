@@ -3,7 +3,7 @@ import { parseChordSymbol, chordSymbol } from "../chords/chord";
 import { parseNoteName } from "../notes/note";
 import type { Key } from "../keys/key";
 import { chordIdentityKey } from "../harmony/chordIdentity";
-import { createEmptyProgression } from "../progression/progression";
+import { DEFAULT_TIME_SIGNATURE } from "../progression/progression";
 import type { Progression } from "../progression/types";
 import { outgoingOptions } from "./options";
 import { startPath, advancePath } from "./path";
@@ -11,6 +11,10 @@ import { rankOptions, resolveHistoryContext, type HistoryContext } from "./ranki
 import type { RankedNavigationOption } from "./types";
 
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
+
+function emptyProgression(): Progression {
+  return { items: [], bpm: 90, timeSignature: DEFAULT_TIME_SIGNATURE };
+}
 
 function rankPosition(ranked: RankedNavigationOption[], symbol: string): number {
   return ranked.findIndex((r) => chordIdentityKey(r.chord) === chordIdentityKey(parseChordSymbol(symbol)));
@@ -46,7 +50,7 @@ describe("rankOptions — context changes prominence (Phase R3 §18/§19/§39)",
     let path = startPath(parseChordSymbol("C"));
     path = advancePath(path, cMajor, parseChordSymbol("Am"));
     path = advancePath(path, cMajor, parseChordSymbol("Dm"));
-    const reinforced = resolveHistoryContext(path, createEmptyProgression(), cMajor);
+    const reinforced = resolveHistoryContext(path, emptyProgression(), cMajor);
     expect(chordSymbol(reinforced.previousChord!)).toBe("Am");
 
     const rankedCold = rankOptions(options, cold);
@@ -104,7 +108,7 @@ describe("resolveHistoryContext — Phase R3 §22 precedence rule", () => {
   it("uses the exploration path's previous chord when the progression's last chord doesn't match the endpoint", () => {
     let path = startPath(parseChordSymbol("C"));
     path = advancePath(path, cMajor, parseChordSymbol("Am"));
-    const history = resolveHistoryContext(path, createEmptyProgression(), cMajor);
+    const history = resolveHistoryContext(path, emptyProgression(), cMajor);
     expect(chordSymbol(history.endpoint)).toBe("Am");
     expect(chordSymbol(history.previousChord!)).toBe("C");
   });
@@ -133,7 +137,7 @@ describe("resolveHistoryContext — Phase R3 §22 precedence rule", () => {
   it("falls back to the exploration path when the progression is empty", () => {
     let path = startPath(parseChordSymbol("Dm"));
     path = advancePath(path, cMajor, parseChordSymbol("G7"));
-    const history = resolveHistoryContext(path, createEmptyProgression(), cMajor);
+    const history = resolveHistoryContext(path, emptyProgression(), cMajor);
     expect(chordSymbol(history.previousChord!)).toBe("Dm");
   });
 });

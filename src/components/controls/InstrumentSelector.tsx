@@ -1,25 +1,27 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { AVAILABLE_INSTRUMENTS, type Instrument } from "./instrument";
+import { INSTRUMENT_NAMES, type InstrumentName } from "@/domain/instruments";
 
 export interface InstrumentSelectorProps {
-  value: Instrument;
-  onChange: (instrument: Instrument) => void;
+  value: InstrumentName;
+  onChange: (instrument: InstrumentName) => void;
 }
 
 /**
- * Switches which instrument representation the panel shows (Phase 8 §22).
+ * The ONE global instrument selector (Phase R3.3 §5-8) — controls both the
+ * map/path audition instrument and the right panel's execution
+ * representation (Piano keyboard / Guitar shape+TAB / Bass pattern+TAB).
  * Deliberately never touches chord selection, exploration, the harmonic
- * map/context, or the progression — it only changes which execution view
- * is rendered below.
+ * map/context, or the progression — changing it only changes which sound
+ * and which execution view are used, never harmonic state (§8).
  */
 export function InstrumentSelector({ value, onChange }: InstrumentSelectorProps) {
   const t = useTranslations("app.instrument");
 
   return (
     <div role="radiogroup" aria-label={t("label")} className="flex gap-1 rounded-full bg-surface p-1">
-      {AVAILABLE_INSTRUMENTS.map((instrument) => {
+      {INSTRUMENT_NAMES.map((instrument) => {
         const isActive = instrument === value;
         return (
           <button

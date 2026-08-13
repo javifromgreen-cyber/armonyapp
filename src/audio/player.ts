@@ -1,9 +1,10 @@
 import * as Tone from "tone";
 import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
-import { neutralVoicing } from "./voicing";
+import type { InstrumentName } from "@/domain/instruments";
 import type { PlayablePitch } from "@/domain/instruments/playablePitch";
 import { buildProgressionSchedule } from "./scheduling";
+import { representativePitchesFor, representativeBassSteps } from "./instrumentVoicing";
 
 /**
  * Thin Tone.js adapter — the ONLY file in `src/audio` that imports Tone.js.
@@ -26,11 +27,14 @@ export class AudioInitError extends Error {
 let synth: Tone.PolySynth<Tone.Synth> | null = null;
 
 /**
- * The NEUTRAL voice — "Hear chord" (Phase 6 §4) and progression playback
- * (Phase 6) only. Deliberately not meant to sound like any particular
- * instrument (product-spec.md §18's "neutral harmonic playback"), so it
- * stays a plain synth even after Phase R2 moved instrument-specific
- * playback to samples below.
+ * The NEUTRAL voice. Since Phase R3.3, "Hear this chord only", map/path
+ * audition, and progression playback are all instrument-aware (§9/§39/§71-
+ * 72) and no longer use this — it survives only as `hearPitches`'s
+ * `voice: "default"` fallback (kept for API completeness; no current caller
+ * passes it). Deliberately not meant to sound like any particular
+ * instrument (product-spec.md §18's original "neutral harmonic playback"
+ * framing), so it stays a plain synth even after Phase R2 moved
+ * instrument-specific playback to samples below.
  */
 function getSynth(): Tone.PolySynth<Tone.Synth> {
   if (!synth) {
@@ -66,8 +70,6 @@ function getSynth(): Tone.PolySynth<Tone.Synth> {
  * `public/audio/{piano,guitar,bass}/`, served from this app's own domain
  * (never hotlinked from a third party at runtime).
  */
-type InstrumentName = "piano" | "guitar" | "bass";
-
 interface SampleMap {
   baseUrl: string;
   urls: Record<string, string>;
@@ -179,15 +181,38 @@ function pitchesToFrequencies(pitches: PlayablePitch[]): number[] {
   return pitches.map((pitch) => pitch.frequencyHz);
 }
 
+/** How long a single note/chord sounds for the isolated "Hear this chord only" preview. */
+const HEAR_CHORD_DURATION_SECONDS = 1.1;
+
 /**
- * One-off chord preview ("Hear chord", Phase 6 §4) — purely auditory, never
- * touches application/progression state. Uses the default neutral voicing;
- * "Hear this voicing" (Phase 7 §13) uses `hearPitches` below instead, with
- * its own computed `PlayablePitch[]` rather than `neutralVoicing`.
+ * One-off chord preview ("Hear this chord only", Phase 6 §4, instrument-
+ * aware since Phase R3.3 §71-72): purely auditory, never touches
+ * application/progression/navigation state. Uses `instrument`'s own
+ * representative voicing/pattern (Phase R3.3 §10/§11) through its real
+ * sampler — coherent with whatever the rest of the UI (toolbar selector,
+ * right panel) is currently showing, rather than a generic neutral synth
+ * that would contradict a visibly-selected Guitar/Bass. Distinct from
+ * "Hear this voicing"/"Hear this pattern" (Phase 7 §13 / Phase 9 §23),
+ * which uses `hearPitches` below with the EXACT displayed voicing/pattern
+ * rather than this function's representative default.
  */
-export async function hearChord(chord: Chord): Promise<void> {
+export async function hearChord(chord: Chord, instrument: InstrumentName): Promise<void> {
   await ensureAudioReady();
-  playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
+  const voice = getInstrumentVoice(instrument);
+  await voice.ready;
+
+  if (instrument === "bass") {
+    const steps = representativeBassSteps(chord);
+    const stepGap = HEAR_CHORD_DURATION_SECONDS / steps.length;
+    const now = Tone.now();
+    steps.forEach((pitch, index) => {
+      voice.sampler.triggerAttackRelease(pitch.frequencyHz, stepGap * 0.85, now + index * stepGap);
+    });
+    return;
+  }
+
+  const pitches = representativePitchesFor(chord, instrument);
+  voice.sampler.triggerAttackRelease(pitchesToFrequencies(pitches), HEAR_CHORD_DURATION_SECONDS);
 }
 
 /** Seconds between successive chords in `hearPath` — enough space to actually hear each one land, but concise since this fires on every preview/confirm/Back/replay click (Phase R3.2 §28: exploring must stay quick, never a "long performance"). */
@@ -195,43 +220,85 @@ const PATH_CHORD_GAP_SECONDS = 0.5;
 const PATH_CHORD_DURATION_SECONDS = 0.42;
 
 /**
- * Neutral harmonic playback (product-spec.md §18) of the CUMULATIVE
- * exploration path — the confirmed navigation history plus (while one is
- * active) the previewed candidate, always replayed from its first chord
- * (Phase R3.2 §14/§18/§21: "does this whole route work?", not just the
- * newest link). The single primitive every audition case reuses: previewing
- * a candidate, Back's shortened path, and replaying the confirmed path from
- * the current/center chord — never separate scheduling logic per case.
- * Deliberately simple: no voice-leading optimisation, same neutral voicing
- * `hearChord` already uses. A no-op only for a genuinely empty sequence —
- * a single chord (e.g. Back all the way down to the starting chord, or
- * replaying a not-yet-advanced path) still plays that one chord.
+ * Schedules one chord's worth of audition inside `hearPath`/`playProgression`,
+ * starting at `slotStartSeconds` and (for Piano/Guitar) sounding for
+ * `slotDurationSeconds`. Bass is handled distinctly (Phase R3.3 §14): it
+ * plays `representativeBassSteps`' short note SEQUENCE spread evenly across
+ * the slot rather than one simultaneous block chord — Bass stays a
+ * melodic, sequential instrument even in cumulative path audition, never
+ * "converted into simultaneous Piano-style chords".
+ */
+function scheduleInstrumentChord(
+  transport: ReturnType<typeof Tone.getTransport>,
+  sampler: Tone.Sampler,
+  chord: Chord,
+  instrument: InstrumentName,
+  slotStartSeconds: number,
+  slotDurationSeconds: number,
+  onSounded?: (time: number) => void,
+): void {
+  if (instrument === "bass") {
+    const steps = representativeBassSteps(chord);
+    const stepGapSeconds = slotDurationSeconds / steps.length;
+    steps.forEach((pitch, index) => {
+      transport.schedule((time) => {
+        sampler.triggerAttackRelease(pitch.frequencyHz, stepGapSeconds * 0.85, time);
+        if (index === 0) onSounded?.(time);
+      }, slotStartSeconds + index * stepGapSeconds);
+    });
+    return;
+  }
+
+  const pitches = representativePitchesFor(chord, instrument);
+  transport.schedule((time) => {
+    sampler.triggerAttackRelease(pitchesToFrequencies(pitches), slotDurationSeconds, time);
+    onSounded?.(time);
+  }, slotStartSeconds);
+}
+
+/**
+ * Instrument-aware playback (Phase R3.3 §9/§13/§17-19, superseding R3.2's
+ * neutral-synth version) of the CUMULATIVE exploration path — the confirmed
+ * navigation history plus (while one is active) the previewed candidate,
+ * always replayed from its first chord (Phase R3.2 §14/§18/§21: "does this
+ * whole route work?", not just the newest link) — now through
+ * `instrument`'s real sampler and representative voicing/pattern rather
+ * than a generic neutral synth (Phase R3.3 §9/§10). The single primitive
+ * every audition case reuses: previewing a candidate, Back's shortened
+ * path, and replaying the confirmed path from the current/center chord —
+ * never separate scheduling logic per case. A no-op only for a genuinely
+ * empty sequence — a single chord (e.g. Back all the way down to the
+ * starting chord, or replaying a not-yet-advanced path) still plays that
+ * one chord.
  *
  * Scheduled on `Tone.Transport` (the same mechanism `playProgression`
  * already uses) rather than raw `Tone.now()`-relative offsets, and always
  * starts by calling `stopProgression()` — this is what makes switching to a
  * new preview candidate (or any other new audition) actually cancel
- * whatever was still pending (Phase R3.2 §15): a `Tone.now()`-relative
- * `triggerAttackRelease` call, once scheduled, cannot be un-scheduled, but
- * `Transport.cancel()` (part of `stopProgression`) clears everything still
- * pending. Reuses the existing playback-cancellation architecture rather
- * than inventing a second one.
+ * whatever was still pending (Phase R3.2 §15, preserved unchanged in
+ * R3.3 §19): a `Tone.now()`-relative `triggerAttackRelease` call, once
+ * scheduled, cannot be un-scheduled, but `Transport.cancel()` (part of
+ * `stopProgression`) clears everything still pending. Reuses the existing
+ * playback-cancellation architecture rather than inventing a second one.
  */
-export async function hearPath(chords: Chord[]): Promise<void> {
+export async function hearPath(chords: Chord[], instrument: InstrumentName): Promise<void> {
   if (chords.length === 0) return;
   await ensureAudioReady();
   stopProgression();
 
+  const voice = getInstrumentVoice(instrument);
+  await voice.ready;
+
   const transport = Tone.getTransport();
-  const synthInstance = getSynth();
   chords.forEach((chord, index) => {
-    transport.schedule((time) => {
-      synthInstance.triggerAttackRelease(
-        pitchesToFrequencies(neutralVoicing(chord)),
-        PATH_CHORD_DURATION_SECONDS,
-        time,
-      );
-    }, index * PATH_CHORD_GAP_SECONDS);
+    scheduleInstrumentChord(
+      transport,
+      voice.sampler,
+      chord,
+      instrument,
+      index * PATH_CHORD_GAP_SECONDS,
+      PATH_CHORD_DURATION_SECONDS,
+    );
   });
 
   const totalSeconds = (chords.length - 1) * PATH_CHORD_GAP_SECONDS + PATH_CHORD_DURATION_SECONDS;
@@ -294,11 +361,6 @@ export async function hearPitches(pitches: PlayablePitch[], options?: HearPitche
   });
 }
 
-/** Low-level playback primitive — assumes the AudioContext is already running; prefer `hearChord`/`hearPitches` from a click handler instead of calling this directly. */
-export function playPitches(frequenciesHz: number[], durationSeconds: number, time?: number): void {
-  getSynth().triggerAttackRelease(frequenciesHz, durationSeconds, time);
-}
-
 export interface PlaybackHandlers {
   /** Fired (UI-thread-synced via `Tone.Draw`) right as each chord starts sounding — drives the "currently playing" card highlight. */
   onChordStart: (itemId: string) => void;
@@ -307,15 +369,22 @@ export interface PlaybackHandlers {
 }
 
 /**
- * Schedules and starts the whole progression on `Tone.Transport`. Guards
- * against overlapping transports itself (Phase 6 §8) by always clearing any
- * prior schedule first — repeated Play presses can never stack duplicate
- * playback. Chords never overlap: each is released ~8% early relative to
- * the next one's start, giving a clean articulation instead of pitches
- * bleeding into each other.
+ * Schedules and starts the whole progression on `Tone.Transport`, through
+ * `instrument`'s real sampler and representative voicing/pattern (Phase
+ * R3.3 §39: one coherent audition instrument across map preview, Hear Path,
+ * current-path replay, AND progression playback — never a contradictory
+ * state where the map says Guitar but the progression plays an unrelated
+ * neutral sound). Guards against overlapping transports itself (Phase 6 §8)
+ * by always clearing any prior schedule first — repeated Play presses can
+ * never stack duplicate playback. Chords never overlap: each is released
+ * ~8% early relative to the next one's start, giving a clean articulation
+ * instead of pitches bleeding into each other (Bass's short note sequence
+ * is spread within that same shortened window, via the shared
+ * `scheduleInstrumentChord` helper `hearPath` also uses).
  */
 export async function playProgression(
   progression: Progression,
+  instrument: InstrumentName,
   handlers: PlaybackHandlers,
 ): Promise<void> {
   await ensureAudioReady();
@@ -324,19 +393,22 @@ export async function playProgression(
   const schedule = buildProgressionSchedule(progression);
   if (schedule.length === 0) return;
 
+  const voice = getInstrumentVoice(instrument);
+  await voice.ready;
+
   const transport = Tone.getTransport();
-  const synthInstance = getSynth();
 
   for (const event of schedule) {
     const soundingSeconds = event.durationSeconds * 0.92;
-    transport.schedule((time) => {
-      synthInstance.triggerAttackRelease(
-        pitchesToFrequencies(neutralVoicing(event.chord)),
-        soundingSeconds,
-        time,
-      );
-      Tone.getDraw().schedule(() => handlers.onChordStart(event.itemId), time);
-    }, event.startSeconds);
+    scheduleInstrumentChord(
+      transport,
+      voice.sampler,
+      event.chord,
+      instrument,
+      event.startSeconds,
+      soundingSeconds,
+      (time) => Tone.getDraw().schedule(() => handlers.onChordStart(event.itemId), time),
+    );
   }
 
   const lastEvent = schedule[schedule.length - 1];

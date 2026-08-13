@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { type Explanation } from "@/domain/harmony";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
-import type { PlayablePitch } from "@/domain/instruments";
+import type { InstrumentName, PlayablePitch } from "@/domain/instruments";
 import type { HearPitchesOptions } from "@/audio/player";
 import { harmonicCharacterFor, harmonicTerritoryFor, DEPTH_LABEL_KEY } from "@/domain/navigation";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
@@ -13,8 +13,6 @@ import { functionDisplayInfo } from "./functionDisplay";
 import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
 import { GuitarVoicingPanel } from "./guitar/GuitarVoicingPanel";
 import { BassPatternPanel } from "./bass/BassPatternPanel";
-import { InstrumentSelector } from "./InstrumentSelector";
-import type { Instrument } from "./instrument";
 
 /** What the panel is currently showing (Phase R3.2 §9/§12/§38) — drives which heading/hint copy applies; the underlying data (`chord`/`relativeToChord`) is the same shape regardless. */
 export type PanelMode = "current" | "hover" | "preview";
@@ -27,13 +25,11 @@ export interface ChordContextPanelProps {
   relativeToChord: Chord | undefined;
   context: Key;
   isDesktop: boolean;
-  activeInstrument: Instrument;
-  onInstrumentChange: (instrument: Instrument) => void;
+  /** The ONE global instrument (Phase R3.3 §6-8) — set exclusively by the toolbar's `InstrumentSelector`; this panel only READS it to decide which sub-panel (Piano/Guitar/Bass) to render. No instrument-choice control lives here anymore (§7 — the old right-panel selector was a duplicate of the global one and is removed). */
+  activeInstrument: InstrumentName;
   /** The progression's current BPM (Phase 9 §24) — reused as-is for bass pattern step timing rather than introducing a second, unrelated tempo state. */
   bpm: number;
-  /** Adds `chord` to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from navigating). */
-  onAddToProgression: (chord: Chord) => void;
-  /** Purely auditory preview of ONLY this chord, isolated from any exploration route (Phase R3.2 §42/§43 — "Hear this chord only") — must never navigate or mutate the progression. */
+  /** Purely auditory preview of ONLY this chord, isolated from any exploration route (Phase R3.2 §42/§43 — "Hear this chord only") — must never navigate or mutate the progression. Uses the global instrument (Phase R3.3 §71) for coherence with the rest of the UI. */
   onHearChord: (chord: Chord) => void;
   /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
   onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
@@ -63,9 +59,7 @@ export function ChordContextPanel({
   context,
   isDesktop,
   activeInstrument,
-  onInstrumentChange,
   bpm,
-  onAddToProgression,
   onHearChord,
   onHearPitches,
 }: ChordContextPanelProps) {
@@ -170,13 +164,6 @@ export function ChordContextPanel({
         </section>
       )}
 
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
-          {tPanel("instrument")}
-        </h3>
-        <InstrumentSelector value={activeInstrument} onChange={onInstrumentChange} />
-      </div>
-
       {activeInstrument === "piano" && (
         <PianoVoicingPanel
           key={`piano-${info.symbol}`}
@@ -216,20 +203,13 @@ export function ChordContextPanel({
         />
       )}
 
-      <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
+      <div className="mt-auto border-t border-border pt-4">
         <button
           type="button"
           onClick={() => onHearChord(chord)}
-          className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+          className="w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
         >
           {tPanel("hearChord")}
-        </button>
-        <button
-          type="button"
-          onClick={() => onAddToProgression(chord)}
-          className="rounded-full border border-accent px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          {tPanel("addToProgression")}
         </button>
       </div>
     </div>

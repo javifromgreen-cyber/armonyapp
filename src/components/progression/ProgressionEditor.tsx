@@ -2,24 +2,14 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  TIME_SIGNATURES,
-  MIN_BPM,
-  MAX_BPM,
-  type Progression,
-  type TimeSignature,
-} from "@/domain/progression";
+import { TIME_SIGNATURES, MIN_BPM, MAX_BPM, type Progression, type TimeSignature } from "@/domain/progression";
 import { ProgressionChordCard } from "./ProgressionChordCard";
 
 export interface ProgressionEditorProps {
+  /** Always the confirmed exploration path (Phase R3.3 §22/§33) — never independently edited here. */
   progression: Progression;
-  onRemove: (id: string) => void;
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  onSetDuration: (id: string, durationBeats: number) => void;
   onSetBpm: (bpm: number) => void;
   onSetTimeSignature: (timeSignature: TimeSignature) => void;
-  onClear: () => void;
-  onTranspose: (semitones: number) => void;
   isPlaying: boolean;
   /** The progression item currently sounding — highlights its card (Phase 6 §7). */
   playingItemId: string | null;
@@ -28,21 +18,22 @@ export interface ProgressionEditorProps {
 }
 
 /**
- * The persistent composition workspace (product-spec.md §16): a lightweight
- * chord-card strip plus BPM/time-signature/transpose controls — deliberately
- * NOT a DAW timeline (no tracks, no piano roll, no waveforms). Used both as
- * the desktop persistent strip below the map and as the mobile "Progression"
- * tab's content (see ExplorerApp.tsx) — same component, no duplicated logic.
+ * The persistent progression display (product-spec.md §16, revised Phase
+ * R3.3): a chord-card strip that automatically mirrors the confirmed
+ * exploration path, plus BPM/time-signature/playback — deliberately NOT a
+ * DAW timeline (no tracks, no piano roll, no waveforms). Per-item reorder/
+ * remove and whole-progression transpose are gone (Phase R3.3 §32/§38):
+ * once the progression IS the confirmed path, editing it independently
+ * would silently diverge from the harmonic route the user actually
+ * navigated — Back and the top-left harmonic-context control are the
+ * (coherent) ways to change it now. Used both as the desktop persistent
+ * strip below the map and as the mobile "Progression" tab's content (see
+ * ExplorerApp.tsx) — same component, no duplicated logic.
  */
 export function ProgressionEditor({
   progression,
-  onRemove,
-  onReorder,
-  onSetDuration,
   onSetBpm,
   onSetTimeSignature,
-  onClear,
-  onTranspose,
   isPlaying,
   playingItemId,
   onPlay,
@@ -53,25 +44,15 @@ export function ProgressionEditor({
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4">
-      {hasItems ? (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {progression.items.map((item, index) => (
-            <ProgressionChordCard
-              key={item.id}
-              item={item}
-              index={index}
-              count={progression.items.length}
-              isPlaying={isPlaying && playingItemId === item.id}
-              onRemove={() => onRemove(item.id)}
-              onDurationChange={(durationBeats) => onSetDuration(item.id, durationBeats)}
-              onMoveEarlier={() => onReorder(index, index - 1)}
-              onMoveLater={() => onReorder(index, index + 1)}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-foreground-muted">{t("empty")}</p>
-      )}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {progression.items.map((item) => (
+          <ProgressionChordCard
+            key={item.id}
+            item={item}
+            isPlaying={isPlaying && playingItemId === item.id}
+          />
+        ))}
+      </div>
 
       <div className="flex flex-wrap items-center gap-4 border-t border-border pt-3">
         <BpmField key={progression.bpm} bpm={progression.bpm} onCommit={onSetBpm} />
@@ -91,28 +72,6 @@ export function ProgressionEditor({
           </select>
         </label>
 
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-foreground-muted">{t("transposeLabel")}</span>
-          <button
-            type="button"
-            onClick={() => onTranspose(-1)}
-            disabled={!hasItems}
-            aria-label={t("transposeDown")}
-            className="rounded-md border border-border px-2 py-1 text-sm text-foreground-muted transition-colors hover:text-foreground disabled:opacity-30"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            onClick={() => onTranspose(1)}
-            disabled={!hasItems}
-            aria-label={t("transposeUp")}
-            className="rounded-md border border-border px-2 py-1 text-sm text-foreground-muted transition-colors hover:text-foreground disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
-
         <button
           type="button"
           onClick={isPlaying ? onStop : onPlay}
@@ -130,16 +89,6 @@ export function ProgressionEditor({
         >
           {isPlaying ? t("stopButton") : t("playButton")}
         </button>
-
-        {hasItems && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="ml-auto text-xs text-foreground-muted underline-offset-2 hover:text-foreground hover:underline"
-          >
-            {t("clear")}
-          </button>
-        )}
       </div>
     </div>
   );

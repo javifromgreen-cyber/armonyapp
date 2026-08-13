@@ -12,7 +12,7 @@ import {
 } from "@/audio/player";
 import type { Chord } from "@/domain/chords";
 import type { Progression } from "@/domain/progression";
-import type { PlayablePitch } from "@/domain/instruments";
+import type { InstrumentName, PlayablePitch } from "@/domain/instruments";
 
 export type AudioErrorKind = "init";
 
@@ -21,7 +21,8 @@ export interface PlaybackController {
   /** The progression item currently sounding, for card highlighting (Phase 6 §7) — null when stopped. */
   playingItemId: string | null;
   error: AudioErrorKind | null;
-  hearChord: (chord: Chord) => void;
+  /** Isolated single-chord preview ("Hear this chord only", Phase R3.3 §71) — uses `instrument`'s representative voicing/pattern, coherent with the global instrument selector. */
+  hearChord: (chord: Chord, instrument: InstrumentName) => void;
   /**
    * Plays an exact set of pitches (Phase 7 §13 / Phase 8 §19's "Hear this
    * voicing" / Phase 9 §23's "Hear this pattern") — never a regenerated
@@ -35,12 +36,15 @@ export interface PlaybackController {
   /**
    * Plays the cumulative exploration audition — the confirmed path, plus a
    * previewed candidate while one is active — from its first chord every
-   * time (Phase R3.2 §14/§18/§21). The single audio primitive that drives
-   * previewing a candidate, Back's shortened-path replay, and the
-   * current-chord's own replay; callers just pass the right chord list.
+   * time (Phase R3.2 §14/§18/§21), through `instrument`'s real sampler and
+   * representative voicing/pattern (Phase R3.3 §9/§17-18). The single audio
+   * primitive that drives previewing a candidate, Back's shortened-path
+   * replay, and the current-chord's own replay; callers just pass the right
+   * chord list and the current global instrument.
    */
-  hearPath: (chords: Chord[]) => Promise<void>;
-  playProgression: (progression: Progression) => void;
+  hearPath: (chords: Chord[], instrument: InstrumentName) => Promise<void>;
+  /** Plays the progression through `instrument`'s real sampler (Phase R3.3 §39) — the same global instrument as map/path audition. */
+  playProgression: (progression: Progression, instrument: InstrumentName) => void;
   stop: () => void;
   dismissError: () => void;
 }
@@ -67,8 +71,8 @@ export function usePlaybackController(): PlaybackController {
   // or a running transport behind (Phase 6 §8).
   useEffect(() => stop, [stop]);
 
-  const hearChord = useCallback((chord: Chord) => {
-    hearChordAudio(chord).catch((cause: unknown) => {
+  const hearChord = useCallback((chord: Chord, instrument: InstrumentName) => {
+    hearChordAudio(chord, instrument).catch((cause: unknown) => {
       if (cause instanceof AudioInitError) setError("init");
     });
   }, []);
@@ -83,18 +87,18 @@ export function usePlaybackController(): PlaybackController {
   // layer (player.ts's hearPath calls stopProgression() first) — if that
   // preempted an actual "Play progression" run, this keeps the Play/Stop
   // UI honest rather than showing "playing" over silence.
-  const hearPath = useCallback((chords: Chord[]) => {
+  const hearPath = useCallback((chords: Chord[], instrument: InstrumentName) => {
     setIsPlaying(false);
     setPlayingItemId(null);
-    return hearPathAudio(chords).catch((cause: unknown) => {
+    return hearPathAudio(chords, instrument).catch((cause: unknown) => {
       if (cause instanceof AudioInitError) setError("init");
     });
   }, []);
 
-  const playProgression = useCallback((progression: Progression) => {
+  const playProgression = useCallback((progression: Progression, instrument: InstrumentName) => {
     if (progression.items.length === 0) return; // defense in depth — the Play control is disabled for this case already
     setError(null);
-    playProgressionAudio(progression, {
+    playProgressionAudio(progression, instrument, {
       onChordStart: setPlayingItemId,
       onFinish: () => {
         setIsPlaying(false);

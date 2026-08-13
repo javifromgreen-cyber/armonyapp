@@ -1,3 +1,5 @@
+export type { InstrumentName } from "./instrumentName";
+export { INSTRUMENT_NAMES } from "./instrumentName";
 export type { PlayablePitch } from "./playablePitch";
 export {
   midiFromPitchClassAndOctave,

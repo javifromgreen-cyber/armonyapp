@@ -887,6 +887,102 @@ strip's empty-state message disappearing), and Piano/Guitar/Bass instrument-sele
 (all three switch cleanly; Guitar's "Hear this voicing" and Bass's "Hear this pattern" labels
 unchanged).
 
+## Phase R3.3 — Global instrument exploration + auto-synced progression + legend usability fix
+- [x] Fix the "How to read the map" legend so ALL content (all 5 territories, all 4 depths) stays
+      reachable at any viewport height — `position: fixed` viewport-anchored overlay with
+      `max-h-[85vh]` + internal `overflow-y-auto`, escaping the map-area ancestor's
+      `overflow-hidden` clipping that was the actual root cause (not a z-index/stacking issue)
+- [x] ONE global instrument selector (Piano/Guitar/Bass) in the main toolbar, controlling both
+      map/path audition and the right panel's execution representation — no duplicate selector in
+      the right panel anymore
+- [x] Map/path audition (preview, Hear Path, current-chord replay), "Hear this chord only", and
+      progression playback all use the globally selected instrument's real sampled sound and
+      existing representative voicing/pattern (reusing the existing Piano/Guitar/Bass domain
+      catalogues, never a new audio engine) — superseding the neutral-synth playback R1–R3.2 used
+- [x] Bass path/chord audition stays melodic/sequential (a short 2-note excerpt from its own
+      default pattern), never converted into a simultaneous Piano-style block chord
+- [x] Instrument switching is a pure preference change — never touches the current chord, confirmed
+      path, preview candidate, key/context, ranking, or the progression
+- [x] Existing Piano/Guitar/Bass sampled audio, voicing/pattern GENERATION, and "Hear this voicing"/
+      "Hear this pattern"/"Hear this chord only" exact-playback behavior completely unchanged
+      (confirmed via `git diff --stat` showing zero changes under `src/domain/instruments/**`
+      except two additive barrel-export lines)
+- [x] Progression automatically mirrors the confirmed exploration path — no manual "Add to
+      progression" action anymore; `Progression.items` is a pure projection of `navPath.steps`
+      (`progressionFromPath`), not a second independently-mutated list
+- [x] The starting chord automatically is progression item 1; previewing never touches the
+      progression; confirming appends exactly once; Back removes exactly the corresponding item
+      (and, unchanged since Phase R3, never removes the starting/root chord); changing the starting
+      harmonic context (top-left control) resets the progression to just the new root
+- [x] Manual per-item reorder/remove and whole-progression transpose REMOVED (not left in an
+      inconsistent state) — a deliberate simplification once progression order/identity is derived
+      from navigation rather than independently editable; BPM/time signature remain adjustable and
+      independently survive Back/Reset/root changes
+- [x] Reviewed and confirmed non-redundant: Hear Path (fixed quick pacing, exploratory) vs.
+      Progression Play (real BPM/time-signature/duration timing, a tempo-accurate performance) —
+      kept both, documented why
+
+This was a **further corrective/additive pass**, prompted by the user's own testing of the deployed
+R3.2 preview. Three independent product problems, three independent fixes, all layered on R3.2's
+approved territory/preview-confirm model without touching it (Harmonic Territory classification,
+its completeness invariant, the sector-based layout, and the preview→confirm interaction itself are
+all byte-for-byte or behaviorally unchanged — confirmed via `git diff` and full regression testing).
+
+Also found and fixed a genuine architecture smell while implementing the progression change: three
+separately-declared local `"piano" | "guitar" | "bass"` string-literal unions (in the audio player,
+the old chord-panel instrument type, and implicitly in each domain instrument sub-module) were
+consolidated into one canonical `InstrumentName` type (`src/domain/instruments/instrumentName.ts`),
+removing a latent drift risk rather than adding a fourth copy for the new toolbar selector.
+
+Verified 2026-08-13: `npm run test` (689 tests, down from 701 — net reduction from deleting
+`progressionReducer.test.ts` and trimming `progression.test.ts` for now-removed manual-editing
+functions, offset by new `fromNavigationPath.test.ts`/expanded `player.test.ts`/`instrumentVoicing`
+coverage), `npx tsc --noEmit`, `npm run lint`, `npm run build` all pass with zero regressions.
+`music-theory-review`: confirmed `harmonicTerritory.ts`/`harmonicCharacter.ts` untouched;
+confirmed `representativePitchesFor`/`representativeBassSteps` correctly reuse the existing,
+already-reviewed domain catalogues (index `[0]` verified to be each catalogue's own documented
+default/curated/best-ranked choice by reading source, not an arbitrary pick); confirmed Bass's
+2-step excerpt (root + 3rd, from `basicArpeggio`'s formula-order ascending steps) is a musically
+valid minimal representation, not a misleading fragment; confirmed no chord-identity mutation
+anywhere in the new audio-routing or progression-derivation code (instrument selection changes
+timbre only). `product-scope-review`: verdict aligned, all 10 required questions answered
+affirmatively with live-browser evidence (see below); confirmed the removal of manual progression
+editing was a deliberate, justified simplification given the new invariant, not silent scope
+creep; confirmed no R4/Auth/Supabase/Projects/Trial/Stripe work began; confirmed no hard-coded
+copy; confirmed the new domain files stay framework-free.
+
+Live-browser verification (Playwright, desktop 1440×900 + a deliberately short 1440×650 + mobile
+390×844, English + Spanish, 70+41 assertions total across three separate verification passes):
+legend opens as a dialog, is reachable and scrollable to Depth 4 at every tested viewport height
+including the short one, and closes correctly; exactly one instrument radiogroup exists on the
+page in every configuration; switching the global selector updates the right panel's heading
+(Piano → Guitar → Bass) with no other interaction; selecting Guitar then Bass and previewing a
+candidate actually issued real HTTP requests to `/audio/guitar/*.mp3` and `/audio/bass/*.mp3`
+respectively (network-level verification, not just UI-state assertions, per the phase's own
+explicit requirement) with zero cross-contamination (no piano samples requested during a
+Guitar-only preview); no "Add to progression" button exists anywhere; the root chord (Cmaj7)
+auto-appears in the progression with no manual action; previewing a candidate leaves the
+progression unchanged while confirming it appends exactly once; Back removes the matching
+progression item in the same action as navigation Back, down to (and never past) the root; changing
+the top-left harmonic context to a new key resets both the current chord and the progression to
+just the new root with no stale items; "Hear this voicing" (Piano), "Hear this pattern" (Bass), and
+"Hear this chord only" labels all still present and correctly distinct; zero console errors across
+every run. A full end-to-end scenario (root C → preview/confirm Am → switch to Guitar → preview/
+confirm Dm → switch to Bass → Back twice to the root → Reset exploration) matched the phase's own
+required live-scenario script exactly, including confirming the selected instrument (Bass) survives
+both Back and Reset exploration unchanged.
+
+Known, deliberate simplification: per-item progression duration editing (previously a `<select>` on
+each chord card) was also removed alongside reorder/remove/transpose, rather than kept via a new
+parallel `durationBeatsByStep` array — every derived item uses the domain's existing default
+duration (`DEFAULT_DURATION_BEATS`). This wasn't explicitly required to go, but keeping it would
+have meant introducing a second piece of state that had to be manually kept in lockstep with
+`navPath.steps`' length on every CONFIRM/BACK/RESET/SET_CONTEXT transition — exactly the kind of
+"two competing arrays that can drift" the phase's own architecture guidance (§65) says to avoid
+without a very strong reason. If per-item duration control turns out to matter in practice, the
+clean way to reintroduce it is folding it into the SAME reducer transaction that mutates `navPath`
+(so it can never desync structurally), not a second independent reducer.
+
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
       Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text

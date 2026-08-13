@@ -1,23 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { parseChordSymbol, chordSymbol } from "@/domain/chords";
-import {
-  createEmptyProgression,
-  addItem,
-  createProgressionItem,
-  setBpm,
-} from "@/domain/progression";
+import { DEFAULT_TIME_SIGNATURE } from "@/domain/progression";
 import type { Progression } from "@/domain/progression";
 import { buildProgressionSchedule, progressionDurationSeconds, secondsPerBeat } from "./scheduling";
 
+let idSuffix = 0;
+
+function emptyProgression(bpm = 90): Progression {
+  return { items: [], bpm, timeSignature: DEFAULT_TIME_SIGNATURE };
+}
+
 function progressionWith(entries: [string, number][], bpm = 90): Progression {
-  let progression = setBpm(createEmptyProgression(), bpm);
-  for (const [symbol, durationBeats] of entries) {
-    progression = addItem(
-      progression,
-      createProgressionItem(parseChordSymbol(symbol), durationBeats),
-    );
-  }
-  return progression;
+  return {
+    items: entries.map(([symbol, durationBeats]) => {
+      idSuffix += 1;
+      return { id: `test-item-${idSuffix}`, chord: parseChordSymbol(symbol), durationBeats };
+    }),
+    bpm,
+    timeSignature: DEFAULT_TIME_SIGNATURE,
+  };
 }
 
 describe("secondsPerBeat", () => {
@@ -36,7 +37,7 @@ describe("secondsPerBeat", () => {
 
 describe("buildProgressionSchedule", () => {
   it("an empty progression schedules no events", () => {
-    expect(buildProgressionSchedule(createEmptyProgression())).toEqual([]);
+    expect(buildProgressionSchedule(emptyProgression())).toEqual([]);
   });
 
   it("schedules events back-to-back in order, using durationBeats * secondsPerBeat", () => {
@@ -102,7 +103,7 @@ describe("buildProgressionSchedule", () => {
 
 describe("progressionDurationSeconds", () => {
   it("is 0 for an empty progression", () => {
-    expect(progressionDurationSeconds(createEmptyProgression())).toBe(0);
+    expect(progressionDurationSeconds(emptyProgression())).toBe(0);
   });
 
   it("sums every item's duration in seconds", () => {

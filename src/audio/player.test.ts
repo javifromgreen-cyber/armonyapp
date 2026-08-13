@@ -6,11 +6,14 @@ import type { PlayablePitch } from "@/domain/instruments/playablePitch";
  * exercised with a real AudioContext in Vitest (no browser here) — that's
  * exactly why the musically-meaningful math lives in Tone-free siblings
  * (`pitch`/`scheduling`/`voicing.ts`), tested separately. What THIS file
- * verifies instead (Phase R2 §23) is the ROUTING and TIMING behavior around
- * Tone.js: which instrument's voice gets triggered for which `voice`
- * option, that "Hear chord" stays on the neutral voice, that staggered
- * (strum/sequential) playback preserves pitch order and timing, and that
- * the exact frequency values passed through are never altered. Achieved by
+ * verifies instead (Phase R2 §23, extended R3.3 §9/§71-72) is the ROUTING
+ * and TIMING behavior around Tone.js: which instrument's voice gets
+ * triggered for which `voice`/instrument argument (including "Hear this
+ * chord only", map/path audition, and progression playback all routing to
+ * the globally selected instrument's real sampler rather than a neutral
+ * synth), that staggered (strum/sequential) playback preserves pitch order
+ * and timing, and that the exact frequency values passed through are never
+ * altered. Achieved by
  * mocking the `tone` module with small recording fakes standing in for
  * `PolySynth`/`Sampler` — this tests player.ts's own logic, not Tone.js
  * itself or real audio output.
@@ -178,25 +181,51 @@ describe("hearPitches — instrument routing (Phase R2 §23)", () => {
   });
 });
 
-describe("hearChord — stays on the neutral voice, never an instrument sample (Phase R2 §20/§23)", () => {
-  it("never constructs a Sampler", async () => {
+describe("hearChord — instrument-aware, coherent with the global selector (Phase R3.3 §71-72)", () => {
+  it("uses the selected instrument's Sampler, never the neutral synth", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearChord(parseChordSymbol("Cmaj7"));
-    expect(Tone.Sampler.instances).toHaveLength(0);
-    expect(Tone.PolySynth.instances).toHaveLength(1);
+    await player.hearChord(parseChordSymbol("Cmaj7"), "piano");
+    expect(Tone.Sampler.instances).toHaveLength(1);
+    expect(Tone.Sampler.instances[0].options.baseUrl).toContain("piano");
+    expect(Tone.PolySynth.instances).toHaveLength(0);
   });
 
-  it("Hear chord and an instrument's Hear-this-voicing use genuinely different voices", async () => {
+  it("switching the instrument between calls loads/uses a genuinely different sampler", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearChord(parseChordSymbol("C"));
-    await player.hearPitches([pitch(440)], { voice: "guitar" });
-    expect(Tone.PolySynth.instances).toHaveLength(1);
-    expect(Tone.Sampler.instances).toHaveLength(1);
-    // the neutral synth's own call list never received the guitar note
-    const neutralCalls = Tone.PolySynth.instances[0].calls;
-    expect(neutralCalls).toHaveLength(1);
+    await player.hearChord(parseChordSymbol("C"), "piano");
+    await player.hearChord(parseChordSymbol("C"), "guitar");
+    expect(Tone.Sampler.instances).toHaveLength(2);
+    const baseUrls = Tone.Sampler.instances.map((s) => s.options.baseUrl);
+    expect(baseUrls[0]).toContain("piano");
+    expect(baseUrls[1]).toContain("guitar");
+  });
+
+  it("Bass plays a short sequential excerpt (never one simultaneous block chord, §14/§71)", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearChord(parseChordSymbol("C"), "bass");
+    const sampler = Tone.Sampler.instances[0];
+    expect(sampler.options.baseUrl).toContain("bass");
+    const noteCalls = sampler.calls.filter((c) => c.method === "triggerAttackRelease");
+    // 2 short sequential single-note calls, not 1 simultaneous chord call.
+    expect(noteCalls).toHaveLength(2);
+    noteCalls.forEach((call) => {
+      const [freq] = call.args as [number, number, number];
+      expect(typeof freq).toBe("number"); // a single pitch per call, not an array/chord
+    });
+  });
+
+  it("Piano plays one simultaneous block-chord call", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearChord(parseChordSymbol("Cmaj7"), "piano");
+    const sampler = Tone.Sampler.instances[0];
+    const noteCalls = sampler.calls.filter((c) => c.method === "triggerAttackRelease");
+    expect(noteCalls).toHaveLength(1);
+    const [freqs] = noteCalls[0].args as [number[], number];
+    expect(Array.isArray(freqs)).toBe(true);
   });
 });
 
@@ -251,16 +280,20 @@ describe("hearPitches — staggered playback order and timing (Guitar strum / Ba
   });
 });
 
-describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§18/§21)", () => {
-  it("schedules one Transport event per chord, in order, at increasing times, on the neutral synth", async () => {
+describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§18/§21, instrument-aware since R3.3 §9)", () => {
+  it("schedules one Transport event per chord, in order, at increasing times, on the selected instrument's sampler", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("Am"), parseChordSymbol("Dm")]);
+    await player.hearPath(
+      [parseChordSymbol("C"), parseChordSymbol("Am"), parseChordSymbol("Dm")],
+      "piano",
+    );
 
-    expect(Tone.PolySynth.instances).toHaveLength(1);
-    expect(Tone.Sampler.instances).toHaveLength(0); // neutral voice only, never an instrument sampler
+    expect(Tone.Sampler.instances).toHaveLength(1);
+    expect(Tone.Sampler.instances[0].options.baseUrl).toContain("piano");
+    expect(Tone.PolySynth.instances).toHaveLength(0); // never the neutral voice
     flushTransport(Tone);
-    const calls = Tone.PolySynth.instances[0].calls;
+    const calls = Tone.Sampler.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
     expect(calls).toHaveLength(3);
     for (let i = 1; i < calls.length; i++) {
       const prevTime = (calls[i - 1].args as [number[], number, number])[2];
@@ -271,16 +304,16 @@ describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§1
 
   it("is a no-op only for a genuinely empty sequence", async () => {
     const { player, Tone } = await freshPlayer();
-    await player.hearPath([]);
-    expect(Tone.PolySynth.instances).toHaveLength(0);
+    await player.hearPath([], "piano");
+    expect(Tone.Sampler.instances).toHaveLength(0);
   });
 
   it("a single chord still plays (Back down to the starting chord, or replaying a not-yet-advanced path)", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearPath([parseChordSymbol("C")]);
+    await player.hearPath([parseChordSymbol("C")], "piano");
     flushTransport(Tone);
-    const calls = Tone.PolySynth.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    const calls = Tone.Sampler.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
     expect(calls).toHaveLength(1);
   });
 
@@ -290,24 +323,25 @@ describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§1
     // confirmed C -> F -> Am, previewing Dm: the whole route sounds, not just Am -> Dm.
     await player.hearPath(
       ["C", "F", "Am", "Dm"].map((s) => parseChordSymbol(s)),
+      "piano",
     );
     flushTransport(Tone);
-    const calls = Tone.PolySynth.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    const calls = Tone.Sampler.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
     expect(calls).toHaveLength(4);
   });
 
-  it("mandatory audio-interruption test (Phase R3.2 §15): switching preview candidates cancels the previous audition, only the new one plays", async () => {
+  it("mandatory audio-interruption test (Phase R3.2 §15, preserved R3.3 §19): switching preview candidates cancels the previous audition, only the new one plays", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
     const confirmed = ["C", "F", "Am"].map((s) => parseChordSymbol(s));
 
     // Preview Dm: confirmed + Dm begins (4 note events + 1 auto-stop, doesn't fire yet).
-    await player.hearPath([...confirmed, parseChordSymbol("Dm")]);
+    await player.hearPath([...confirmed, parseChordSymbol("Dm")], "piano");
     const transport = Tone.getTransport();
     expect(transport.scheduled).toHaveLength(5);
 
     // Before that finishes, switch preview to E7 — confirmed history is unchanged.
-    await player.hearPath([...confirmed, parseChordSymbol("E7")]);
+    await player.hearPath([...confirmed, parseChordSymbol("E7")], "piano");
 
     // The Dm preview's still-pending events must have been cancelled — cancel()
     // fired once per hearPath call, and the pending queue now holds only the
@@ -320,7 +354,7 @@ describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§1
     // The second stopProgression() also released the still-sounding prior
     // audition (a real, separate `releaseAll` call) — filter to just the
     // note triggers to check what actually sounded.
-    const noteCalls = Tone.PolySynth.instances[0].calls.filter(
+    const noteCalls = Tone.Sampler.instances[0].calls.filter(
       (c) => c.method === "triggerAttackRelease",
     );
     // Only C -> F -> Am -> E7 actually sounds (4 chords) — Dm's would-be 4th
@@ -333,10 +367,57 @@ describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§1
     const { player, Tone } = await freshPlayer();
     await player.hearPitches([pitch(440)], { voice: "piano" });
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("G")]);
+    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("G")], "piano");
 
     const pianoSampler = Tone.Sampler.instances[0];
     expect(pianoSampler.calls.some((c) => c.method === "releaseAll")).toBe(true);
+  });
+
+  it("Bass plays a short sequential excerpt per chord, never a simultaneous block chord (§14)", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearPath([parseChordSymbol("C"), parseChordSymbol("F")], "bass");
+    flushTransport(Tone);
+    const noteCalls = Tone.Sampler.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    // 2 chords x 2 short notes each = 4 single-pitch calls, never a 2-call
+    // (one simultaneous chord per step) sequence like Piano/Guitar.
+    expect(noteCalls).toHaveLength(4);
+    noteCalls.forEach((call) => {
+      const [freq] = call.args as [number, number, number];
+      expect(typeof freq).toBe("number");
+    });
+  });
+
+  it("switching the instrument uses a genuinely different sampler for the next audition", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    await player.hearPath([parseChordSymbol("C")], "piano");
+    await player.hearPath([parseChordSymbol("C")], "guitar");
+    expect(Tone.Sampler.instances).toHaveLength(2);
+    expect(Tone.Sampler.instances[0].options.baseUrl).toContain("piano");
+    expect(Tone.Sampler.instances[1].options.baseUrl).toContain("guitar");
+  });
+});
+
+describe("playProgression — instrument-aware (Phase R3.3 §39)", () => {
+  it("uses the selected instrument's sampler, never the neutral synth", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    const progression = {
+      items: [
+        { id: "1", chord: parseChordSymbol("C"), durationBeats: 4 },
+        { id: "2", chord: parseChordSymbol("G"), durationBeats: 4 },
+      ],
+      bpm: 90,
+      timeSignature: "4/4" as const,
+    };
+    await player.playProgression(progression, "guitar", { onChordStart: () => {}, onFinish: () => {} });
+    expect(Tone.Sampler.instances).toHaveLength(1);
+    expect(Tone.Sampler.instances[0].options.baseUrl).toContain("guitar");
+    expect(Tone.PolySynth.instances).toHaveLength(0);
+    flushTransport(Tone);
+    const calls = Tone.Sampler.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    expect(calls).toHaveLength(2);
   });
 });
 
