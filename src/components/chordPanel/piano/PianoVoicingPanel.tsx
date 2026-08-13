@@ -6,11 +6,12 @@ import { noteName, noteToPitchClass } from "@/domain/notes";
 import { pianoVoicingsFor, type PianoVoicing } from "@/domain/instruments/piano";
 import type { Chord } from "@/domain/chords";
 import { PianoKeyboard } from "./PianoKeyboard";
+import { useAsyncTrigger } from "../../audio/useAsyncTrigger";
 
 export interface PianoVoicingPanelProps {
   chord: Chord;
   isDesktop: boolean;
-  onHearVoicing: (voicing: PianoVoicing) => void;
+  onHearVoicing: (voicing: PianoVoicing) => Promise<void>;
 }
 
 function voicingLabelKey(voicing: PianoVoicing): string {
@@ -30,6 +31,7 @@ function voicingLabelKey(voicing: PianoVoicing): string {
 export function PianoVoicingPanel({ chord, isDesktop, onHearVoicing }: PianoVoicingPanelProps) {
   const t = useTranslations("app.piano");
   const [voicingIndex, setVoicingIndex] = useState(0);
+  const { run: hearVoicing, isPending: isPreparingSound } = useAsyncTrigger(onHearVoicing);
 
   const voicings = useMemo(() => pianoVoicingsFor(chord), [chord]);
   const voicing = voicings[voicingIndex];
@@ -99,10 +101,11 @@ export function PianoVoicingPanel({ chord, isDesktop, onHearVoicing }: PianoVoic
 
         <button
           type="button"
-          onClick={() => onHearVoicing(voicing)}
-          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+          onClick={() => hearVoicing(voicing)}
+          disabled={isPreparingSound}
+          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
         >
-          {t("hearThisVoicing")}
+          {isPreparingSound ? t("preparingSound") : t("hearThisVoicing")}
         </button>
       </div>
     </section>

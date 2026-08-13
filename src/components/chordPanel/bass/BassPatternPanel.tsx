@@ -6,11 +6,12 @@ import { noteToPitchClass } from "@/domain/notes";
 import { bassPatternsFor, tabLinesFor, type BassPattern } from "@/domain/instruments/bass";
 import type { Chord } from "@/domain/chords";
 import { BassFretboard } from "./BassFretboard";
+import { useAsyncTrigger } from "../../audio/useAsyncTrigger";
 
 export interface BassPatternPanelProps {
   chord: Chord;
   isDesktop: boolean;
-  onHearPattern: (pattern: BassPattern) => void;
+  onHearPattern: (pattern: BassPattern) => Promise<void>;
 }
 
 function positionLabelKey(pattern: BassPattern): string {
@@ -31,6 +32,7 @@ function positionLabelKey(pattern: BassPattern): string {
 export function BassPatternPanel({ chord, isDesktop, onHearPattern }: BassPatternPanelProps) {
   const t = useTranslations("app.bass");
   const [patternIndex, setPatternIndex] = useState(0);
+  const { run: hearPattern, isPending: isPreparingSound } = useAsyncTrigger(onHearPattern);
 
   const patterns = useMemo(() => bassPatternsFor(chord), [chord]);
   const rootPitchClass = noteToPitchClass(chord.root);
@@ -121,10 +123,11 @@ export function BassPatternPanel({ chord, isDesktop, onHearPattern }: BassPatter
 
         <button
           type="button"
-          onClick={() => onHearPattern(pattern)}
-          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+          onClick={() => hearPattern(pattern)}
+          disabled={isPreparingSound}
+          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
         >
-          {t("hearThisPattern")}
+          {isPreparingSound ? t("preparingSound") : t("hearThisPattern")}
         </button>
       </div>
     </section>

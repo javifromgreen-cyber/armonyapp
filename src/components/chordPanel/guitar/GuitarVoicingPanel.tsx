@@ -6,10 +6,11 @@ import { noteToPitchClass } from "@/domain/notes";
 import { guitarVoicingsFor, tabLinesFor, type GuitarVoicing } from "@/domain/instruments/guitar";
 import type { Chord } from "@/domain/chords";
 import { GuitarDiagram } from "./GuitarDiagram";
+import { useAsyncTrigger } from "../../audio/useAsyncTrigger";
 
 export interface GuitarVoicingPanelProps {
   chord: Chord;
-  onHearVoicing: (voicing: GuitarVoicing) => void;
+  onHearVoicing: (voicing: GuitarVoicing) => Promise<void>;
 }
 
 function positionLabelKey(voicing: GuitarVoicing): string {
@@ -35,6 +36,7 @@ function inversionLabelKey(inversion: number): string | undefined {
 export function GuitarVoicingPanel({ chord, onHearVoicing }: GuitarVoicingPanelProps) {
   const t = useTranslations("app.guitar");
   const [voicingIndex, setVoicingIndex] = useState(0);
+  const { run: hearVoicing, isPending: isPreparingSound } = useAsyncTrigger(onHearVoicing);
 
   const voicings = useMemo(() => guitarVoicingsFor(chord), [chord]);
   const rootPitchClass = noteToPitchClass(chord.root);
@@ -136,10 +138,11 @@ export function GuitarVoicingPanel({ chord, onHearVoicing }: GuitarVoicingPanelP
 
         <button
           type="button"
-          onClick={() => onHearVoicing(voicing)}
-          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent"
+          onClick={() => hearVoicing(voicing)}
+          disabled={isPreparingSound}
+          className="mt-3 w-full rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
         >
-          {t("hearThisVoicing")}
+          {isPreparingSound ? t("preparingSound") : t("hearThisVoicing")}
         </button>
       </div>
     </section>

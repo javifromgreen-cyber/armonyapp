@@ -96,7 +96,8 @@
       "proBadge": "Pro",
       "voicingCounter": "{current} of {total}",
       "suggestedFingering": "Suggested fingering",
-      "hearThisVoicing": "Hear this voicing"
+      "hearThisVoicing": "Hear this voicing",
+      "preparingSound": "Loading sound…"
     },
     "guitar": {
       "title": "Guitar",
@@ -120,7 +121,8 @@
       "nextVoicing": "Next voicing",
       "noSuitableVoicing": "No suitable voicing found",
       "voicingCounter": "{current} of {total}",
-      "proBadge": "Pro"
+      "proBadge": "Pro",
+      "preparingSound": "Loading sound…"
     },
     "bass": {
       "title": "Bass",
@@ -145,7 +147,8 @@
       "noSuitablePattern": "No suitable pattern found",
       "patternCounter": "{current} of {total}",
       "tab": "TAB",
-      "proBadge": "Pro"
+      "proBadge": "Pro",
+      "preparingSound": "Loading sound…"
     },
     "instrument": {
       "label": "Instrument",

@@ -602,15 +602,47 @@ delivered alongside this change (not duplicated here — see the conversation th
 in, and the substance is captured in the product-spec.md/architecture.md sections listed above).
 
 ## Phase R2 — Instrument audio quality
-- [ ] Evaluate whether synth-only playback can achieve real Piano/Guitar/Bass identity
-- [ ] Move to a lightweight sample-based approach if not (`Tone.Sampler` or equivalent)
-- [ ] Piano: recognizable acoustic piano, not organ/generic synth/Guitar
-- [ ] Guitar: clean plucked guitar, clearly distinct from Piano
-- [ ] Bass: clean fingerstyle electric bass — not fretless/synth/slap/short-and-piercing
-- [ ] Preserve the shared scheduling/playback architecture (no duplicated timing logic)
-- [ ] Lazy-load instrument assets; cache per session; no blocking of initial map load
-- [ ] Tests: instrument routing, Guitar strum order, Bass sequence order, no pitch/MIDI regression
-- [ ] Live verification on the deployed Vercel preview; explicit judgment on Bass in particular
+- [x] Evaluate whether synth-only playback can achieve real Piano/Guitar/Bass identity
+- [x] Move to a lightweight sample-based approach if not (`Tone.Sampler` or equivalent)
+- [x] Piano: recognizable acoustic piano, not organ/generic synth/Guitar
+- [x] Guitar: clean plucked guitar, clearly distinct from Piano
+- [x] Bass: clean fingerstyle electric bass — not fretless/synth/slap/short-and-piercing
+- [x] Preserve the shared scheduling/playback architecture (no duplicated timing logic)
+- [x] Lazy-load instrument assets; cache per session; no blocking of initial map load
+- [x] Tests: instrument routing, Guitar strum order, Bass sequence order, no pitch/MIDI regression
+- [x] Live verification on the deployed Vercel preview; explicit judgment on Bass in particular
+
+Concluded synth-only playback (Phase 8/9's oscillator/envelope tweaks) cannot give genuine
+Piano/Guitar/Bass timbral identity — confirmed by direct user listening feedback on the Phase 1–9
+Vercel preview (Piano/Guitar too similar, Bass reading as short/artificial/fretless-synth-like).
+Moved to `Tone.Sampler`, sparsely multisampled (4-semitone/major-third spacing) per instrument from
+real recordings — legally usable CC BY 3.0 samples (FluidR3_GM General MIDI soundfont via
+`gleitz/midi-js-soundfonts`; full attribution and license terms in `docs/audio-credits.md`),
+re-hosted under this repo's own `public/audio/{piano,guitar,bass}/` rather than hotlinked. Bass
+uses `electric_bass_finger` specifically (not fretless/synth/slap) for genuine fingerstyle
+identity. "Hear chord"/progression playback stays on the pre-existing neutral `PolySynth` voice,
+unchanged — only the three instrument panels' "Hear this voicing/pattern" route through samples.
+Sample ranges sized from the domain layer's own real output (Piano 60–97 MIDI, Guitar 40–77, Bass
+28–56), not guessed. Each instrument's samples lazy-load on first use via a new
+`InstrumentVoice`/`getInstrumentVoice()` cache in `src/audio/player.ts` and stay cached for the
+session; a new shared `useAsyncTrigger` hook shows a "Loading sound…" label on the triggering
+button while the first load is in flight, applied identically across `PianoVoicingPanel`,
+`GuitarVoicingPanel`, `BassPatternPanel`. `TriggerableVoice` structural typing keeps
+`hearPitches()`'s existing strum-stagger/bass-sequential scheduling loop untouched — only the
+voice source changed, no duplicated timing logic.
+
+Verified 2026-08-13: `npm run test` (614 tests, up from 601 — 13 new in `src/audio/player.test.ts`
+covering instrument routing, neutral-voice separation, strum/sequential order and timing, exact
+pitch preservation, session caching, and safe stop), `npm run typecheck`, `npm run lint`,
+`npm run build` all pass with zero regressions. Live-browser verification (Playwright against the
+dev server): selected C, Cmaj7, Am, F chords on the map (G7 wasn't directly reachable as a graph
+node from the C-major starting context at the depth tested) and clicked "Hear this voicing"/"Hear
+this pattern" across Piano, Guitar, and Bass for each — all 28 sample files returned HTTP 200 on
+first use per instrument, zero browser console errors, buttons correctly re-enabled after each
+instrument's first load. Automated tests and this browser check confirm correct routing, no
+pitch/MIDI regression, and no crashes/errors — they cannot confirm sound *quality*; per the
+phase's own instruction, that judgment is the user's, pending their listen on the deployed Vercel
+preview.
 
 ## Phase R3 — Progressive contextual harmonic navigation
 - [ ] New `ProgressionNavigationEngine`-equivalent layer on top of the existing (preserved) harmony

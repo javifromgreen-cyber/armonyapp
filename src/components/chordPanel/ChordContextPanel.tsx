@@ -31,8 +31,8 @@ export interface ChordContextPanelProps {
   onAddToProgression: (chord: Chord) => void;
   /** Purely auditory preview (Phase 6 §4) — must never select/explore/add. */
   onHearChord: (chord: Chord) => void;
-  /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23) — distinct from `onHearChord`'s generic neutral preview. */
-  onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => void;
+  /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
+  onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
 }
 
 /** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
@@ -147,7 +147,7 @@ export function ChordContextPanel({
           key={`piano-${info.symbol}`}
           chord={chord}
           isDesktop={isDesktop}
-          onHearVoicing={(voicing) => onHearPitches(voicing.pitches)}
+          onHearVoicing={(voicing) => onHearPitches(voicing.pitches, { voice: "piano" })}
         />
       )}
       {activeInstrument === "guitar" && (
@@ -157,7 +157,7 @@ export function ChordContextPanel({
           onHearVoicing={(voicing) =>
             onHearPitches(
               voicing.strings.filter((s) => s.pitch).map((s) => s.pitch!),
-              { strumDelaySeconds: GUITAR_STRUM_DELAY_SECONDS },
+              { strumDelaySeconds: GUITAR_STRUM_DELAY_SECONDS, voice: "guitar" },
             )
           }
         />
@@ -169,7 +169,7 @@ export function ChordContextPanel({
           isDesktop={isDesktop}
           onHearPattern={(pattern) => {
             const stepSeconds = 60 / bpm;
-            onHearPitches(
+            return onHearPitches(
               pattern.steps.map((s) => s.pitch),
               {
                 strumDelaySeconds: stepSeconds,

@@ -25,6 +25,13 @@ export class AudioInitError extends Error {
 
 let synth: Tone.PolySynth<Tone.Synth> | null = null;
 
+/**
+ * The NEUTRAL voice — "Hear chord" (Phase 6 §4) and progression playback
+ * (Phase 6) only. Deliberately not meant to sound like any particular
+ * instrument (product-spec.md §18's "neutral harmonic playback"), so it
+ * stays a plain synth even after Phase R2 moved instrument-specific
+ * playback to samples below.
+ */
 function getSynth(): Tone.PolySynth<Tone.Synth> {
   if (!synth) {
     synth = new Tone.PolySynth(Tone.Synth, {
@@ -35,26 +42,122 @@ function getSynth(): Tone.PolySynth<Tone.Synth> {
   return synth;
 }
 
-let bassSynth: Tone.PolySynth<Tone.Synth> | null = null;
-
 /**
- * A lightweight, lower-register-friendly voice for "Hear this pattern"
- * (Phase 9 §25) — still the same Tone.js `PolySynth` synthesis approach as
- * the main synth (no sample libraries, no amp sim, no effects chain), just
- * a sine oscillator (rounder, cleaner low end than the main triangle wave)
- * with a slightly slower attack/longer release for a smoother, less
- * plucky-sounding note. This is a genuinely separate synth instance (not a
- * parameter tweak on the shared one) so it never alters how Piano/Guitar
- * chords sound.
+ * Real per-instrument identity for "Hear this voicing"/"Hear this pattern"
+ * (Phase R2). A synth-only approach (tried in Phases 8/9 — an oscillator
+ * type + envelope tweak per instrument) was evaluated honestly against real
+ * listening feedback and found insufficient: Piano and Guitar stayed too
+ * similar, and no oscillator/envelope combination gave Bass a convincing
+ * fingerstyle-electric-bass identity (it read as a short, artificial,
+ * synth/fretless-like tone). This moves instrument playback to a small,
+ * lazily-loaded sample set per instrument via `Tone.Sampler`
+ * (repitches from a sparse set of recorded notes — not a full 88-key
+ * multisample — so asset size stays small: ~150–250KB per instrument,
+ * loaded only the first time that instrument's "Hear this voicing/pattern"
+ * fires, cached in `instrumentVoices` for the rest of the session).
+ *
+ * Samples: General MIDI "FluidR3_GM" soundfont, rendered to MP3 by the
+ * `gleitz/midi-js-soundfonts` project (https://github.com/gleitz/midi-js-soundfonts),
+ * licensed CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/us/) —
+ * see `docs/audio-credits.md` for the full attribution this license
+ * requires. Instruments used: `acoustic_grand_piano`, `acoustic_guitar_steel`,
+ * `electric_bass_finger` (a genuine fingerstyle-bass recording, directly
+ * answering the "not synth/fretless/slap" requirement). Files live in
+ * `public/audio/{piano,guitar,bass}/`, served from this app's own domain
+ * (never hotlinked from a third party at runtime).
  */
-function getBassSynth(): Tone.PolySynth<Tone.Synth> {
-  if (!bassSynth) {
-    bassSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "sine" },
-      envelope: { attack: 0.015, decay: 0.2, sustain: 0.4, release: 0.3 },
-    }).toDestination();
-  }
-  return bassSynth;
+type InstrumentName = "piano" | "guitar" | "bass";
+
+interface SampleMap {
+  baseUrl: string;
+  urls: Record<string, string>;
+  /** Seconds of release tail (Phase R2 §17/§19: real sustain, not an abruptly cut-off note) — tuned per instrument since Bass in particular needs longer natural sustain than Piano/Guitar. */
+  release: number;
+}
+
+const SAMPLE_MAPS: Record<InstrumentName, SampleMap> = {
+  piano: {
+    baseUrl: "/audio/piano/",
+    urls: {
+      C4: "C4.mp3",
+      E4: "E4.mp3",
+      Ab4: "Ab4.mp3",
+      C5: "C5.mp3",
+      E5: "E5.mp3",
+      Ab5: "Ab5.mp3",
+      C6: "C6.mp3",
+      E6: "E6.mp3",
+      Ab6: "Ab6.mp3",
+      C7: "C7.mp3",
+    },
+    release: 1.2,
+  },
+  guitar: {
+    baseUrl: "/audio/guitar/",
+    urls: {
+      E2: "E2.mp3",
+      Ab2: "Ab2.mp3",
+      C3: "C3.mp3",
+      E3: "E3.mp3",
+      Ab3: "Ab3.mp3",
+      C4: "C4.mp3",
+      E4: "E4.mp3",
+      Ab4: "Ab4.mp3",
+      C5: "C5.mp3",
+      E5: "E5.mp3",
+    },
+    release: 1.0,
+  },
+  bass: {
+    baseUrl: "/audio/bass/",
+    urls: {
+      E1: "E1.mp3",
+      Ab1: "Ab1.mp3",
+      C2: "C2.mp3",
+      E2: "E2.mp3",
+      Ab2: "Ab2.mp3",
+      C3: "C3.mp3",
+      E3: "E3.mp3",
+      Ab3: "Ab3.mp3",
+    },
+    release: 1.4,
+  },
+};
+
+/** Structural subset both `Tone.PolySynth` and `Tone.Sampler` satisfy — lets `hearPitches` below call either without caring which. */
+interface TriggerableVoice {
+  triggerAttackRelease(notes: number[] | number, duration: number, time?: number): this;
+  releaseAll(time?: number): this;
+}
+
+interface InstrumentVoice {
+  sampler: Tone.Sampler;
+  /** Resolves once every sample for this instrument has loaded — awaited before the first note ever plays (Phase R2 §22: lazy-load, never block anything until this instrument is actually used). */
+  ready: Promise<void>;
+}
+
+const instrumentVoices = new Map<InstrumentName, InstrumentVoice>();
+
+/** Creates and starts loading an instrument's sampler on first use only; returns the same cached instance (and already-resolved `ready`) on every later call this session (Phase R2 §22's per-session caching). */
+function getInstrumentVoice(instrument: InstrumentName): InstrumentVoice {
+  const existing = instrumentVoices.get(instrument);
+  if (existing) return existing;
+
+  const map = SAMPLE_MAPS[instrument];
+  let resolveReady!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve;
+  });
+  const sampler = new Tone.Sampler({
+    urls: map.urls,
+    baseUrl: map.baseUrl,
+    release: map.release,
+    onload: () => resolveReady(),
+  }).toDestination();
+
+  const voice: InstrumentVoice = { sampler, ready };
+  instrumentVoices.set(instrument, voice);
+  return voice;
 }
 
 /**
@@ -99,8 +202,8 @@ export interface HearPitchesOptions {
    * `pitches` should be ordered the way they're meant to be heard.
    */
   strumDelaySeconds?: number;
-  /** "default" (the shared triangle-wave synth) or "bass" (Phase 9 §25's lower-register-friendly voice) — omit for "default". */
-  voice?: "default" | "bass";
+  /** "default" (the neutral synth) or a real instrument voice (Phase R2) — omit for "default". */
+  voice?: "default" | InstrumentName;
 }
 
 /**
@@ -112,12 +215,24 @@ export interface HearPitchesOptions {
  * duplicating it. A non-zero `strumDelaySeconds` staggers onsets — small
  * for a light guitar strum, one beat's worth for a bass pattern played
  * strictly in sequence — still the exact pitches, just not simultaneous.
+ * When `voice` names a real instrument, this awaits that instrument's
+ * sample set (lazy-loaded on first use, cached after) before triggering —
+ * exact pitch/octave is preserved either way since `Tone.Sampler` repitches
+ * by frequency, the same `pitch.frequencyHz` this always played.
  */
 export async function hearPitches(pitches: PlayablePitch[], options?: HearPitchesOptions): Promise<void> {
   await ensureAudioReady();
   const durationSeconds = options?.durationSeconds ?? 1.4;
   const strumDelaySeconds = options?.strumDelaySeconds ?? 0;
-  const synthInstance = options?.voice === "bass" ? getBassSynth() : getSynth();
+
+  let synthInstance: TriggerableVoice;
+  if (options?.voice && options.voice !== "default") {
+    const voice = getInstrumentVoice(options.voice);
+    await voice.ready;
+    synthInstance = voice.sampler;
+  } else {
+    synthInstance = getSynth();
+  }
 
   if (strumDelaySeconds <= 0) {
     synthInstance.triggerAttackRelease(pitchesToFrequencies(pitches), durationSeconds);
@@ -191,5 +306,5 @@ export function stopProgression(): void {
   transport.stop();
   transport.cancel(); // clears every scheduled event
   synth?.releaseAll();
-  bassSynth?.releaseAll();
+  for (const voice of instrumentVoices.values()) voice.sampler.releaseAll();
 }
