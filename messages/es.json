@@ -35,11 +35,26 @@
       "hearPath": "Escuchar camino",
       "currentMove": "Movimiento actual",
       "pathDepth": "Profundidad del camino",
+      "previewing": "Escuchando",
+      "previewHintDesktop": "Haz clic de nuevo para explorar →",
+      "previewHintMobile": "Pulsa de nuevo para explorar →",
+      "legendToggle": "Cómo leer el mapa",
+      "legendTitle": "Cómo leer el mapa",
+      "legendTerritoriesIntro": "Cada acorde que ves es un destino real y válido, agrupado según el tipo de efecto musical que produce:",
+      "legendDepthTitle": "Profundidad",
+      "legendDepthIntro": "Indica qué tan directa o lejana es una relación armónica, no una valoración de dificultad o calidad:",
+      "legendClose": "Cerrar",
       "depth": {
         "direct": "Directo",
         "expanded": "Ampliado",
         "colour": "Color",
         "deep": "Profundo"
+      },
+      "depthBlurb": {
+        "1": "Relación armónica muy directa.",
+        "2": "Algo más de movimiento o tensión armónica.",
+        "3": "Más color o distancia cromática.",
+        "4": "Una relación más lejana o exploratoria."
       },
       "character": {
         "naturalContinuation": "Continuación natural",
@@ -50,6 +65,20 @@
         "substitution": "Sustitución",
         "chromaticColour": "Color cromático",
         "adventurous": "Aventurado"
+      },
+      "territory": {
+        "natural": "Natural",
+        "tension": "Tensión",
+        "modalColour": "Color modal",
+        "substitution": "Sustitución",
+        "exploration": "Exploración"
+      },
+      "territoryBlurb": {
+        "natural": "Una continuación armónica familiar y estable.",
+        "tension": "Crea tensión: la armonía suele querer continuar o resolver.",
+        "modalColour": "Introduce un color armónico distinto, tomado prestado fuera de la tonalidad principal.",
+        "substitution": "Un acorde alternativo que puede cumplir un papel armónico similar.",
+        "exploration": "Una dirección armónica más inesperada, cromática o lejana."
       }
     },
     "map": {
@@ -63,8 +92,10 @@
       "intervalFormula": "Fórmula de intervalos",
       "contextualRole": "Rol contextual",
       "arrivedVia": "Llegaste desde {chord}",
+      "relationshipToCurrent": "Relación con {chord}",
+      "depthSummary": "Profundidad {depth} · {label}",
       "addToProgression": "Añadir a la progresión",
-      "hearChord": "Escuchar acorde",
+      "hearChord": "Escuchar solo este acorde",
       "instrument": "Instrumento",
       "selectPrompt": "Selecciona un acorde en el mapa para ver sus detalles.",
       "additionalRelationships": "También relacionado como:"

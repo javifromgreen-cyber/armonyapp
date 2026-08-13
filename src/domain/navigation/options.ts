@@ -3,6 +3,7 @@ import type { Key } from "../keys/key";
 import { relationshipsFrom } from "../graph/harmonicGraph";
 import { groupRelationshipsByTarget, type MapGraphNode } from "../graph/mapGraph";
 import { harmonicCharacterFor } from "./harmonicCharacter";
+import { harmonicTerritoryFor } from "./harmonicTerritory";
 import type { NavigationOption } from "./types";
 
 /**
@@ -21,6 +22,7 @@ function toNavigationOption(node: MapGraphNode): NavigationOption {
     primaryRelationship: node.primaryRelationship,
     depth: node.primaryRelationship.harmonicDepth,
     character: harmonicCharacterFor(node.primaryRelationship),
+    territory: harmonicTerritoryFor(node.primaryRelationship),
   };
 }
 

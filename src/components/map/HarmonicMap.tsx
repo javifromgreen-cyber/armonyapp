@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { chordSymbol, type Chord } from "@/domain/chords";
 import { chordsEqual, chordIdentityKey, type Explanation } from "@/domain/harmony";
@@ -16,7 +16,7 @@ import {
   type NavigationPath,
 } from "@/domain/navigation";
 import { computeRadialLayout, CURRENT_NODE_RADIUS, CANDIDATE_NODE_RADIUS } from "./layout";
-import { relationshipVisual } from "./relationshipVisuals";
+import { territoryVisual } from "./territoryVisuals";
 import { MapNode } from "./MapNode";
 import { MapEdge } from "./MapEdge";
 
@@ -24,8 +24,17 @@ export interface HarmonicMapProps {
   context: Key;
   navPath: NavigationPath;
   progression: Progression;
-  /** A single click/tap/Enter on a candidate: play the transition and commit it as the new endpoint, all at once (Phase R3.1 §5/§6/§10) — the only way anything here navigates or makes sound. */
-  onNavigate: (chord: Chord) => void;
+  /** The candidate awaiting confirmation, if any (Phase R3.2 §2/§9) — owned by the reducer, not local state, since Back/Reset/context changes must clear it. */
+  previewChord: Chord | null;
+  /** Silent, informational-only hover target — owned by the parent so the side panel can show the same candidate's info (Phase R3.2 §11-12). */
+  hoveredChord: Chord | null;
+  onHoverChord: (chord: Chord | null) => void;
+  /** First activation of a candidate, or switching to a different one while a preview is active — auditions confirmed path + candidate, never navigates (Phase R3.2 §1-4/§8). */
+  onPreview: (chord: Chord) => void;
+  /** Activating the already-previewed candidate again — confirms it as the new current chord (Phase R3.2 §5). */
+  onConfirm: (chord: Chord) => void;
+  /** Activating the current/center chord — replays the confirmed path without navigating (Phase R3.2 §17/§26). */
+  onReplayCurrent: () => void;
 }
 
 function explanationText(
@@ -37,21 +46,32 @@ function explanationText(
 }
 
 /**
- * The harmonic path explorer (Phase R3.1, correcting R3's map interaction):
- * the current chord sits at the center, every valid immediate outgoing
- * option sits on ONE shared ring around it (never staged into depth rings
- * that read as a chain — see layout.ts), and a single click/tap/Enter on a
- * candidate both plays the transition and navigates there. Hovering/
- * focusing a candidate is purely silent, local, informational (§29) — it
- * never sounds anything and never moves the path.
+ * The harmonic path explorer (Phase R3.2): the current chord sits at the
+ * center, every valid immediate outgoing option sits on ONE shared ring
+ * around it, grouped into labeled TERRITORY sectors (natural/tension/
+ * modal colour/substitution/exploration — see layout.ts) rather than the
+ * undifferentiated single ring R3.1 shipped. First activation of a
+ * candidate previews it (auditions the confirmed path + candidate, stays
+ * put); activating that same candidate again confirms/navigates.
+ * Hovering/focusing is purely silent and informational — it never sounds
+ * anything, never sets preview state, never moves the path.
  */
-export function HarmonicMap({ context, navPath, progression, onNavigate }: HarmonicMapProps) {
+export function HarmonicMap({
+  context,
+  navPath,
+  progression,
+  previewChord,
+  hoveredChord,
+  onHoverChord,
+  onPreview,
+  onConfirm,
+  onReplayCurrent,
+}: HarmonicMapProps) {
   const t = useTranslations();
   const tMap = useTranslations("app.map");
   const tDepth = useTranslations("app.navigation.depth");
   const tCharacter = useTranslations("app.navigation.character");
-
-  const [hoveredChord, setHoveredChord] = useState<Chord | null>(null);
+  const tTerritory = useTranslations("app.navigation.territory");
 
   const endpointLabel = chordSymbol(currentEndpoint(navPath));
 
@@ -65,6 +85,14 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
     };
   }, [context, navPath, progression]);
 
+  function handleActivateCandidate(chord: Chord) {
+    if (previewChord && chordsEqual(previewChord, chord)) {
+      onConfirm(chord);
+    } else {
+      onPreview(chord);
+    }
+  }
+
   return (
     <svg
       viewBox={`0 0 ${layout.size} ${layout.size}`}
@@ -73,13 +101,30 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
       className="h-full w-full"
     >
       {/* Keyed by the current chord so the whole neighborhood remounts (and
-          its CSS arrival animation retriggers) on every navigation — the
-          "the map moved" cue from Phase R3.1 §13/§37. */}
+          its CSS arrival animation retriggers) on every confirmed
+          navigation — the "the map moved" cue. */}
       <g key={endpointLabel}>
         <g className="animate-map-arrive">
+          {layout.sectors.map((sector) => {
+            const visual = territoryVisual(sector.territory);
+            return (
+              <text
+                key={sector.territory}
+                x={sector.labelX}
+                y={sector.labelY}
+                textAnchor={sector.labelAnchor}
+                dominantBaseline="central"
+                className="pointer-events-none select-none text-[11px] font-semibold uppercase tracking-wide"
+                style={{ fill: visual.colorVar }}
+              >
+                {visual.badge} {tTerritory(sector.territory)}
+              </text>
+            );
+          })}
+
           {layout.nodes.map((positioned) => {
-            const visual = relationshipVisual(positioned.option.primaryRelationship.relationshipType);
-            const isHovered = !!hoveredChord && chordsEqual(hoveredChord, positioned.option.chord);
+            const visual = territoryVisual(positioned.option.territory);
+            const isPreviewed = !!previewChord && chordsEqual(previewChord, positioned.option.chord);
             return (
               <MapEdge
                 key={chordSymbol(positioned.option.chord)}
@@ -89,7 +134,7 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
                 colorVar={visual.colorVar}
                 badge={visual.badge}
                 title={explanationText(t, positioned.option.primaryRelationship.explanation)}
-                isHighlighted={isHovered}
+                isHighlighted={isPreviewed}
               />
             );
           })}
@@ -97,13 +142,14 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
           {layout.nodes.map((positioned) => {
             const option = positioned.option;
             const label = chordSymbol(option.chord);
-            const visual = relationshipVisual(option.primaryRelationship.relationshipType);
+            const visual = territoryVisual(option.territory);
             const relationshipDescription = explanationText(t, option.primaryRelationship.explanation);
             const isHovered = !!hoveredChord && chordsEqual(hoveredChord, option.chord);
+            const isPreviewed = !!previewChord && chordsEqual(previewChord, option.chord);
             const isTopRanked = chordIdentityKey(option.chord) === topRankedKey;
             const ariaLabel = tMap("nodeLabel", {
               chord: label,
-              relationship: `${relationshipDescription} — ${option.depth} ${tDepth(
+              relationship: `${tTerritory(option.territory)} — ${relationshipDescription} — ${option.depth} ${tDepth(
                 DEPTH_LABEL_KEY[option.depth],
               )} · ${tCharacter(harmonicCharacterFor(option.primaryRelationship))}`,
             });
@@ -117,14 +163,15 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
                 label={label}
                 variant="candidate"
                 isHovered={isHovered}
+                isPreviewed={isPreviewed}
                 isTopRanked={isTopRanked}
                 relationshipCount={option.relationships.length}
                 depth={option.depth}
                 colorVar={visual.colorVar}
                 ariaLabel={ariaLabel}
-                onHoverStart={() => setHoveredChord(option.chord)}
-                onHoverEnd={() => setHoveredChord(null)}
-                onActivate={() => onNavigate(option.chord)}
+                onHoverStart={() => onHoverChord(option.chord)}
+                onHoverEnd={() => onHoverChord(null)}
+                onActivate={() => handleActivateCandidate(option.chord)}
               />
             );
           })}
@@ -142,7 +189,7 @@ export function HarmonicMap({ context, navPath, progression, onNavigate }: Harmo
             ariaLabel={tMap("sourceLabel", { chord: endpointLabel })}
             onHoverStart={() => {}}
             onHoverEnd={() => {}}
-            onActivate={() => {}}
+            onActivate={onReplayCurrent}
           />
         </g>
       </g>

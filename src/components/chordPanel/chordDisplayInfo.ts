@@ -20,9 +20,9 @@ const ALL_DEPTHS = 4;
 /**
  * Everything the contextual side panel needs for a chord — a thin,
  * presentation-shaped combination of domain queries (chord identity, its
- * contextual role, and how it relates to the chord immediately before it
- * in navigation history), kept as a pure function so it's testable without
- * React.
+ * contextual role, and how it relates to whichever chord the panel is
+ * currently comparing it against), kept as a pure function so it's
+ * testable without React.
  */
 export interface ChordDisplayInfo {
   chord: Chord;
@@ -30,24 +30,27 @@ export interface ChordDisplayInfo {
   noteNames: string[];
   intervalFormula: readonly string[];
   contextualRole: ContextualRole | undefined;
-  /** Every relationship connecting the previous chord in navigation history to this one — how we arrived here. Empty at the very start (no previous chord yet). */
+  /** Every relationship connecting `relativeToChord` to this one. Empty when there's no `relativeToChord` (the very first chord, no predecessor yet) or it equals `chord`. */
   arrivalRelationships: HarmonicEdge[];
 }
 
 /**
- * `previousChord` is the chord immediately before `chord` in navigation
- * history (Phase R3.1 — the panel always shows the CURRENT chord now,
- * there is no separate "previewed candidate" concept; `previousChord` is
- * `undefined` only for the very first chord, which has no predecessor).
- * Always queries the full depth range (Phase R3 removed the manual Zoom
- * selector that used to cap this).
+ * `relativeToChord` is whichever chord the panel is currently explaining
+ * `chord`'s relationship against (Phase R3.2 §38): the previous confirmed
+ * chord when showing the confirmed current chord itself ("arrived via"),
+ * or the confirmed current chord itself when showing a hovered/previewed
+ * candidate ("relationship to current"). The caller (`ChordContextPanel`)
+ * decides which; this function only needs SOME comparison chord, or
+ * `undefined` at the very start (no predecessor yet). Always queries the
+ * full depth range (Phase R3 removed the manual Zoom selector that used to
+ * cap this).
  */
 export function getChordDisplayInfo(
   chord: Chord,
-  previousChord: Chord | undefined,
+  relativeToChord: Chord | undefined,
   context: Key,
 ): ChordDisplayInfo {
-  const hasPredecessor = previousChord !== undefined && !chordsEqual(chord, previousChord);
+  const hasComparison = relativeToChord !== undefined && !chordsEqual(chord, relativeToChord);
 
   return {
     chord,
@@ -55,8 +58,8 @@ export function getChordDisplayInfo(
     noteNames: chordNotes(chord).map(noteName),
     intervalFormula: chordIntervalFormula(chord),
     contextualRole: contextualRole(chord, context),
-    arrivalRelationships: hasPredecessor
-      ? relationshipsBetween(previousChord, chord, context, ALL_DEPTHS)
+    arrivalRelationships: hasComparison
+      ? relationshipsBetween(relativeToChord, chord, context, ALL_DEPTHS)
       : [],
   };
 }

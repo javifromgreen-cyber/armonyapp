@@ -21,6 +21,23 @@ export const HARMONIC_CHARACTERS = [
 export type HarmonicCharacter = (typeof HARMONIC_CHARACTERS)[number];
 
 /**
+ * A small set of beginner-readable macro-categories for map ORGANIZATION
+ * (Phase R3.2 §20/§24) — layered ON TOP of `HarmonicCharacter` (which stays
+ * the finer-grained, still-available metadata). Deliberately kept to five:
+ * enough to give the map real semantic structure without turning it into a
+ * theory taxonomy. Independent of `ZoomLevel`/depth (§22) — never merged.
+ */
+export const HARMONIC_TERRITORIES = [
+  "natural",
+  "tension",
+  "modalColour",
+  "substitution",
+  "exploration",
+] as const;
+
+export type HarmonicTerritory = (typeof HARMONIC_TERRITORIES)[number];
+
+/**
  * One reachable next chord from the current path endpoint. Exactly one
  * `NavigationOption` per unique chord identity even when several
  * relationships lead to it (Phase R3 §17/§37) — `relationships` keeps every
@@ -36,6 +53,8 @@ export interface NavigationOption {
   /** The depth of the move that would be taken to reach this chord — belongs to the relationship, not permanently to the chord (Phase R3 §6). */
   depth: ZoomLevel;
   character: HarmonicCharacter;
+  /** The territory this option is placed in for map layout (Phase R3.2 §25) — one primary territory per node, even though `relationships` may carry several. */
+  territory: HarmonicTerritory;
 }
 
 /** A ranked `NavigationOption` — same set, same membership, only reordered/scored (Phase R3 §3/§18: "ranking organizes, never deletes"). */

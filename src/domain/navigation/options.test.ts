@@ -4,6 +4,7 @@ import { parseNoteName } from "../notes/note";
 import type { Key } from "../keys/key";
 import { relationshipsFrom } from "../graph/harmonicGraph";
 import { chordIdentityKey } from "../harmony/chordIdentity";
+import { HARMONIC_TERRITORIES } from "./types";
 import { outgoingOptions } from "./options";
 
 const cMajor: Key = { tonic: parseNoteName("C"), mode: "major" };
@@ -62,6 +63,41 @@ describe("outgoingOptions — multi-relationship preservation (Phase R3 §37)", 
     expect(target).toBeDefined();
     expect(target!.relationships).toHaveLength(1);
   });
+});
+
+describe("outgoingOptions — completeness across territories (Phase R3.2 §41/§53)", () => {
+  const cases: [string, Key][] = [
+    ["C", cMajor],
+    ["Dm", cMajor],
+    ["G7", cMajor],
+    ["F#dim", cMajor],
+    ["Am", aMinor],
+  ];
+
+  it.each(cases)(
+    "outgoingOptions(%s) — the union of chords across every territory equals the full outgoing set, with no chord in two territories",
+    (symbol, context) => {
+      const options = outgoingOptions(parseChordSymbol(symbol), context);
+      const allIds = options.map((o) => chordIdentityKey(o.chord));
+
+      // every option has exactly one (primary) territory, always one of the 5 known values
+      for (const option of options) {
+        expect(HARMONIC_TERRITORIES).toContain(option.territory);
+      }
+
+      // union across territories == the full set, and no id appears twice anywhere
+      const byTerritory = new Map<string, Set<string>>();
+      for (const option of options) {
+        const id = chordIdentityKey(option.chord);
+        const set = byTerritory.get(option.territory) ?? new Set<string>();
+        set.add(id);
+        byTerritory.set(option.territory, set);
+      }
+      const unionIds = new Set([...byTerritory.values()].flatMap((s) => [...s]));
+      expect(unionIds).toEqual(new Set(allIds));
+      expect(new Set(allIds).size).toBe(allIds.length); // no duplicate chord identities at all
+    },
+  );
 });
 
 describe("outgoingOptions — depth belongs to the move, not the chord (Phase R3 §6)", () => {

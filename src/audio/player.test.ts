@@ -251,8 +251,8 @@ describe("hearPitches — staggered playback order and timing (Guitar strum / Ba
   });
 });
 
-describe("hearPath / hearTransition — neutral sequential chord playback (Phase R3.1 §5/§6/§8)", () => {
-  it("hearPath schedules one Transport event per chord, in order, at increasing times, on the neutral synth", async () => {
+describe("hearPath — cumulative exploration-path playback (Phase R3.2 §14/§18/§21)", () => {
+  it("schedules one Transport event per chord, in order, at increasing times, on the neutral synth", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
     await player.hearPath([parseChordSymbol("C"), parseChordSymbol("Am"), parseChordSymbol("Dm")]);
@@ -269,64 +269,64 @@ describe("hearPath / hearTransition — neutral sequential chord playback (Phase
     }
   });
 
-  it("hearPath is a no-op for fewer than 2 chords — nothing to sequence", async () => {
+  it("is a no-op only for a genuinely empty sequence", async () => {
     const { player, Tone } = await freshPlayer();
-    const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearPath([parseChordSymbol("C")]);
     await player.hearPath([]);
     expect(Tone.PolySynth.instances).toHaveLength(0);
   });
 
-  it("hearTransition plays exactly the from-chord then the to-chord", async () => {
+  it("a single chord still plays (Back down to the starting chord, or replaying a not-yet-advanced path)", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    await player.hearTransition(parseChordSymbol("Dm"), parseChordSymbol("G7"));
+    await player.hearPath([parseChordSymbol("C")]);
     flushTransport(Tone);
-
-    const calls = Tone.PolySynth.instances[0].calls;
-    expect(calls).toHaveLength(2);
-    const [firstTime, secondTime] = calls.map((c) => (c.args as [number[], number, number])[2]);
-    expect(secondTime).toBeGreaterThan(firstTime);
+    const calls = Tone.PolySynth.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    expect(calls).toHaveLength(1);
   });
 
-  it("mandatory audio-interruption test (Phase R3.1 §33): a rapid second navigation click cancels the first transition, only the second plays", async () => {
+  it("replays the FULL path from the beginning every time, not just the newest chord (§21)", async () => {
     const { player, Tone } = await freshPlayer();
     const { parseChordSymbol } = await import("@/domain/chords");
-    const C = parseChordSymbol("C");
-    const Am = parseChordSymbol("Am");
-    const F = parseChordSymbol("F");
+    // confirmed C -> F -> Am, previewing Dm: the whole route sounds, not just Am -> Dm.
+    await player.hearPath(
+      ["C", "F", "Am", "Dm"].map((s) => parseChordSymbol(s)),
+    );
+    flushTransport(Tone);
+    const calls = Tone.PolySynth.instances[0].calls.filter((c) => c.method === "triggerAttackRelease");
+    expect(calls).toHaveLength(4);
+  });
 
-    // Current C, click Am: C -> Am begins (2 note events + 1 auto-stop event, doesn't fire yet).
-    await player.hearTransition(C, Am);
+  it("mandatory audio-interruption test (Phase R3.2 §15): switching preview candidates cancels the previous audition, only the new one plays", async () => {
+    const { player, Tone } = await freshPlayer();
+    const { parseChordSymbol } = await import("@/domain/chords");
+    const confirmed = ["C", "F", "Am"].map((s) => parseChordSymbol(s));
+
+    // Preview Dm: confirmed + Dm begins (4 note events + 1 auto-stop, doesn't fire yet).
+    await player.hearPath([...confirmed, parseChordSymbol("Dm")]);
     const transport = Tone.getTransport();
-    expect(transport.scheduled).toHaveLength(3); // C, Am, and the auto-stop event
+    expect(transport.scheduled).toHaveLength(5);
 
-    // Before that playback completes, click F from the new Am neighborhood.
-    await player.hearTransition(Am, F);
+    // Before that finishes, switch preview to E7 — confirmed history is unchanged.
+    await player.hearPath([...confirmed, parseChordSymbol("E7")]);
 
-    // The first transition's still-pending events must have been cancelled —
-    // cancel() fired once per hearTransition call (both the initial one and
-    // the interrupting one), and the pending queue now holds only the
-    // fresh Am -> F transition's 3 events, never C's leftover ones (which
-    // would make this 6 if cancellation weren't actually clearing the
-    // queue).
+    // The Dm preview's still-pending events must have been cancelled — cancel()
+    // fired once per hearPath call, and the pending queue now holds only the
+    // fresh confirmed+E7 audition's 5 events, never Dm's leftover ones (which
+    // would make this 10 if cancellation weren't actually clearing the queue).
     expect(transport.cancel).toHaveBeenCalledTimes(2);
-    expect(transport.scheduled).toHaveLength(3);
+    expect(transport.scheduled).toHaveLength(5);
 
     flushTransport(Tone);
-    // The second stopProgression() also released the still-sounding first
-    // chord (a real, separate `releaseAll` call) — filter to just the note
-    // triggers to check what actually sounded.
+    // The second stopProgression() also released the still-sounding prior
+    // audition (a real, separate `releaseAll` call) — filter to just the
+    // note triggers to check what actually sounded.
     const noteCalls = Tone.PolySynth.instances[0].calls.filter(
       (c) => c.method === "triggerAttackRelease",
     );
-    // Only Am -> F actually sounds — never C, and Am only once (not twice).
-    expect(noteCalls).toHaveLength(2);
-    const [firstFreqs] = noteCalls[0].args as [number[], number, number];
-    const [secondFreqs] = noteCalls[1].args as [number[], number, number];
-    // Am's frequency set, then F's — the leftover C event from the
-    // cancelled first transition never fires.
-    expect(firstFreqs).not.toEqual(secondFreqs);
+    // Only C -> F -> Am -> E7 actually sounds (4 chords) — Dm's would-be 4th
+    // call (C -> F -> Am -> Dm) never fires, proving it was cancelled rather
+    // than merely superseded by a 5th trailing call.
+    expect(noteCalls).toHaveLength(4);
   });
 
   it("hearPath also cancels an in-flight progression/instrument voice via stopProgression (no overlapping audio sources)", async () => {

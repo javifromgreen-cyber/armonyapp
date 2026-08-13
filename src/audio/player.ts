@@ -190,31 +190,35 @@ export async function hearChord(chord: Chord): Promise<void> {
   playPitches(pitchesToFrequencies(neutralVoicing(chord)), 1.1);
 }
 
-/** Seconds between successive chords in `hearPath`/`hearTransition` — enough space to actually hear each one land, but concise since this fires on every navigation click (Phase R3.1 §32: exploring must stay quick, never a "long performance"). */
+/** Seconds between successive chords in `hearPath` — enough space to actually hear each one land, but concise since this fires on every preview/confirm/Back/replay click (Phase R3.2 §28: exploring must stay quick, never a "long performance"). */
 const PATH_CHORD_GAP_SECONDS = 0.5;
 const PATH_CHORD_DURATION_SECONDS = 0.42;
 
 /**
- * Neutral harmonic playback (product-spec.md §18) of a sequence of whole
- * chords, one after another — the primitive both "Hear transition" (a
- * 2-chord sequence, now played automatically as part of every navigation
- * click, Phase R3.1 §5/§6/§8) and "Hear path" reuse, rather than each
- * having its own scheduling logic. Deliberately simple: no voice-leading
- * optimisation, same neutral voicing `hearChord` already uses. A no-op for
- * an empty/single-chord sequence — there's nothing to sequence.
+ * Neutral harmonic playback (product-spec.md §18) of the CUMULATIVE
+ * exploration path — the confirmed navigation history plus (while one is
+ * active) the previewed candidate, always replayed from its first chord
+ * (Phase R3.2 §14/§18/§21: "does this whole route work?", not just the
+ * newest link). The single primitive every audition case reuses: previewing
+ * a candidate, Back's shortened path, and replaying the confirmed path from
+ * the current/center chord — never separate scheduling logic per case.
+ * Deliberately simple: no voice-leading optimisation, same neutral voicing
+ * `hearChord` already uses. A no-op only for a genuinely empty sequence —
+ * a single chord (e.g. Back all the way down to the starting chord, or
+ * replaying a not-yet-advanced path) still plays that one chord.
  *
  * Scheduled on `Tone.Transport` (the same mechanism `playProgression`
  * already uses) rather than raw `Tone.now()`-relative offsets, and always
- * starts by calling `stopProgression()` — this is what makes a rapid
- * second navigation click actually cancel the first transition's
- * not-yet-fired notes (Phase R3.1 §7/§33): a `Tone.now()`-relative
+ * starts by calling `stopProgression()` — this is what makes switching to a
+ * new preview candidate (or any other new audition) actually cancel
+ * whatever was still pending (Phase R3.2 §15): a `Tone.now()`-relative
  * `triggerAttackRelease` call, once scheduled, cannot be un-scheduled, but
  * `Transport.cancel()` (part of `stopProgression`) clears everything still
  * pending. Reuses the existing playback-cancellation architecture rather
  * than inventing a second one.
  */
 export async function hearPath(chords: Chord[]): Promise<void> {
-  if (chords.length < 2) return;
+  if (chords.length === 0) return;
   await ensureAudioReady();
   stopProgression();
 
@@ -233,11 +237,6 @@ export async function hearPath(chords: Chord[]): Promise<void> {
   const totalSeconds = (chords.length - 1) * PATH_CHORD_GAP_SECONDS + PATH_CHORD_DURATION_SECONDS;
   transport.schedule(() => transport.stop(), totalSeconds);
   transport.start();
-}
-
-/** "Hear transition" (Phase R3.1 §5/§6/§8) — plays automatically as part of a single navigation click (current endpoint -> the clicked destination), never a separate manual step. */
-export function hearTransition(from: Chord, to: Chord): Promise<void> {
-  return hearPath([from, to]);
 }
 
 export interface HearPitchesOptions {

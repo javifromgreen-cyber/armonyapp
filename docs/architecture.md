@@ -179,3 +179,55 @@ flatten that back into one-node-per-edge.
   transition's still-pending notes via `Transport.cancel()` rather than letting both sound
   (previously latent since nothing exercised rapid re-triggering before R3.1's mandatory
   interruption test).
+- **R3.2: Harmonic Territories + preview-before-navigation (supersedes R3.1's single-click
+  model).** Prompted by further user testing of the deployed R3.1 preview: single-click-does-
+  everything removed the ability to audition/compare a candidate before committing to it, and an
+  undifferentiated single ring made a dense candidate set (e.g. G7's 18 options) hard to read at a
+  glance. Two additions, both layered on top of R3.1's approved foundations rather than replacing
+  them:
+  - **Domain**: `src/domain/navigation/harmonicTerritory.ts` adds `harmonicTerritoryFor(edge)`, a
+    deterministic `HarmonicCharacter -> HarmonicTerritory` mapping (`HARMONIC_TERRITORIES` in
+    `types.ts`: natural/tension/modalColour/substitution/exploration) built strictly on top of the
+    already-reviewed `harmonicCharacterFor` — it never reads `relationshipType` or
+    `harmonicDepth` directly, so it automatically inherits R3's major-mode-only
+    strongResolution/deceptive overrides and stays structurally independent of Depth (verified
+    empirically too: Depth 1 alone spans both the `natural` and `tension` territories, and Depths
+    2/3 each span four of the five territories). `NavigationOption.territory` (`options.ts`)
+    exposes it to the UI; `options.test.ts` adds a completeness-invariant suite (union of all
+    territories == the full outgoing set, no chord in two territories).
+  - **Interaction**: `src/components/map/explorerState.ts`'s reducer gains `previewChord: Chord |
+    null` and `PREVIEW`/`CONFIRM`/`CLEAR_PREVIEW` actions (replacing R3.1's single `ADVANCE`).
+    `ExplorerApp.tsx`'s `handlePreviewCandidate`/`handleConfirmCandidate`/`handleReplayCurrent`/
+    `handleBack` wire these to `playback.hearPath` — always called with the FULL cumulative chord
+    array (confirmed steps + the active preview candidate, or just confirmed steps on
+    confirm/replay/Back) rather than a single transition, so `src/audio/player.ts`'s
+    `hearTransition` is deleted entirely (dead code once every caller passes full arrays) and
+    `hearPath`'s guard changes from `length < 2` to `length === 0` to support a single-chord replay
+    at the very start. `hoveredChord` stays local `useState` in `ExplorerApp` (unchanged from
+    R3.1) but is now explicitly cleared on confirm/Back/Reset/context-change to avoid a stale
+    hover pointing at a candidate that no longer exists once the outgoing set regenerates.
+  - **Layout**: `src/components/map/layout.ts`'s `computeRadialLayout` is rewritten from a single
+    uniform-spacing ring to a two-pass sector algorithm — territory sectors get angular spans
+    proportional to member count (with fixed gaps between sectors), then the tightest ACTUAL
+    angular gap between any two circularly-adjacent nodes (not an assumed-uniform gap) determines
+    the ring radius via the chord-length formula, clamped to the same readable range as R3.1. No
+    concentric rings are introduced by this — R3.1's "one shared ring" invariant holds; sectors are
+    angular grouping only. `src/components/map/territoryVisuals.ts` (new) maps each territory to a
+    colour/dash-pattern/badge, reusing the previously-unused `--color-tonic`/`--color-predominant`
+    CSS tokens (confirmed unused elsewhere via grep before repurposing) rather than inventing new
+    design tokens; `relationshipVisuals.ts` (the old per-relationship-type visual system) is
+    deleted, fully superseded. `src/components/map/MapLegend.tsx` (new) is a compact, expandable
+    "How to read the map" popover listing all 5 territories and 4 depths using the exact same
+    `territoryVisual()` colours as the map itself, so map and legend structurally cannot drift out
+    of sync.
+  - **Mobile bottom-sheet interaction with two-step preview (fix applied during this phase's own
+    browser verification, not part of the original R3.2 spec)**: opening the mobile bottom sheet on
+    PREVIEW (as R3.1 did on its single completed navigation) covers the map before the user gets a
+    chance to perform the second activation that confirms it — a real interaction-breaking bug
+    caught by live Playwright testing, not a hypothetical. Fixed by only auto-opening the sheet on
+    CONFIRM, matching R3.1's original timing (a completed action), while PREVIEW just switches the
+    mobile tab selector without forcing the sheet open. A related, narrower issue — the local Back
+    control's `z-10` matching the sheet's own `z-10`, so DOM order let the sheet's stacking context
+    cover Back once the sheet was open from an earlier confirm — was fixed by bumping Back to
+    `z-20`. Both are layout-only fixes to pre-existing R3.1 behavior, made necessary by R3.2's
+    interaction changes; no new UI system was introduced.

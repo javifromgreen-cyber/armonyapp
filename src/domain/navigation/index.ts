@@ -4,9 +4,11 @@ export type {
   NavigationStep,
   NavigationPath,
   HarmonicCharacter,
+  HarmonicTerritory,
 } from "./types";
-export { HARMONIC_CHARACTERS } from "./types";
+export { HARMONIC_CHARACTERS, HARMONIC_TERRITORIES } from "./types";
 export { harmonicCharacterFor } from "./harmonicCharacter";
+export { harmonicTerritoryFor } from "./harmonicTerritory";
 export { outgoingOptions } from "./options";
 export {
   startPath,

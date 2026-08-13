@@ -7,7 +7,7 @@ import { chordSymbol, type Chord } from "@/domain/chords";
 import type { Key } from "@/domain/keys";
 import type { PlayablePitch } from "@/domain/instruments";
 import type { HearPitchesOptions } from "@/audio/player";
-import { harmonicCharacterFor, DEPTH_LABEL_KEY } from "@/domain/navigation";
+import { harmonicCharacterFor, harmonicTerritoryFor, DEPTH_LABEL_KEY } from "@/domain/navigation";
 import { getChordDisplayInfo } from "./chordDisplayInfo";
 import { functionDisplayInfo } from "./functionDisplay";
 import { PianoVoicingPanel } from "./piano/PianoVoicingPanel";
@@ -16,11 +16,15 @@ import { BassPatternPanel } from "./bass/BassPatternPanel";
 import { InstrumentSelector } from "./InstrumentSelector";
 import type { Instrument } from "./instrument";
 
+/** What the panel is currently showing (Phase R3.2 §9/§12/§38) — drives which heading/hint copy applies; the underlying data (`chord`/`relativeToChord`) is the same shape regardless. */
+export type PanelMode = "current" | "hover" | "preview";
+
 export interface ChordContextPanelProps {
-  /** The current chord — always the navigation history's endpoint (Phase R3.1: there is no separate previewed-candidate state, the panel simply follows navigation). */
+  /** The chord currently shown — the hovered candidate if any, else the previewed candidate if any, else the confirmed current chord (Phase R3.2 §11/§38). */
   chord: Chord;
-  /** The chord immediately before `chord` in navigation history, if any (undefined only at the very start) — used to show how we arrived here. */
-  previousChord: Chord | undefined;
+  panelMode: PanelMode;
+  /** What `chord`'s relationship info is shown relative to: the confirmed current chord when hovering/previewing a candidate, or the previous confirmed chord when showing the current chord itself ("arrived via"). Undefined only at the very start, with no predecessor. */
+  relativeToChord: Chord | undefined;
   context: Key;
   isDesktop: boolean;
   activeInstrument: Instrument;
@@ -29,16 +33,11 @@ export interface ChordContextPanelProps {
   bpm: number;
   /** Adds `chord` to the progression (product-spec.md Phase 5 §5: an explicit, distinct action from navigating). */
   onAddToProgression: (chord: Chord) => void;
-  /** Purely auditory preview (Phase 6 §4) — must never navigate or mutate the progression. */
+  /** Purely auditory preview of ONLY this chord, isolated from any exploration route (Phase R3.2 §42/§43 — "Hear this chord only") — must never navigate or mutate the progression. */
   onHearChord: (chord: Chord) => void;
   /** Plays EXACTLY the pitches of the currently displayed instrument voicing/pattern (Phase 7 §13 / Phase 8 §19 / Phase 9 §23), with real per-instrument sample-based timbre (Phase R2) — distinct from `onHearChord`'s generic neutral preview. Returns a promise so panels can show a brief loading state on that instrument's first use this session. */
   onHearPitches: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
 }
-
-/** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
-const GUITAR_STRUM_DELAY_SECONDS = 0.02;
-/** How much of each bass pattern step's duration actually sounds (Phase 9 §24) — leaves a clean gap before the next note, mirroring the progression player's own ~8%-early-release convention rather than letting notes bleed together. */
-const BASS_STEP_SOUNDING_RATIO = 0.85;
 
 function explanationText(
   t: ReturnType<typeof useTranslations>,
@@ -48,17 +47,19 @@ function explanationText(
 }
 
 /**
- * The current-chord panel (product-spec.md §11, revised Phase R3.1):
- * identity, notes, interval formula, contextual role, and — when there is a
- * previous chord in navigation history — how we arrived here (depth,
- * character, explanation). No navigation controls live here anymore
- * (Phase R3.1 §5/§28): the map is the sole place clicking navigates, and
- * the transition is already heard automatically as part of that click, so
- * there is nothing left for this panel to trigger.
+ * The chord panel (product-spec.md §11, revised Phase R3.2): identity,
+ * notes, interval formula, contextual role, and — layered beginner-first
+ * then technical (§12/§16) — the relationship/territory/depth info for
+ * whatever `chord` currently represents (the confirmed current chord, a
+ * silently-hovered candidate, or an actively-previewed one). No navigation
+ * controls live here — the map is the sole place clicking
+ * previews/confirms, and preview auditions already happen automatically as
+ * part of that click.
  */
 export function ChordContextPanel({
   chord,
-  previousChord,
+  panelMode,
+  relativeToChord,
   context,
   isDesktop,
   activeInstrument,
@@ -72,15 +73,21 @@ export function ChordContextPanel({
   const tPanel = useTranslations("app.panel");
   const tFunction = useTranslations("harmony.function");
   const tDepth = useTranslations("app.navigation.depth");
+  const tDepthBlurb = useTranslations("app.navigation.depthBlurb");
   const tCharacter = useTranslations("app.navigation.character");
+  const tTerritory = useTranslations("app.navigation.territory");
+  const tTerritoryBlurb = useTranslations("app.navigation.territoryBlurb");
+  const tNav = useTranslations("app.navigation");
 
   const info = useMemo(
-    () => getChordDisplayInfo(chord, previousChord, context),
-    [chord, previousChord, context],
+    () => getChordDisplayInfo(chord, relativeToChord, context),
+    [chord, relativeToChord, context],
   );
   const functionDisplay = useMemo(() => functionDisplayInfo(chord, context), [chord, context]);
 
-  const [primaryArrival, ...additionalArrivals] = info.arrivalRelationships;
+  const [primaryRelationship, ...additionalRelationships] = info.arrivalRelationships;
+  const territory = primaryRelationship ? harmonicTerritoryFor(primaryRelationship) : undefined;
+  const relationshipHeadingKey = panelMode === "current" ? "arrivedVia" : "relationshipToCurrent";
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
@@ -95,6 +102,15 @@ export function ChordContextPanel({
           </p>
         )}
       </div>
+
+      {panelMode === "preview" && (
+        <div className="rounded-lg border border-accent bg-accent/10 px-3 py-2">
+          <p className="text-sm font-semibold text-accent">{tNav("previewing")}</p>
+          <p className="mt-0.5 text-xs text-foreground-muted">
+            {isDesktop ? tNav("previewHintDesktop") : tNav("previewHintMobile")}
+          </p>
+        </div>
+      )}
 
       <section>
         <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
@@ -112,25 +128,38 @@ export function ChordContextPanel({
         </p>
       </section>
 
-      {primaryArrival && previousChord && (
+      {primaryRelationship && relativeToChord && territory && (
         <section>
           <h3 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
-            {tPanel("arrivedVia", { chord: chordSymbol(previousChord) })}
+            {tPanel(relationshipHeadingKey, { chord: chordSymbol(relativeToChord) })}
           </h3>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+
+          <div className="mt-1.5 rounded-lg border border-border p-3">
+            <p className="text-sm font-semibold text-foreground">{tTerritory(territory)}</p>
+            <p className="mt-0.5 text-sm text-foreground-muted">{tTerritoryBlurb(territory)}</p>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
-              {primaryArrival.harmonicDepth} · {tDepth(DEPTH_LABEL_KEY[primaryArrival.harmonicDepth])}
+              {tPanel("depthSummary", {
+                depth: primaryRelationship.harmonicDepth,
+                label: tDepth(DEPTH_LABEL_KEY[primaryRelationship.harmonicDepth]),
+              })}
             </span>
             <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground-muted">
-              {tCharacter(harmonicCharacterFor(primaryArrival))}
+              {tCharacter(harmonicCharacterFor(primaryRelationship))}
             </span>
           </div>
-          <p className="mt-1.5 text-sm text-foreground">{explanationText(t, primaryArrival.explanation)}</p>
-          {additionalArrivals.length > 0 && (
+          <p className="mt-1 text-xs text-foreground-muted">
+            {tDepthBlurb(String(primaryRelationship.harmonicDepth))}
+          </p>
+
+          <p className="mt-2 text-sm text-foreground">{explanationText(t, primaryRelationship.explanation)}</p>
+          {additionalRelationships.length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-foreground-muted">{tPanel("additionalRelationships")}</p>
               <ul className="mt-1 flex flex-col gap-1">
-                {additionalArrivals.map((relationship) => (
+                {additionalRelationships.map((relationship) => (
                   <li key={relationship.relationshipType} className="text-sm text-foreground-muted">
                     {explanationText(t, relationship.explanation)}
                   </li>
@@ -206,3 +235,8 @@ export function ChordContextPanel({
     </div>
   );
 }
+
+/** A very light, guitar-like onset stagger (Phase 8 §20) — not a sound-design project, just a small delay between successive strings. */
+const GUITAR_STRUM_DELAY_SECONDS = 0.02;
+/** How much of each bass pattern step's duration actually sounds (Phase 9 §24) — leaves a clean gap before the next note, mirroring the progression player's own ~8%-early-release convention rather than letting notes bleed together. */
+const BASS_STEP_SOUNDING_RATIO = 0.85;

@@ -100,29 +100,42 @@ Mobile/tablet get purpose-designed responsive behavior, not a shrunk desktop UI.
 
 ## 7. Critical Interaction Rule
 
-*(Revised R3.1 — corrects R3's own map interaction after the user tested the deployed R3 preview;
-supersedes R3's "hover previews, a second click on the already-previewed candidate commits"
-two-step model. §30 and `docs/roadmap.md`'s R3.1 entry have the full navigation-model detail.)*
+*(Revised R3.2 — reintroduces a two-step preview-before-navigation interaction on top of R3.1's
+foundations, after real Vercel testing found R3.1's single-click-does-everything model removed the
+ability to audition/compare a candidate before committing to it; supersedes R3.1's own
+single-click model. §30 and `docs/roadmap.md`'s R3.2 entry have the full navigation-model detail.)*
 
 Three distinct operations, never conflated:
 
 1. Inspecting a chord silently (hover/keyboard-focus on a candidate — informational only, never
-   sounds anything, never moves anywhere).
-2. Navigating to a chord: a single click/tap/Enter on a valid next-chord node stops any in-flight
-   navigation audio, plays the current-endpoint-to-destination transition, and commits that chord
-   as the new endpoint — all as one action, with no separate "Hear Transition" or "Explore from
-   here" step. This is navigation HISTORY (kept internally for Back and contextual ranking), never
-   rendered as a visible chain that could be mistaken for an authored progression.
+   sounds anything, never moves anywhere, never sets preview state).
+2. Navigating to a chord — a two-step gesture, not a double-click/timer (persistent UI state;
+   arbitrary time may elapse between the two steps):
+   - **Preview** (first click/tap/Enter on a candidate): cancels any in-flight audio, plays the
+     CONFIRMED path so far plus the candidate — always replayed cumulatively from the beginning —
+     and shows layered info in the side panel. Does NOT navigate, recenter, or touch navigation
+     history/the progression. Activating a *different* candidate while one is previewed cancels
+     the old audition and starts a new one from the confirmed path + the new candidate, still
+     without touching confirmed history.
+   - **Confirm** (activating the SAME already-previewed candidate again): commits it to navigation
+     HISTORY (kept internally for Back and contextual ranking, never rendered as a visible chain
+     that could be mistaken for an authored progression), becomes the new current chord, clears
+     the preview, recenters the map, and regenerates outgoing options. Plays no audio itself — the
+     candidate was already heard in full during preview.
+   - Activating the current/center chord replays the confirmed path from the beginning without
+     ever navigating or touching history.
+   - A local Back control cancels any preview/audio, drops the latest confirmed step, recenters,
+     and replays the shortened confirmed path.
 3. Adding the chord to the progression.
 
 The exploration/navigation history must never appear as a long visible sequence resembling a
-composed progression (the R3.1 correction's core finding — a musician idly exploring
-`Em -> C -> Bm -> C -> Em -> D#dim7 -> ...` must not see that read back as if it were an authored
-piece). A compact, local "Back" control near the current chord (showing only the immediately
-previous chord) is sufficient; the full history does not need permanent screen space. What must
-stay true regardless: inspecting a chord must never sound anything or move the map, and adding to
-the progression always stays a distinct, explicit action, never triggered by inspecting or
-navigating.
+composed progression (the R3.1 correction's original finding, still true under R3.2 — a musician
+idly exploring `Em -> C -> Bm -> C -> Em -> D#dim7 -> ...` must not see that read back as if it
+were an authored piece). A compact, local "Back" control near the current chord (showing only the
+immediately previous chord) is sufficient; the full history does not need permanent screen space.
+What must stay true regardless: inspecting a chord must never sound anything or move the map, and
+adding to the progression always stays a distinct, explicit action, never triggered by inspecting,
+previewing, or confirming.
 
 ## 8. Harmonic Map — Harmonic Depth ("Zoom")
 
@@ -150,6 +163,13 @@ not a behavior change).
 prominence/order/grouping, but must never delete a valid possibility from what the user can reach.**
 No arbitrary "top N" recommendation cap at any depth (R3 formalizes and tests this rule; see §30 and
 `docs/roadmap.md`'s Phase R3).
+
+**Harmonic Territory (R3.2)** is a separate, independent grouping layered on top of this same
+outgoing set — by musical FUNCTION (Natural/Tension/Modal Colour/Substitution/Exploration) rather
+than by depth — and drives the map's primary visual identity, with Depth demoted to a small
+secondary badge. Territory and Depth never collapse into each other: chords at different depths
+routinely share a territory, and chords at the same depth routinely land in different territories.
+See §30 for the full territory model.
 
 ## 9. Harmonic Depth Availability
 
@@ -411,11 +431,13 @@ from explicit musical rules, not hand-authored per node. Correctness over clever
 
 ## 30. Map UX
 
-*(Revised R1, then R3.1 — the completeness rule below supersedes the previous "always emphasise
-the current chord and its most relevant nearby options" phrasing, which read as license to
-silently truncate. R3 implemented the harmonic-path-explorer model on top of the harmonic graph
+*(Revised R1, then R3.1, then R3.2 — the completeness rule below supersedes the previous "always
+emphasise the current chord and its most relevant nearby options" phrasing, which read as license
+to silently truncate. R3 implemented the harmonic-path-explorer model on top of the harmonic graph
 engine built in Phases 1–4; R3.1 corrected that implementation's own map interaction after the user
-tested the deployed R3 preview — see `docs/roadmap.md`'s R3 and R3.1 entries for the full history.)*
+tested the deployed R3 preview; R3.2 added Harmonic Territories and reintroduced a
+preview-before-navigation interaction after further Vercel testing — see `docs/roadmap.md`'s R3,
+R3.1, and R3.2 entries for the full history.)*
 
 The map is a **harmonic path explorer**, not a static neighborhood graph (§0). For the current
 chord and harmonic context, the map exposes **every valid immediate outgoing harmonic possibility
@@ -430,20 +452,40 @@ sibling destination, never as a descendant of another option (R3.1: R3's origina
 concentric rings visually implied false parentage — e.g. a deeper-depth option positioned near a
 shallower one on an outer ring looked like it descended FROM that shallower option, rather than
 being an equally-direct move from the current chord — this is corrected). Depth is metadata about
-the move (a badge/label), never expressed as radial position or as a separate graph edge. A single
-click/tap/Enter on a valid option stops any in-flight navigation audio, plays the transition, and
-commits it as the new current chord, all as one action (R3.1 §5/§6/§8) — the map itself never
-requires a second click to navigate. Hovering/keyboard-focusing an option is purely silent,
-informational preview (never sounds anything, never moves the map). Chosen navigation history is
+the move (a small secondary badge), never expressed as radial position or as a separate graph edge.
+
+**Harmonic Territories (R3.2):** within the one shared ring, options are additionally organized
+into labeled sectors by **Harmonic Territory** — a beginner-readable grouping by the musical
+FUNCTION of the relationship, independent of Depth: Natural, Tension, Modal Colour, Substitution,
+Exploration (Spanish: Natural, Tensión, Color modal, Sustitución, Exploración). Territory is
+domain-classified (never hardcoded per chord name), covers the full outgoing set with no overlap
+(every option belongs to exactly one territory; empty territories are simply omitted), and drives
+the option's primary visual identity (colour, edge style, sector heading) — Depth stays a small,
+neutral, secondary badge that never competes with territory colour. A compact, expandable "How to
+read the map" legend explains both axes in plain, non-difficulty language (e.g. Depth 1 = very
+direct, Depth 4 = more distant/exploratory) using the exact same colour/badge identity as the map
+itself, so the two never drift out of sync.
+
+**Interaction (R3.2 — supersedes R3.1's single-click model, see §7 for full detail):** the FIRST
+click/tap/Enter on a candidate PREVIEWS it — auditions the confirmed path plus the candidate,
+cumulatively from the beginning, and shows layered info in the panel, without navigating or
+recentering. The SECOND activation of that SAME candidate CONFIRMS it — commits it as the new
+current chord, recenters the map, and regenerates outgoing options; it plays no audio of its own,
+since the candidate was already heard during preview. This is persistent UI state, not a
+double-click/timer. Hovering/keyboard-focusing an option remains purely silent, informational
+preview (never sounds anything, never sets preview state, never moves the map). Activating the
+current/center chord replays the confirmed path without navigating. Chosen navigation history is
 kept internally (for Back and contextual ranking) but is never rendered as a long visible chain
 that could be mistaken for an authored progression — a compact, local Back control near the current
-chord is sufficient. Previous context (the navigation history so far, or the actual progression
-when it corresponds to the current point — see the precedence rule in `docs/roadmap.md`'s Phase R3)
-may shift ranking, prominence, and explanation — never membership.
+chord is sufficient, and it cancels audio/clears preview/drops the latest step/replays the
+shortened path. Previous context (the navigation history so far, or the actual progression when it
+corresponds to the current point — see the precedence rule in `docs/roadmap.md`'s Phase R3) may
+shift ranking, prominence, and explanation — never membership.
 
-Users can inspect silently, navigate (which also hears the transition), understand, step backward
-along navigation history, reset to a new starting chord, and explicitly add to the progression.
-Relationships must be distinguishable by more than colour alone.
+Users can inspect silently, preview (which auditions cumulatively without navigating), confirm
+(which navigates), understand, step backward along navigation history, reset to a new starting
+chord, and explicitly add to the progression. Relationships must be distinguishable by more than
+colour alone.
 
 ## 31. Paywall UX
 

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   hearChord as hearChordAudio,
   hearPitches as hearPitchesAudio,
-  hearTransition as hearTransitionAudio,
   hearPath as hearPathAudio,
   playProgression as playProgressionAudio,
   stopProgression as stopProgressionAudio,
@@ -33,9 +32,13 @@ export interface PlaybackController {
    * only meaningful the first time a given instrument is heard this session.
    */
   hearVoicing: (pitches: PlayablePitch[], options?: HearPitchesOptions) => Promise<void>;
-  /** Auditions current-endpoint -> candidate before committing it to the path (Phase R3 §25/§26) — neutral playback, same error routing as the other Hear actions. */
-  hearTransition: (from: Chord, to: Chord) => Promise<void>;
-  /** Plays the full chosen exploration path in sequence (Phase R3 §27). */
+  /**
+   * Plays the cumulative exploration audition — the confirmed path, plus a
+   * previewed candidate while one is active — from its first chord every
+   * time (Phase R3.2 §14/§18/§21). The single audio primitive that drives
+   * previewing a candidate, Back's shortened-path replay, and the
+   * current-chord's own replay; callers just pass the right chord list.
+   */
   hearPath: (chords: Chord[]) => Promise<void>;
   playProgression: (progression: Progression) => void;
   stop: () => void;
@@ -76,18 +79,10 @@ export function usePlaybackController(): PlaybackController {
     });
   }, []);
 
-  // hearTransition/hearPath cancel any in-flight Transport-scheduled audio
-  // at the audio layer (player.ts's hearPath calls stopProgression() first)
-  // — if that preempted an actual "Play progression" run, this keeps the
-  // Play/Stop UI honest rather than showing "playing" over silence.
-  const hearTransition = useCallback((from: Chord, to: Chord) => {
-    setIsPlaying(false);
-    setPlayingItemId(null);
-    return hearTransitionAudio(from, to).catch((cause: unknown) => {
-      if (cause instanceof AudioInitError) setError("init");
-    });
-  }, []);
-
+  // hearPath cancels any in-flight Transport-scheduled audio at the audio
+  // layer (player.ts's hearPath calls stopProgression() first) — if that
+  // preempted an actual "Play progression" run, this keeps the Play/Stop
+  // UI honest rather than showing "playing" over silence.
   const hearPath = useCallback((chords: Chord[]) => {
     setIsPlaying(false);
     setPlayingItemId(null);
@@ -120,7 +115,6 @@ export function usePlaybackController(): PlaybackController {
     error,
     hearChord,
     hearVoicing,
-    hearTransition,
     hearPath,
     playProgression,
     stop,

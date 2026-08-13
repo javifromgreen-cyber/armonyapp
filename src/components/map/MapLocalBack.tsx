@@ -29,7 +29,7 @@ export function MapLocalBack({ navPath, onBack }: MapLocalBackProps) {
       type="button"
       onClick={onBack}
       aria-label={t("backTo", { chord: previousSymbol })}
-      className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-sm font-medium text-foreground-muted shadow-sm backdrop-blur transition-colors hover:border-accent hover:text-accent"
+      className="absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-sm font-medium text-foreground-muted shadow-sm backdrop-blur transition-colors hover:border-accent hover:text-accent"
     >
       <span aria-hidden="true">‹</span>
       {previousSymbol}

@@ -9,8 +9,9 @@ import { createProgressionItem, type TimeSignature } from "@/domain/progression"
 import { HarmonicMap } from "./map/HarmonicMap";
 import { explorerReducer, initialExplorerState } from "./map/explorerState";
 import { MapLocalBack } from "./map/MapLocalBack";
+import { MapLegend } from "./map/MapLegend";
 import { DepthIndicator } from "./map/DepthIndicator";
-import { ChordContextPanel } from "./chordPanel/ChordContextPanel";
+import { ChordContextPanel, type PanelMode } from "./chordPanel/ChordContextPanel";
 import { KeySelector } from "./controls/KeySelector";
 import { ProgressionEditor } from "./progression/ProgressionEditor";
 import {
@@ -74,6 +75,10 @@ export function ExplorerApp() {
   const [isPanelOpenOnMobile, setIsPanelOpenOnMobile] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>("chord");
   const [activeInstrument, setActiveInstrument] = useState<Instrument>("piano");
+  // Silent, informational-only — never affects navigation history or audio
+  // (Phase R3.2 §11-13). Lifted here (not in the reducer) because it's
+  // purely ephemeral and must be shared between the map and the panel.
+  const [hoveredChord, setHoveredChord] = useState<Chord | null>(null);
   const isDesktop = useIsDesktop();
   const playback = usePlaybackController();
 
@@ -86,32 +91,60 @@ export function ExplorerApp() {
     progressionDispatch(action);
   }
 
-  // A single click/tap/Enter on a valid destination chord performs the
-  // complete navigation action (Phase R3.1 §5/§6/§8/§10): stop whatever
-  // audio was playing, play the current-endpoint -> destination transition,
-  // and commit the destination as the new endpoint — all at once, never a
-  // separate preview step or a manual "Hear transition"/"Explore from
-  // here" click. `hearTransition` itself handles cancelling any in-flight
-  // audio (§7/§33) before starting the new transition. Opens the mobile
-  // bottom sheet so the result is actually visible there, without
-  // needlessly touching that state on desktop where it's unused.
-  function handleNavigate(chord: Chord) {
-    playback.hearTransition(currentEndpoint(state.navPath), chord);
-    dispatch({ type: "ADVANCE", chord });
+  // First activation of a candidate (or switching preview to a different
+  // one): previews it without navigating (Phase R3.2 §1-4/§8) — auditions
+  // the confirmed path so far PLUS the candidate, always replayed from the
+  // beginning. `hearPath` cancels any in-flight audio itself before
+  // starting. History/progression are untouched. Deliberately does NOT
+  // open the mobile bottom sheet: forcing it open here would cover the map
+  // with the sheet before the user gets a chance to tap the same (or a
+  // different) candidate again — the sheet's collapsed peek tab still
+  // surfaces that a chord is selected, and switches to the chord tab so
+  // it's ready if the user opens it manually.
+  function handlePreviewCandidate(chord: Chord) {
+    dispatch({ type: "PREVIEW", chord });
+    const confirmedChords = state.navPath.steps.map((step) => step.chord);
+    playback.hearPath([...confirmedChords, chord]);
+    if (!isDesktop) {
+      setMobileTab("chord");
+    }
+  }
+
+  // Second activation of the ALREADY-previewed candidate: confirms it as
+  // the new current chord (Phase R3.2 §5) — no audio here, since the
+  // candidate was already heard in full during preview.
+  function handleConfirmCandidate(chord: Chord) {
+    dispatch({ type: "CONFIRM", chord });
+    setHoveredChord(null);
     if (!isDesktop) {
       setMobileTab("chord");
       setIsPanelOpenOnMobile(true);
     }
   }
 
-  // Silent by default (§11) — Back never plays audio, it only steps
-  // navigation history back one move.
+  // Activating the current/center chord: replays the confirmed path from
+  // the beginning without navigating (Phase R3.2 §17/§26) — also clears any
+  // stray preview state, since re-hearing the confirmed path supersedes it.
+  function handleReplayCurrent() {
+    dispatch({ type: "CLEAR_PREVIEW" });
+    playback.hearPath(state.navPath.steps.map((step) => step.chord));
+  }
+
+  // Local Back (Phase R3.2 §6): cancels any preview/audio, drops the latest
+  // confirmed step, and replays the shortened confirmed path — computed
+  // BEFORE dispatching so it reflects the path Back is returning to, not
+  // the one being left.
   function handleBack() {
+    if (state.navPath.steps.length <= 1) return;
+    const shortened = state.navPath.steps.slice(0, -1).map((step) => step.chord);
     dispatch({ type: "BACK" });
+    setHoveredChord(null);
+    playback.hearPath(shortened);
   }
 
   function handleResetExploration() {
     dispatch({ type: "RESET" });
+    setHoveredChord(null);
   }
 
   function handleKeyChange(context: Key | null) {
@@ -121,7 +154,14 @@ export function ExplorerApp() {
       return;
     }
     setIsFreeMode(false);
+    setHoveredChord(null);
     dispatch({ type: "SET_CONTEXT", context });
+  }
+
+  // Silent, informational-only (Phase R3.2 §11-13) — never dispatches
+  // navigation state, never plays audio.
+  function handleHoverChord(chord: Chord | null) {
+    setHoveredChord(chord);
   }
 
   // Explicit "Add to progression" action (product-spec.md Phase 5 §2/§5):
@@ -162,15 +202,36 @@ export function ExplorerApp() {
     dispatchProgression({ type: "TRANSPOSE", semitones });
   }
 
-  const previousChord =
-    state.navPath.steps.length > 1
-      ? state.navPath.steps[state.navPath.steps.length - 2].chord
-      : undefined;
+  // What the panel shows: a silently-hovered candidate takes priority, then
+  // an actively-previewed candidate, then the confirmed current chord
+  // (Phase R3.2 §11/§38) — each with the right "relative to" chord and mode
+  // for its heading/hint copy.
+  const currentChord = currentEndpoint(state.navPath);
+  let panelChord: Chord;
+  let panelMode: PanelMode;
+  let relativeToChord: Chord | undefined;
+  if (hoveredChord) {
+    panelChord = hoveredChord;
+    panelMode = "hover";
+    relativeToChord = currentChord;
+  } else if (state.previewChord) {
+    panelChord = state.previewChord;
+    panelMode = "preview";
+    relativeToChord = currentChord;
+  } else {
+    panelChord = currentChord;
+    panelMode = "current";
+    relativeToChord =
+      state.navPath.steps.length > 1
+        ? state.navPath.steps[state.navPath.steps.length - 2].chord
+        : undefined;
+  }
 
   const chordPanel = !isFreeMode && (
     <ChordContextPanel
-      chord={currentEndpoint(state.navPath)}
-      previousChord={previousChord}
+      chord={panelChord}
+      panelMode={panelMode}
+      relativeToChord={relativeToChord}
       context={state.context}
       isDesktop={isDesktop}
       activeInstrument={activeInstrument}
@@ -210,9 +271,10 @@ export function ExplorerApp() {
                 <DepthIndicator navPath={state.navPath} />
                 <ExplorationSecondaryControls
                   canHearPath={state.navPath.steps.length > 1}
-                  onHearPath={() => playback.hearPath(state.navPath.steps.map((step) => step.chord))}
+                  onHearPath={handleReplayCurrent}
                   onReset={handleResetExploration}
                 />
+                <MapLegend />
               </div>
             )}
           </div>
@@ -229,7 +291,12 @@ export function ExplorerApp() {
                   context={state.context}
                   navPath={state.navPath}
                   progression={progression}
-                  onNavigate={handleNavigate}
+                  previewChord={state.previewChord}
+                  hoveredChord={hoveredChord}
+                  onHoverChord={handleHoverChord}
+                  onPreview={handlePreviewCandidate}
+                  onConfirm={handleConfirmCandidate}
+                  onReplayCurrent={handleReplayCurrent}
                 />
               </>
             )}

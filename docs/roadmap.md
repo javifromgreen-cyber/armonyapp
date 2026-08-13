@@ -794,6 +794,99 @@ matches the required "tap = hear transition + navigate" behavior exactly, so it'
 note that "hover-only preview" is inherently a desktop/keyboard-focus refinement on touch devices,
 same as documented in the R3 entry above.
 
+## Phase R3.2 — Harmonic territories + preview-before-navigation
+- [x] Harmonic Territory domain classifier (`harmonicTerritoryFor`): natural/tension/modal
+      colour/substitution/exploration, layered on top of the already-reviewed
+      `harmonicCharacterFor`, never re-deriving from `relationshipType`/depth directly
+- [x] Completeness invariant for territories: union of all territories == full outgoing set, no
+      chord in two territories, empty territories simply omitted (never truncated/equalized)
+- [x] Territory is structurally and empirically independent of Depth — verified in
+      `music-theory-review`: Depth 1 alone spans both `natural` and `tension`; Depths 2 and 3 each
+      span four of the five territories
+- [x] Reintroduce a two-step map interaction on top of R3.1's foundations: hover/focus stays
+      silent-only; first click/tap/Enter on a candidate PREVIEWS it (cumulative audition of
+      confirmed path + candidate, no navigation/history/progression change); the SAME candidate's
+      second activation CONFIRMS it (commits to history, recenters, no audio replay since already
+      heard) — persistent UI state, not a double-click/timer
+- [x] Switching preview to a different candidate cancels the old audition and starts a new one
+      without touching confirmed history
+- [x] Cumulative audio always replays from the first chord of the CONFIRMED path (plus the active
+      preview candidate when previewing) — never an arbitrary append-only or truncated window;
+      only one audition exists at a time
+- [x] Local Back cancels audio/preview, drops the latest confirmed step, recenters, and replays the
+      shortened confirmed path
+- [x] Activating the current/center chord replays the confirmed path without ever navigating
+- [x] Sector-based map layout: territory sectors get angular spans proportional to member count;
+      ring radius derived from the tightest actual angular gap between adjacent nodes (not an
+      assumed-uniform gap) — still ONE shared ring, no concentric depth rings reintroduced
+- [x] Territory drives primary visual identity (colour, edge dash pattern, sector heading); Depth
+      demoted to a small, neutral, secondary badge that never competes with territory colour
+- [x] Compact, expandable "How to read the map" / "Cómo leer el mapa" legend explaining both axes
+      in plain, non-difficulty language, using the exact same colour/badge identity as the map
+- [x] The 3 existing audio controls stay behaviorally distinct: map/path cumulative audio, isolated
+      "Hear this chord only" (label renamed from "Hear chord", behavior unchanged), and
+      instrument-specific "Hear this voicing"/"Hear this pattern" (Piano/Guitar/Bass, completely
+      untouched — confirmed via `git diff --stat` showing zero changes in those directories)
+- [x] `hearTransition` removed from `src/audio/player.ts` (dead code — every caller now passes full
+      cumulative chord arrays through `hearPath`); `hearPath`'s guard changed from `length < 2` to
+      `length === 0` to support single-chord replay at the very start of exploration
+- [x] EN/ES i18n for territories, depth plain-language blurbs, legend, previewing-state hint, and
+      the "Hear this chord only" label rename — no hard-coded copy
+
+This was a **further corrective/additive pass**, prompted by the user's own testing of the deployed
+R3.1 preview: R3.1's underlying navigation/domain architecture, completeness guarantee, single
+shared ring (no concentric depth rings), local Back, and no-visible-breadcrumb rule are all
+preserved and extended, not rebuilt. Two real problems drove this phase: (1) R3.1's
+single-click-does-everything model gave no way to audition or compare a candidate before
+committing to it — musicians wanted to hear a move before locking it in; (2) an undifferentiated
+single ring made dense candidate sets (e.g. G7's 18 options) hard to read at a glance without any
+functional grouping.
+
+Also found and fixed during this phase's own mandatory browser verification (Playwright, not
+hypothetical): opening the mobile bottom sheet on PREVIEW (carried over from R3.1's "open on
+completed navigation" timing) covered the map before the user could perform the second activation
+that confirms a candidate — an interaction-breaking regression under the new two-step model. Fixed
+by only auto-opening the sheet on CONFIRM. A related issue — the local Back control sharing the
+mobile sheet's `z-10`, so DOM order let the sheet cover Back once open from an earlier confirm — was
+fixed by bumping Back to `z-20`. Both are documented in `docs/architecture.md`'s Deviations section.
+
+Also found and fixed during `music-theory-review`: two test-quality gaps in
+`harmonicTerritory.test.ts` (not correctness bugs) — one assertion was guarded behind
+`if (chained) { ... }` so it would silently pass without exercising anything if the relationship
+type it probed for ever failed to generate; fixed by using a genuinely deterministic
+`secondaryDominantChain` case (D7 -> A7 in C major) instead of an unreliable C -> F probe. An
+unused intermediate variable worked around with `void` was also removed.
+
+Verified 2026-08-13: `npm run test` (701 tests, up from 673), `npx tsc --noEmit`, `npm run lint`,
+`npm run build` all pass with zero regressions. `music-theory-review`: territory classification
+verified musically sound and genuinely independent of Depth both structurally (the function never
+reads `harmonicDepth`) and empirically (cross-checked against every relationship type's actual
+depth assignment); deceptive resolution confirmed correctly tension-classified (still
+dominant-sourced pull, per standard tonal harmony); `chromaticColour`/`adventurous` collapsing into
+`exploration` confirmed defensible (the least function-driven, most colour-for-colour's-sake
+families the engine models). `product-scope-review`: verdict aligned — hover never triggers
+audio/navigation; first click previews only (no history mutation, confirmed live); second
+activation of the same candidate confirms (confirmed live, no double-click/timer); switching
+preview cancels/restarts correctly (confirmed live); audio is always cumulative from the confirmed
+path's start; local Back and center-chord replay behave as specified (confirmed live); the 3 audio
+controls stay distinct with only the one label rename; territory drives primary visual identity
+with depth as secondary badge only, confirmed via both code reading and a live colour cross-check
+between the map's SVG sector headings and the legend's swatches (identical `--color-*` CSS
+variables on both sides); §44's hard constraint honored (zero diff in Piano/Guitar/Bass code); no
+R4/Auth/Supabase/Projects/Trial/Stripe work began; no visible breadcrumb; "Add to progression"
+stays a fully separate action; no hard-coded copy; domain layer stays framework-free. Live-browser
+verification (Playwright, desktop 1440×900 + mobile 390×844, English + Spanish, real touch-capable
+viewports): hover never sets preview state; first click sets preview without moving the center;
+switching preview clears the old candidate's preview and sets the new one; second click on the same
+candidate navigates (center becomes that chord); local Back appears and restores the previous
+center chord; clicking the current/center chord replays without navigating; the legend opens and
+lists all territories with matching colours; zero console errors — all 48 assertions passed across
+all 4 viewport/locale combinations. A second pass verified "Hear this chord only"'s label and
+distinctness from "Add to progression" (which correctly adds an item, verified via the progression
+strip's empty-state message disappearing), and Piano/Guitar/Bass instrument-selector regression
+(all three switch cleanly; Guitar's "Hear this voicing" and Bass's "Hear this pattern" labels
+unchanged).
+
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
       Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text

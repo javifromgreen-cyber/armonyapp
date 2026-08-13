@@ -35,11 +35,26 @@
       "hearPath": "Hear path",
       "currentMove": "Current move",
       "pathDepth": "Path depth",
+      "previewing": "Previewing",
+      "previewHintDesktop": "Click again to explore →",
+      "previewHintMobile": "Tap again to explore →",
+      "legendToggle": "How to read the map",
+      "legendTitle": "How to read the map",
+      "legendTerritoriesIntro": "Every chord you see is a real, valid destination — grouped by the kind of musical effect it has:",
+      "legendDepthTitle": "Depth",
+      "legendDepthIntro": "How direct or harmonically distant a relationship is — not a difficulty or quality rating:",
+      "legendClose": "Close",
       "depth": {
         "direct": "Direct",
         "expanded": "Expanded",
         "colour": "Colour",
         "deep": "Deep"
+      },
+      "depthBlurb": {
+        "1": "Very direct harmonic relationship.",
+        "2": "Some additional harmonic movement or tension.",
+        "3": "More colour or chromatic distance.",
+        "4": "A more distant or exploratory relationship."
       },
       "character": {
         "naturalContinuation": "Natural continuation",
@@ -50,6 +65,20 @@
         "substitution": "Substitution",
         "chromaticColour": "Chromatic colour",
         "adventurous": "Adventurous"
+      },
+      "territory": {
+        "natural": "Natural",
+        "tension": "Tension",
+        "modalColour": "Modal colour",
+        "substitution": "Substitution",
+        "exploration": "Exploration"
+      },
+      "territoryBlurb": {
+        "natural": "A familiar, stable harmonic continuation.",
+        "tension": "Creates pull — the harmony often wants to continue or resolve.",
+        "modalColour": "Introduces a different harmonic colour, borrowed from outside the main key.",
+        "substitution": "An alternative chord that can play a similar harmonic role.",
+        "exploration": "A more unexpected, chromatic or distant harmonic direction."
       }
     },
     "map": {
@@ -63,8 +92,10 @@
       "intervalFormula": "Interval formula",
       "contextualRole": "Contextual role",
       "arrivedVia": "Arrived via {chord}",
+      "relationshipToCurrent": "Relationship to {chord}",
+      "depthSummary": "Depth {depth} · {label}",
       "addToProgression": "Add to progression",
-      "hearChord": "Hear chord",
+      "hearChord": "Hear this chord only",
       "instrument": "Instrument",
       "selectPrompt": "Select a chord on the map to see its details.",
       "additionalRelationships": "Also related as:"

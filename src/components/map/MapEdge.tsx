@@ -3,7 +3,7 @@ export interface MapEdgeProps {
   to: { x: number; y: number };
   dashArray: string | undefined;
   colorVar: string;
-  /** Short (1-2 char) relationship-family badge (see ./relationshipVisuals) shown at the edge midpoint — a persistent, non-color cue for what kind of relationship this is, without a permanent legend. */
+  /** Short territory glyph (see ./territoryVisuals) shown at the edge midpoint — a persistent, non-colour cue for which harmonic territory this candidate belongs to. */
   badge: string;
   /** Full relationship description, shown as a native tooltip on hover/focus. */
   title: string;
@@ -11,13 +11,11 @@ export interface MapEdgeProps {
 }
 
 /**
- * The connection line from the explored/source chord to one neighbor node.
- * Line treatment (dash pattern) is the primary way relationship families are
- * told apart — never colour alone (product-spec.md §30). The small badge
- * label at the midpoint and the native tooltip (`<title>`) are secondary,
- * always-available reinforcement, since dash patterns alone get hard to
- * distinguish once several relationship families are on screen at once
- * (Zoom 3/4).
+ * The connection line from the current chord to one candidate node. Line
+ * treatment (dash pattern) is the primary way harmonic territories are
+ * told apart — never colour alone (product-spec.md §30, Phase R3.2 §34).
+ * The small badge glyph at the midpoint and the native tooltip (`<title>`)
+ * are secondary, always-available reinforcement.
  */
 export function MapEdge({ from, to, dashArray, colorVar, badge, title, isHighlighted }: MapEdgeProps) {
   const midX = (from.x + to.x) / 2;
