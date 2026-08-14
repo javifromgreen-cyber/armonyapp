@@ -153,27 +153,40 @@ html {
 }
 
 /*
- * ONA home hero's abstract wave backdrop (product-spec.md §8) — a slow,
- * calm horizontal drift, never literal music notes. Deliberately plain CSS
- * (no animation/canvas library): two translucent paths at different
- * durations drift left at different speeds for subtle parallax. Neutralized
- * for prefers-reduced-motion by the blanket rule above.
+ * ONA's recurring wave motif (product-spec.md §1/§8) — a slow, calm breathe
+ * rather than a marquee scroll: each layer eases between two nearby
+ * positions and back (`alternate infinite`), never literal music notes or a
+ * repeating tiled pattern. Two independent keyframes at different
+ * durations/directions give the primary/secondary wave layers gentle
+ * parallax without ever synchronizing. Neutralized for
+ * prefers-reduced-motion by the blanket rule above.
  */
-@keyframes hero-wave-drift {
+@keyframes wave-drift-primary {
   from {
-    transform: translateX(0);
+    transform: translate(0, 0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translate(-2.5%, -1.2%);
   }
 }
 
-.animate-hero-wave-slow {
-  animation: hero-wave-drift 36s linear infinite;
+@keyframes wave-drift-secondary {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(2%, 1%);
+  }
 }
 
-.animate-hero-wave-fast {
-  animation: hero-wave-drift 22s linear infinite reverse;
+.animate-wave-primary {
+  animation: wave-drift-primary 26s ease-in-out infinite alternate;
+  transform-box: fill-box;
+}
+
+.animate-wave-secondary {
+  animation: wave-drift-secondary 34s ease-in-out infinite alternate;
+  transform-box: fill-box;
 }
 
 .animate-map-arrive {

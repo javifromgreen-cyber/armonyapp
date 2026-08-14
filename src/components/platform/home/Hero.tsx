@@ -1,6 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
-import { HeroWaves } from "./HeroWaves";
+import { HeroWave } from "../wave/HeroWave";
 
 /** product-spec.md §8 — one CTA only, dark/artistic, ONA-as-platform not Armony-as-hero. */
 export async function Hero() {
@@ -8,7 +8,7 @@ export async function Hero() {
 
   return (
     <section className="relative overflow-hidden border-b border-ona-border bg-ona-bg">
-      <HeroWaves />
+      <HeroWave />
       <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 py-28 text-center sm:py-36">
         <h1 className="text-4xl font-semibold tracking-tight text-balance text-ona-fg sm:text-5xl">
           {t("headline")}

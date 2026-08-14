@@ -595,3 +595,67 @@ flatten that back into one-node-per-edge.
   header's "Sign in" landed on `/sign-in` (no query string), and clicking the mock email button
   from there landed on `/account`. A final screenshot of `/app` after all of the above confirmed
   Armony itself unchanged.
+- **P0 third follow-up: a real wave motif, section-level visual depth, a reusable app-nav
+  component.** Purely visual; structure/copy/pricing/routes/auth mocks/Armony untouched.
+  - **New `src/components/platform/wave/` module — the wave finally reads as a wave.** The prior
+    follow-up's fix (a heavy `blur(48px)` on the hero's flat vector shapes) was itself superseded
+    here: blurred that much, the shape had stopped reading as a wave at all and just looked like
+    another petroleum-toned glow — exactly the complaint this pass was asked to fix.
+    `wavePaths.ts` hand-authors a handful of open "crest" curves (irregular Bézier control points,
+    not a repeating sine) as plain `WaveCurve` data (`{ width, height, crest }`); `fillPath()`
+    derives a closed silhouette from a crest by literally appending `L width,height L0,height Z` —
+    so a stroke and a fill drawn from the same curve always trace one identical line, they can
+    never visually drift apart. `HeroWave.tsx` draws the primary layer as BOTH a modest translucent
+    fill (`opacity 0.24`) AND a crisp brighter stroke along just the crest (`opacity 0.7`,
+    `strokeWidth 2.5`) — the stroke is the actual fix: a contour line is what makes an organic
+    shape unambiguously read as "a wave" rather than "a colored blob," the same reason
+    line-illustration wave/mountain art works. A second, fainter (`opacity 0.14`), differently-
+    shaped, fill-only layer sits behind it for depth. `SectionWave.tsx` is the reusable "large
+    fragment bleeding from one edge" variant (fill-only, `side`/`opacity` props) used elsewhere on
+    the page.
+  - **Motion: replaced the seamless-marquee scroll with a slow independent breathe.** The previous
+    `hero-wave-drift` keyframe (`translateX(0) → translateX(-50%)`, requiring each path to be
+    drawn twice for a seamless loop) is gone. New `wave-drift-primary`/`wave-drift-secondary`
+    keyframes (`globals.css`) each ease between the origin and a small `translate(x%, y%)` offset
+    and back (`ease-in-out infinite alternate`, 26s and 34s — deliberately different so the two
+    layers never move in lock-step), applied to a wrapping `<g transform-box: fill-box>` per layer
+    so the percentage offsets resolve against each wave's own bounding box rather than the SVG
+    viewport. Still fully neutralized by the existing global `prefers-reduced-motion` rule —
+    verified via computed style (`animation-duration` collapses to ~0) rather than only visual
+    inspection this time.
+  - **Home sections now carry deliberately different backgrounds, per the brief's suggested
+    rhythm.** `IntroSection.tsx` and `TrialSection.tsx` each gained `relative overflow-hidden` and
+    one `<SectionWave>` at a LOW opacity (0.06 and 0.10 respectively) on opposite sides (`left`/
+    `right`) — different enough that the two sections don't look like copies of each other.
+    `ToolsCatalogue.tsx` and `PricingSection.tsx` are untouched — no wave — so the app cards and
+    the Pro module stay each section's visual focus, per the brief's explicit "cleaner and calmer"
+    / "calmer/darker again" guidance. `FinalCta.tsx` reuses `HeroWave` VERBATIM (not a new variant)
+    specifically so the page closes by echoing the hero rather than introducing a third
+    interpretation of the motif.
+  - **New `AppBackToPlatform.tsx` replaces `PlatformBackLink.tsx` outright** (the old file is
+    deleted, not deprecated — it had exactly one consumer). Same discreet single-link pattern as
+    before, now prefixed with the real ONA logo at `variant="compact"` (the waveform-only mark,
+    `heightPx={14}`) — the `full` lettering+waveform lockup was already established as illegible
+    below roughly 36–40px in the earlier logo-integration pass, so this is precisely the scenario
+    that variant exists for. `alt=""` on the image (the surrounding link's visible text already
+    supplies the accessible name). Styling intentionally still reads from Armony's own generic
+    semantic tokens (`border`, `foreground-muted`) rather than `.ona-shell` — the component is
+    documented as reusable by ANY future app specifically because those token names are a
+    convention every app is expected to define, not because they're borrowed from the platform
+    shell. `src/app/[locale]/app/page.tsx` changes only its import and the one tag it renders;
+    `ExplorerApp` and everything under `src/domain` are untouched.
+
+  Verified 2026-08-14: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676,
+  unchanged), `npm run build` all pass with zero errors. Live-browser verification against the
+  PRODUCTION build — desktop 1440×900 + mobile 390×844, English + Spanish: zero console/page/
+  4xx-5xx errors and zero horizontal overflow on every combination (this pass also caught and fixed
+  a false-positive of its own: an earlier verification run hit stale 500s/404s from a leftover
+  `next start` process still serving a now-overwritten `.next` build after a fresh `npm run build`
+  — killing that process and starting clean resolved it; not a code defect). The hero wave is now
+  unambiguously identifiable as a wave silhouette, not a glow, on both viewports, with headline/
+  subtitle/CTA fully legible; the four backgrounded sections (hero, intro, trial, final CTA) are
+  each visually distinct from one another rather than repeating one treatment, while tools/pricing
+  remain deliberately plain. Clicked "Back to ONA" from `/es/app` and confirmed it lands on `/es`
+  — locale preserved end-to-end, not just by inspecting the generated href. A final screenshot of
+  `/app` (desktop + mobile, EN + ES) confirmed Armony itself pixel-unchanged apart from the
+  back-link swap.

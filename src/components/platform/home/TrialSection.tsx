@@ -1,13 +1,15 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { SectionWave } from "../wave/SectionWave";
 
 /** product-spec.md §12 — an elegant visual band, not a conversion funnel. */
 export async function TrialSection() {
   const t = await getTranslations("platform.trial");
 
   return (
-    <section className="border-y border-ona-border bg-ona-surface px-6 py-16 sm:py-20">
-      <div className="mx-auto flex max-w-3xl flex-col items-center gap-5 text-center">
+    <section className="relative overflow-hidden border-y border-ona-border bg-ona-surface px-6 py-16 sm:py-20">
+      <SectionWave side="right" opacity={0.1} />
+      <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-5 text-center">
         <h2 className="text-2xl font-semibold text-balance text-ona-fg sm:text-3xl">
           {t("headline")}
         </h2>

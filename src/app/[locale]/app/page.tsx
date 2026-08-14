@@ -1,6 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import { ExplorerApp } from "@/components/ExplorerApp";
-import { PlatformBackLink } from "@/components/platform/PlatformBackLink";
+import { AppBackToPlatform } from "@/components/platform/AppBackToPlatform";
 
 export default async function AppShellPage({
   params,
@@ -10,7 +10,7 @@ export default async function AppShellPage({
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden">
-      <PlatformBackLink />
+      <AppBackToPlatform />
       <div className="flex flex-1 flex-col overflow-hidden">
         <ExplorerApp />
       </div>

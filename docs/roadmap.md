@@ -1247,6 +1247,52 @@ Spanish); the header's "Sign in" → sign-in (no `returnTo`) → mock "Continue 
 `/account`. Armony's `/app` route screenshotted and confirmed pixel-identical to before this
 follow-up.
 
+**Third follow-up (same phase): a real ONA wave motif, section-by-section visual depth, a reusable
+app-level "back to ONA" component.** Purely visual; structure/copy/pricing/routes/auth
+mocks/Armony untouched.
+- [x] **New wave asset system** (`src/components/platform/wave/`): `wavePaths.ts` hand-authors a
+      few irregular (non-repeating) organic Bézier crest curves as plain data; every filled
+      silhouette is DERIVED from its crest curve (crest + close-to-bottom), so a stroke and a fill
+      of the same wave always trace the identical line. `HeroWave.tsx` pairs a modest translucent
+      fill with a crisp, brighter stroke along just the crest — the stroke is what keeps the shape
+      unmistakably a wave at a glance, replacing the previous pass's heavily-blurred glow (rejected
+      on inspection as "no longer read as a wave"). `SectionWave.tsx` is a fill-only, lower-opacity
+      "large fragment bleeding from one edge" variant reused across sections with different
+      `side`/`opacity` per call site.
+- [x] **Hero rebuilt around the new motif.** Two independent layers (primary: fill + crest stroke;
+      secondary: fill only, different curve, lower opacity) drift very slowly and independently
+      (new `wave-drift-primary`/`wave-drift-secondary` keyframes, `ease-in-out infinite alternate`,
+      26s/34s — a slow breathe, not the previous seamless marquee scroll), both neutralized by the
+      existing global `prefers-reduced-motion` rule. Headline/subtitle/CTA/layout unchanged.
+- [x] **Home sections now vary rather than repeating one treatment**: Hero — strongest, full
+      primary+secondary wave with the crest stroke. Introduction — mostly dark, a large, very
+      subtle (`opacity 0.06`) wave fragment bleeding in from the left. Tools — unchanged, no wave,
+      deliberately calm so the app cards stay the focus. 72-hour trial — kept its existing slightly
+      lighter charcoal surface (`bg-ona-surface`) and gained a subtler fragment from the right
+      (`opacity 0.10`). Pricing — unchanged, no wave, calmest/darkest so the Pro module stays the
+      focus. Final CTA — reuses `HeroWave` verbatim (not a variant) as an intentional bookend,
+      "echoing the hero" per the brief. Footer — unchanged, still minimal.
+- [x] **New `AppBackToPlatform` component** (`src/components/platform/AppBackToPlatform.tsx`)
+      replaces the plain-text `PlatformBackLink` — now a small real ONA logo (the `compact`
+      waveform-only variant at 14px tall; the full lettering+waveform lockup isn't legible at that
+      size, confirmed in an earlier pass) immediately followed by "Back to ONA"/"Volver a ONA",
+      the whole element one link to localized Home. Styled with the same generic semantic tokens
+      (`border`/`foreground-muted`) Armony's own UI already uses, not the platform's `.ona-shell`
+      palette, so it visually belongs to whichever app hosts it — written to be dropped into any
+      future app's page unchanged, not Armony-specific. `src/app/[locale]/app/page.tsx`'s only
+      change is swapping the import/usage; `ExplorerApp` and every domain module untouched.
+
+Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676, unchanged),
+`npm run build` all pass. Live-browser verification against the PRODUCTION build — desktop
+1440×900 + mobile 390×844, English + Spanish: zero console/page/4xx-5xx errors and zero horizontal
+overflow on every combination; the hero wave is now clearly identifiable as a wave (not a glow) on
+both viewports with headline/subtitle fully legible; each Home section visibly differs from its
+neighbors rather than repeating the same background treatment; `prefers-reduced-motion` confirmed
+via computed style (`animation-duration` collapses to ~0 on the wave layers). Clicked "Back to
+ONA"/"Volver a ONA" from `/es/app` and confirmed it lands on `/es` (locale preserved) — the mock
+logo+text component works end-to-end, not just visually. A final screenshot of `/app` (desktop +
+mobile, EN + ES) confirmed Armony itself unchanged.
+
 ---
 
 # Infrastructure phases (resume after R1–R4)
