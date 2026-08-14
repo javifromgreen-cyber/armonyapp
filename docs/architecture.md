@@ -760,3 +760,17 @@ flatten that back into one-node-per-edge.
     response next-intl's locale-routing middleware produces (pass-through or redirect) — necessary
     because Supabase's session-refresh needs to run in the same middleware pass as locale routing,
     but next-intl's `createMiddleware` already owns response construction.
+
+- **ONA Functional Phase 1 hardening pass (2026-08-14) — publishable-key migration, pure `/app`
+  access decision.** After the real Supabase project was wired up in Production, its dashboard
+  labeled the low-privilege public key "Publishable key" rather than the "anon key" this phase's
+  code originally read, which surfaced as a startup config error. Fixed by making
+  `src/platform/supabase/env.ts`'s `getSupabasePublicEnv()` the single place any Supabase client
+  reads env vars from — it now reads `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` exclusively;
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` has zero effect anywhere in the app (verified by
+  `src/platform/supabase/env.test.ts`, including a case that sets the legacy variable and confirms
+  it's ignored). No RLS/DB/service-role change — the underlying Supabase key itself didn't change,
+  only which env var name the app looks for. Also added `src/domain/entitlements/appAccess.ts`
+  (`decideAppAccess`) — a small pure function factoring `/app`'s three-way redirect decision
+  (sign-in / trial-ended / allow) out of `app/page.tsx` so it's unit-testable without mocking
+  Next.js or Supabase; the actual redirect wiring and production behavior are unchanged.

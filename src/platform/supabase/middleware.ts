@@ -20,18 +20,18 @@ interface PendingCookie {
  * server-side.
  *
  * Swallows any Supabase/env error and returns no cookies to set — e.g.
- * `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` not configured yet. This runs on
- * EVERY matched request; letting it throw would take down locale routing
- * (and therefore the whole site) whenever Supabase is unreachable, which is
- * strictly worse than visitors simply appearing signed out until it's
- * configured.
+ * `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` not
+ * configured yet. This runs on EVERY matched request; letting it throw
+ * would take down locale routing (and therefore the whole site) whenever
+ * Supabase is unreachable, which is strictly worse than visitors simply
+ * appearing signed out until it's configured.
  */
 export async function refreshSupabaseSession(request: NextRequest): Promise<PendingCookie[]> {
   try {
-    const { url, anonKey } = getSupabasePublicEnv();
+    const { url, publishableKey } = getSupabasePublicEnv();
     const pendingCookies: PendingCookie[] = [];
 
-    const supabase = createServerClient(url, anonKey, {
+    const supabase = createServerClient(url, publishableKey, {
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {

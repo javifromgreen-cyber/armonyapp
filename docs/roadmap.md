@@ -1407,3 +1407,34 @@ system.
   setup. **Explicitly not done in this phase** (per the request that scoped it): Stripe, paid Pro
   activation, billing portal, transactional emails, trial-reminder email, MIDI export, additional
   apps, anti-fraud/fingerprinting — all remain future phases.
+
+- **2026-08-14 — ONA Functional Phase 1 hardening pass: publishable-key migration + manual
+  Production verification.** Two fixes, no product/UX/schema change:
+  1. Production revealed the app's Supabase client code still required the legacy
+     `NEXT_PUBLIC_SUPABASE_ANON_KEY` variable name, while the real project's dashboard uses
+     Supabase's current "Publishable key" naming — migrated every Supabase client
+     (`src/platform/supabase/{env,client,server,middleware}.ts`) to read
+     `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` exclusively, through the one shared
+     `getSupabasePublicEnv()` helper. `ANON_KEY` is no longer read anywhere in the app (confirmed by
+     `src/platform/supabase/env.test.ts`). No RLS/DB/service-role change — same underlying key,
+     different env var name. See `docs/supabase-setup.md` for the updated setup steps.
+  2. Added `decideAppAccess` (`src/domain/entitlements/appAccess.ts`) — the `/app` protection
+     decision (sign-in / trial-ended / allow) extracted as a small pure function so it's
+     unit-tested (`appAccess.test.ts`) without mocking Next.js/Supabase; `app/page.tsx`'s actual
+     redirect behavior is unchanged.
+
+  **Real manual Production verification, performed before this pass** (recorded here since it's
+  the first time it's been confirmed against the real deployed Supabase project, not just unit
+  tests): passwordless email sign-in works end-to-end; Google OAuth sign-in works end-to-end;
+  signing in with Google and with the same email via passwordless resolve to **one** Supabase user
+  showing both linked providers; the 72-hour trial row is created automatically; signing out and
+  back in does not reset or duplicate the trial (including after linking the second provider);
+  `/app` opens correctly during an active trial; Account shows the real email and real trial end.
+  **Not yet manually verified**: the expired-trial path — `docs/supabase-setup.md` §8 documents a
+  safe, dedicated-QA-account SQL procedure for verifying it against the real project without adding
+  any bypass to the product itself, but that procedure has not been run yet. No production QA
+  bypass, query-string override, or hidden route was added anywhere in this pass — the only new
+  surface is the pure `decideAppAccess` function, which has no wiring a visitor can reach.
+
+  Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build` all
+  pass — see this session's completion report for exact counts.

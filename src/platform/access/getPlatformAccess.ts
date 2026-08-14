@@ -28,7 +28,8 @@ interface PlatformAccessRow {
  * never a client-supplied timestamp.
  *
  * Deliberately swallows any Supabase/env error and returns `null` instead —
- * e.g. `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` not configured yet, or a
+ * e.g. `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` not
+ * configured yet, or a
  * transient network failure. Every page that calls this treats `null` as
  * "signed out" and still renders (the public marketing shell, sign-in,
  * etc.); the alternative — letting this throw — would take the entire site
