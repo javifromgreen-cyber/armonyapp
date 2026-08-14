@@ -1293,6 +1293,48 @@ ONA"/"Volver a ONA" from `/es/app` and confirmed it lands on `/es` (locale prese
 logo+text component works end-to-end, not just visually. A final screenshot of `/app` (desktop +
 mobile, EN + ES) confirmed Armony itself unchanged.
 
+**Fourth follow-up (same phase): wave geometry actually reads as a wave.** The previous follow-up's
+waves were visible but weak — user testing flagged the hero as "closest but could flow better," the
+introduction wave as "almost invisible," and the trial wave as "reads like a hill/blob, not a
+wave." Root cause: every curve so far had at most one rise-and-fall (visually indistinguishable
+from a hill) and the section waves had no crest stroke at all (fill alone doesn't read as a defined
+shape). Fix, in `src/components/platform/wave/`:
+- [x] **`wavePaths.ts` curves rebuilt with 2-3 irregular asymmetric crests each** — `HERO_PRIMARY`/
+      `HERO_SECONDARY` (rewritten), plus two BRAND NEW curves, `INTRO_WAVE` and `TRIAL_WAVE`,
+      replacing the old single-rise `EDGE_FRAGMENT` that both section waves previously shared
+      (mirrored) — a repeat rise-and-fall rhythm is what makes a curve read as "a wave" rather than
+      "a hill," confirmed by rendering isolated curve candidates in a throwaway HTML preview before
+      choosing final control points (never committed).
+- [x] **`SectionWave.tsx` gained a crest stroke** (it previously rendered fill only) at roughly 3×
+      the fill's opacity, capped at 0.5 — the same "translucent fill + brighter contour line"
+      formula `HeroWave` already used, now applied consistently everywhere the motif appears, and
+      takes an explicit `curve` prop instead of a single shared shape.
+- [x] **Motion gained a very subtle scale breathe** alongside the existing slow translate drift
+      (`wave-drift-primary`/`-secondary` keyframes, `globals.css`) — `scale(1)` → `scale(1.015)`/
+      `scale(1.02)` — for a touch more organic life, timing unchanged (26s/34s, within the
+      suggested 20-40s range).
+- [x] **`HeroWave` gained a `flip` prop**; Final CTA now passes `flip` instead of rendering the
+      exact same unflipped composition Home's hero uses — same curves, same design family,
+      mirrored, so it echoes the hero without being a pixel-identical copy.
+- [x] Intro/Trial section wave opacity raised slightly (0.06→0.12, 0.10→0.16) now that the
+      GEOMETRY itself reads as a wave — raising opacity on the old single-rise shapes would only
+      have made a more visible hill, so this was deliberately sequenced after the geometry fix, not
+      instead of it.
+
+Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676, unchanged — this
+pass touches only `src/components/platform/wave/**`, `src/components/platform/home/**`, and
+`globals.css`), `npm run build` all pass. Live-browser verification against the PRODUCTION build —
+desktop 1440×900 + mobile 390×844, English + Spanish: zero console/page/4xx-5xx errors, zero
+horizontal overflow; visually re-judged against the same 9 questions the brief posed — the hero,
+introduction, trial, and final-CTA waves ALL now read unambiguously as waves (multiple visible
+crests/troughs), not hills or blobs; the four treatments are recognizably one family (shared
+curve style, colour, fill+stroke formula) while remaining visually distinct from each other in
+crest count, scale, crop, and opacity; text stayed fully legible everywhere the wave crosses behind
+it, confirmed via close-up crops, not just the full-page view; `prefers-reduced-motion` reconfirmed
+via computed style (`animation-duration` ~0 on both wave layers). Armony's `/app` route
+screenshotted and confirmed unchanged — this pass touched no file outside the wave/Home-background
+system.
+
 ---
 
 # Infrastructure phases (resume after R1–R4)

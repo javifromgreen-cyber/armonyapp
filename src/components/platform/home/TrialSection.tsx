@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SectionWave } from "../wave/SectionWave";
+import { TRIAL_WAVE } from "../wave/wavePaths";
 
 /** product-spec.md §12 — an elegant visual band, not a conversion funnel. */
 export async function TrialSection() {
@@ -8,7 +9,7 @@ export async function TrialSection() {
 
   return (
     <section className="relative overflow-hidden border-y border-ona-border bg-ona-surface px-6 py-16 sm:py-20">
-      <SectionWave side="right" opacity={0.1} />
+      <SectionWave curve={TRIAL_WAVE} side="right" opacity={0.16} />
       <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-5 text-center">
         <h2 className="text-2xl font-semibold text-balance text-ona-fg sm:text-3xl">
           {t("headline")}

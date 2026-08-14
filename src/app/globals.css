@@ -163,19 +163,19 @@ html {
  */
 @keyframes wave-drift-primary {
   from {
-    transform: translate(0, 0);
+    transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(-2.5%, -1.2%);
+    transform: translate(-2.5%, -1.4%) scale(1.015);
   }
 }
 
 @keyframes wave-drift-secondary {
   from {
-    transform: translate(0, 0);
+    transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(2%, 1%);
+    transform: translate(2.2%, 1.2%) scale(1.02);
   }
 }
 

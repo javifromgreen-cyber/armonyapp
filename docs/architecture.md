@@ -659,3 +659,58 @@ flatten that back into one-node-per-edge.
   — locale preserved end-to-end, not just by inspecting the generated href. A final screenshot of
   `/app` (desktop + mobile, EN + ES) confirmed Armony itself pixel-unchanged apart from the
   back-link swap.
+- **P0 fourth follow-up: the waves finally read as waves, not hills.** User visual review of the
+  third follow-up's output found the geometry itself insufficient — the hero was "closest but could
+  flow more," the introduction wave "almost invisible," the trial wave "reads like a hill/blob."
+  Diagnosis: every curve so far had at most ONE rise-and-fall across its width — geometrically
+  indistinguishable from a hill/dome regardless of colour or opacity — and `SectionWave` rendered
+  fill only, with no crest stroke, so its shape had no defined edge to read at all. Both root
+  causes were fixed in `src/components/platform/wave/`, not papered over with more opacity:
+  - **New curve geometry, validated before being committed.** `wavePaths.ts`'s `HERO_PRIMARY`/
+    `HERO_SECONDARY` were rewritten and two brand-new curves added — `INTRO_WAVE`, `TRIAL_WAVE` —
+    each with 2-3 irregular, unevenly-spaced asymmetric crests (never a repeating sine — every hump
+    has different width/height than its neighbors, avoiding both the "hill" read and the
+    "equalizer" read). The old shared `EDGE_FRAGMENT` (one gentle rise, mirrored between Intro and
+    Trial) is gone — the two sections now each have their own distinct shape, matching the brief's
+    explicit "not a duplicate" requirement. Before committing to control-point values, several
+    candidate curves were rendered in an isolated static HTML page (flat stroke/fill only, no app
+    chrome) via a throwaway Playwright screenshot pass — never added to the repo — specifically so
+    the shape itself could be judged without the confound of section context; the current curves
+    are the ones that read unambiguously as "a wave" in that isolated test.
+  - **`SectionWave.tsx` gained a crest stroke.** It now takes an explicit `curve: WaveCurve` prop
+    (previously hardcoded to `EDGE_FRAGMENT`) and renders BOTH a translucent fill and a stroke
+    along the crest — opacity `min(fillOpacity × 3, 0.5)` — the same "fill + brighter contour"
+    formula `HeroWave` already used for the hero. This is the second half of the actual fix: a
+    filled blob without a defined edge cannot read as "a wave" no matter how visible its colour is.
+  - **Motion gained a very subtle scale breathe.** `wave-drift-primary`/`wave-drift-secondary`
+    (`globals.css`) now animate `scale(1) → scale(1.015)`/`scale(1.02)` alongside the existing
+    slow `translate`, adding a touch of organic "alive" quality per the brief's "slight
+    breathing/scale variation" suggestion. Timing (26s/34s, `ease-in-out infinite alternate`)
+    unchanged — already within the brief's suggested 20-40s range.
+  - **`HeroWave` gained a `flip` prop; Final CTA now uses it.** Rather than rendering the exact
+    same unflipped hero composition a second time (assessed as too repetitive per the brief's own
+    "inspect whether it feels too repetitive" instruction), `FinalCta.tsx` now passes `flip` —
+    mirrors the whole SVG group horizontally via `-scale-x-100` on the purely decorative
+    `aria-hidden` wrapper (the headline/CTA are siblings, unaffected) — same curves, same design
+    family, visually distinct enough to read as an echo rather than a copy.
+  - **Section wave opacity raised only AFTER the geometry fix**, not instead of it — Intro's fill
+    went from 0.06 to 0.12, Trial's from 0.10 to 0.16. Raising opacity on the OLD single-rise
+    shapes would have produced a more visible hill; sequencing the fix this way (shape first,
+    then intensity) was deliberate, per the brief's own "do not simply increase opacity... improve
+    the actual geometry."
+
+  Verified 2026-08-14: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676,
+  unchanged — this pass touches only files under `src/components/platform/wave/`,
+  `src/components/platform/home/`, and `globals.css`), `npm run build` all pass with zero errors.
+  Live-browser verification against the PRODUCTION build — desktop 1440×900 + mobile 390×844,
+  English + Spanish: zero console/page/4xx-5xx errors and zero horizontal overflow. Re-judged
+  against the brief's own 9 review questions rather than assuming the geometry fix was sufficient
+  just because it matched the instructions: the hero, introduction, trial, and final-CTA waves now
+  ALL show multiple visible crests/troughs and read unambiguously as waves, not hills/blobs; the
+  four are recognizably one family (shared curve style, petroleum colour, fill+stroke formula) yet
+  distinct from each other in crest count/scale/crop/opacity; text stayed fully legible everywhere
+  a wave crosses behind it, confirmed via pixel-level close-up crops of the intro and trial
+  sections specifically, not just the full-page screenshot; `prefers-reduced-motion` reconfirmed
+  via computed style (`animation-duration` collapses to ~0 on both wave layers). A final `/app`
+  screenshot (desktop + mobile, EN + ES) confirmed Armony itself untouched — this pass modified no
+  file outside the wave/Home-background system.

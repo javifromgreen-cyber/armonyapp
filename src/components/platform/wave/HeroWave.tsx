@@ -10,20 +10,27 @@ import { HERO_PRIMARY, HERO_SECONDARY, crestPath, fillPath } from "./wavePaths";
  * second, fainter, differently-shaped layer sits behind it for depth. Both
  * drift very slowly and independently (`wave-drift-*` in globals.css,
  * `prefers-reduced-motion`-safe) rather than a repeating tiled scroll.
+ *
+ * `flip` mirrors the whole composition horizontally — used by the Final CTA
+ * to echo the hero's exact wave language without rendering a pixel-identical
+ * copy of it.
  */
-export function HeroWave() {
+export function HeroWave({ flip = false }: { flip?: boolean }) {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 overflow-hidden ${flip ? "-scale-x-100" : ""}`}
+    >
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${HERO_PRIMARY.width} ${HERO_PRIMARY.height}`}
         preserveAspectRatio="xMidYMax slice"
       >
         <g className="animate-wave-secondary">
-          <path d={fillPath(HERO_SECONDARY)} fill="var(--ona-accent)" opacity="0.14" />
+          <path d={fillPath(HERO_SECONDARY)} fill="var(--ona-accent)" opacity="0.16" />
         </g>
         <g className="animate-wave-primary">
-          <path d={fillPath(HERO_PRIMARY)} fill="var(--ona-accent)" opacity="0.24" />
+          <path d={fillPath(HERO_PRIMARY)} fill="var(--ona-accent)" opacity="0.28" />
           <path
             d={crestPath(HERO_PRIMARY)}
             fill="none"
