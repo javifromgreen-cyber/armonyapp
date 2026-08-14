@@ -30,7 +30,7 @@ export async function ToolCard({ tool }: { tool: PlatformTool }) {
           ))}
         </ul>
         <Link
-          href={{ pathname: "/sign-in", query: { from: tool.id } }}
+          href={{ pathname: "/sign-in", query: { returnTo: tool.route } }}
           className="mt-auto inline-flex w-fit items-center gap-1 text-sm font-medium text-ona-accent transition-opacity hover:opacity-80"
         >
           {t("cta")} <span aria-hidden="true">→</span>

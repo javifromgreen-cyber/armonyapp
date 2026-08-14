@@ -1207,6 +1207,46 @@ is pixel-identical to before this follow-up except the untouched plain-text "Vol
 ONA" link (left as text, not swapped to the image mark, since it lives inside Armony's own toolbar
 styling, not the ONA platform shell).
 
+**Second follow-up (same phase): hero wave visibility, multi-territory card, mock-flow `returnTo`.**
+Three narrowly-scoped fixes; everything else (structure, copy, pricing, auth mocks, EN/ES,
+Armony) unchanged.
+- [x] **Hero wave made clearly visible without turning "techy."** A first attempt (raising per-path
+      opacity on the flat vector wave shapes) was rejected on inspection — at a visible opacity, the
+      hard-edged shape read as a bold graphic "poster" element, not the intended calm/artistic
+      backdrop. The shipped fix instead applies a soft blur (`filter: blur(48px)` on the wrapping
+      layer) so the same two accent-coloured wave layers read as an atmospheric glow rather than a
+      crisp shape — clearly perceptible on both desktop and mobile, headline/subtitle stay fully
+      readable, motion (and the reduced-motion override) unchanged.
+- [x] **Armony card rebuilt to demonstrate harmonic TERRITORIES, not just "a chord with neighbors."**
+      Replaced the single-territory (natural + one tension chord) snapshot with a verified,
+      real 5-territory excerpt from C in C major — F (natural), A7 (tension), Em (substitution), Ab
+      (modal colour), A (exploration) — confirmed against the actual
+      `relationshipsFrom`/`harmonicTerritoryFor` output (a throwaway Vitest scratch test, deleted
+      after use) rather than hand-picked. Organic, asymmetric placement (varying distance/angle per
+      node, exploration pushed farthest out) replaces the previous even/symmetrical arc; three of
+      the five nodes carry a small, subtle territory-name caption (Natural/Tension/Exploration) —
+      the other two rely on colour/dash alone, per the task's own "don't overcrowd" allowance.
+- [x] **Mock sign-in flow now returns to where the user started.** New
+      `src/platform/safeReturnTo.ts`: `resolveSafeReturnTo(returnTo, fallback)` checks the
+      requested destination against an explicit allowlist built from `platformTools`' real routes —
+      never a generic "starts with /" check — falling back to the given default for anything else
+      (missing, malformed, external, protocol-relative). The Armony card's CTA now links to
+      `/sign-in?returnTo=/app`; both mock "Continue with Google/email" buttons on the sign-in page
+      resolve to that validated destination. The header's plain "Sign in" link carries no
+      `returnTo`, so it still defaults to `/account`, unchanged.
+
+Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676, unchanged),
+`npm run build` all pass. Live-browser verification against the PRODUCTION build — desktop
+1440×900 + mobile 390×844, English + Spanish: zero console/page/4xx-5xx errors, zero horizontal
+overflow on any combination; the hero wave is visibly present as a soft glow without obscuring the
+headline; the Armony card renders all five labeled nodes legibly at real card size on both
+viewports; end-to-end click-through confirmed both flows through the actual UI (not just URL
+construction) — Armony "Try now" from the Spanish home page → sign-in (`returnTo=%2Fapp` in the
+URL, locale preserved) → mock "Continue with Google" → landed on `/es/app` (Armony, still in
+Spanish); the header's "Sign in" → sign-in (no `returnTo`) → mock "Continue with email" → landed on
+`/account`. Armony's `/app` route screenshotted and confirmed pixel-identical to before this
+follow-up.
+
 ---
 
 # Infrastructure phases (resume after R1–R4)

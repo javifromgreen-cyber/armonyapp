@@ -532,3 +532,66 @@ flatten that back into one-node-per-edge.
   visually identical to before this follow-up, including the still-plain-text (not image) "Volver a
   ONA"/"Back to ONA" link, which was intentionally left alone since it's styled with Armony's own
   tokens, not the ONA platform shell's.
+- **P0 second follow-up: hero wave visibility, multi-territory card, mock-flow `returnTo`.** Three
+  narrowly-scoped fixes; structure/copy/pricing/routes/EN-ES/Armony untouched.
+  - **Hero wave: blur, not just opacity.** `HeroWaves.tsx`'s first fix attempt (raising the flat
+    vector wave paths' opacity directly) was visually rejected — at an opacity high enough to be
+    "clearly visible," the hard SVG edge read as a bold, poster-like graphic shape, explicitly what
+    the brief called out as unwanted ("bright, neon, glossy, techy"). The shipped version instead
+    wraps both wave `<svg>` layers in one `<div style={{ filter: "blur(48px)" }}>` — the same two
+    accent-coloured shapes, now diffused into a soft atmospheric glow, letting opacity sit high
+    enough (0.35/0.45) to be unmistakably present while the blur keeps the result feeling ambient
+    rather than a bold vector illustration. Everything else about the component (the two-layer
+    parallax structure, the seamless `-50%` translate loop, the global `prefers-reduced-motion`
+    override) is untouched.
+  - **Armony card: a real, verified 5-territory excerpt, not a hand-picked one.** The previous
+    version showed one territory (natural) plus one tension chord — genuinely just "a chord
+    connected to a few neighbors," not a demonstration of Armony's territory concept. The new
+    `ToolCardVisual.tsx` data (F/A7/Em/Ab/A around center C) was confirmed against the ACTUAL
+    domain output before being hand-placed as SVG coordinates: a throwaway Vitest test
+    (`src/domain/graph/__scratch.test.ts`, written, run once via
+    `npx vitest run ... --reporter=verbose`, then deleted — never committed) called the real
+    `relationshipsFrom(parseChordSymbol("C"), context, 4)` and printed each edge's
+    `harmonicTerritoryFor` result, so every displayed (chord, territory) pair is a genuine,
+    currently-reachable relationship, not an invented one. Node placement is now intentionally
+    organic/asymmetric (varying radius and angle per node, with the exploration-territory node
+    pushed farthest from center to loosely echo "deeper relationship = more distant") rather than
+    the previous even semicircular arc, per the brief's "should feel more organic and exploratory,
+    not a symmetrical star." Three of five nodes carry a small (`fontSize 8`, ~75% opacity)
+    territory-name caption in the node's own territory colour; the other two (substitution, modal
+    colour) rely on colour + dash pattern alone, matching the brief's explicit permission not to
+    label every territory if it would crowd the thumbnail. Styling formulas and CSS custom
+    properties are unchanged from the prior pass (still no `@/domain` import at the component level
+    — the domain-verification step happened offline, in a deleted scratch test, not at render time).
+  - **Mock sign-in flow: `returnTo`, validated against a real allowlist.** New
+    `src/platform/safeReturnTo.ts` exports `resolveSafeReturnTo(returnTo, fallback)`: the requested
+    destination is checked against `new Set(platformTools.map(t => t.route))` — built from the
+    SAME central tool catalogue the marketing card already reads from, so a future second app is
+    automatically a valid `returnTo` target the moment it's added to `tools.ts`, with no separate
+    allowlist to maintain — and only an exact match is ever returned; anything else (undefined,
+    empty, an external URL, a protocol-relative `//host` path, an unrecognized internal path) falls
+    back to the caller's default. `ToolCard.tsx`'s CTA changed from `?from=<tool id>` (unused by
+    anything) to `?returnTo=<tool.route>` (`/sign-in?returnTo=/app` for Armony).
+    `src/app/[locale]/sign-in/page.tsx` reads `returnTo`, resolves it via `resolveSafeReturnTo(...,
+    "/account")`, and both mock "Continue with Google/email" `Link`s use that single resolved
+    `destination` string directly — no `as any` cast needed; a plain `string` href compiles cleanly
+    against next-intl's typed `Link` here, confirmed via `tsc --noEmit` before settling on this
+    approach over an earlier draft that assumed (incorrectly) a cast was required. The header's
+    "Sign in" link is unchanged — it still points at bare `/sign-in` with no `returnTo`, so it
+    continues to resolve to the `/account` default, matching the brief's explicit CASE B
+    requirement.
+
+  Verified 2026-08-14: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676,
+  unchanged — no `src/domain` file was committed with a diff; the scratch test used to verify the
+  card's chord/territory data was deleted before commit), `npm run build` all pass with zero
+  errors. Live-browser verification against the PRODUCTION build — desktop 1440×900 + mobile
+  390×844, English + Spanish: zero console/page/4xx-5xx errors and zero horizontal overflow on
+  every combination tested; the hero wave reads as a clearly-present soft glow with headline/
+  subtitle fully legible in both viewports; the Armony card shows all five labeled chord nodes
+  legibly at real rendered card size on both desktop and mobile. End-to-end flow verification
+  clicked through the real UI rather than only inspecting generated hrefs: from `/es`, clicking
+  Armony's "Try now" landed on `/es/sign-in?returnTo=%2Fapp`, and clicking the mock Google button
+  from there landed on `/es/app` — Armony, still in Spanish; separately, from `/`, clicking the
+  header's "Sign in" landed on `/sign-in` (no query string), and clicking the mock email button
+  from there landed on `/account`. A final screenshot of `/app` after all of the above confirmed
+  Armony itself unchanged.

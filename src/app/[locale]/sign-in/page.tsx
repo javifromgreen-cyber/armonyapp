@@ -2,14 +2,21 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { AuthShell } from "@/components/platform/AuthShell";
+import { resolveSafeReturnTo } from "@/platform/safeReturnTo";
 
 export const metadata: Metadata = { title: "ONA — Sign in" };
 
+const DEFAULT_DESTINATION = "/account";
+
 /**
- * Visual-only sign-in/trial-start screen (product-spec.md §17). No real
- * auth backend — both actions are structured as the future intended
- * destination (Account, carrying the same `from` app id) so the routing
- * shape is already correct once Google/email auth is wired in.
+ * Visual-only sign-in/trial-start screen (product-spec.md §17/§20). No real
+ * auth backend — both mock actions land on a `returnTo` destination
+ * (validated against the platform's own known app routes by
+ * `resolveSafeReturnTo`, never trusted blindly): arriving from an app's
+ * "Try now" sends the user back to that app after mock sign-in; arriving
+ * from the header's plain "Sign in" (no `returnTo`) lands on Account, same
+ * as today. The routing shape is already correct once real Google/email
+ * auth is wired in.
  */
 export default async function SignInPage({
   params,
@@ -17,7 +24,9 @@ export default async function SignInPage({
 }: PageProps<"/[locale]/sign-in">) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { from } = await searchParams;
+  const { returnTo } = await searchParams;
+  const returnToValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+  const destination = resolveSafeReturnTo(returnToValue, DEFAULT_DESTINATION);
 
   const t = await getTranslations("platform.signIn");
 
@@ -30,13 +39,13 @@ export default async function SignInPage({
         </div>
         <div className="flex w-full flex-col gap-3">
           <Link
-            href={{ pathname: "/account", query: from ? { from } : undefined }}
+            href={destination}
             className="w-full rounded-full bg-ona-accent px-5 py-3 text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90"
           >
             {t("continueWithGoogle")}
           </Link>
           <Link
-            href={{ pathname: "/account", query: from ? { from } : undefined }}
+            href={destination}
             className="w-full rounded-full border border-ona-border px-5 py-3 text-sm font-medium text-ona-fg transition-colors hover:border-ona-fg-muted"
           >
             {t("continueWithEmail")}

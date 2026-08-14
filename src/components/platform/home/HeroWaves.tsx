@@ -10,26 +10,34 @@ const WAVE_PATH =
  */
 export function HeroWaves() {
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 overflow-hidden opacity-60"
-    >
-      <svg
-        className="animate-hero-wave-slow absolute bottom-0 left-0 h-full w-[200%]"
-        viewBox="0 0 1600 200"
-        preserveAspectRatio="none"
-      >
-        <path d={WAVE_PATH} fill="var(--ona-accent)" opacity="0.18" />
-        <path d={WAVE_PATH} transform="translate(800 0)" fill="var(--ona-accent)" opacity="0.18" />
-      </svg>
-      <svg
-        className="animate-hero-wave-fast absolute bottom-0 left-0 h-2/3 w-[200%]"
-        viewBox="0 0 1600 200"
-        preserveAspectRatio="none"
-      >
-        <path d={WAVE_PATH} fill="var(--ona-surface)" opacity="0.9" />
-        <path d={WAVE_PATH} transform="translate(800 0)" fill="var(--ona-surface)" opacity="0.9" />
-      </svg>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/*
+        Two layers, both in the same petroleum accent (never the near-black
+        `--ona-surface`, which read as invisible dark-on-dark against
+        `--ona-bg`) — a soft blur turns the flat vector shapes into an
+        atmospheric glow rather than a bold, hard-edged graphic (what made an
+        earlier, higher-opacity, unblurred pass read as "neon"/"techy"), so
+        opacity can sit high enough to be clearly perceptible while the wave
+        itself still reads as soft and ambient, not a poster shape.
+      */}
+      <div className="absolute inset-0" style={{ filter: "blur(48px)" }}>
+        <svg
+          className="animate-hero-wave-slow absolute bottom-0 left-0 h-full w-[200%]"
+          viewBox="0 0 1600 200"
+          preserveAspectRatio="none"
+        >
+          <path d={WAVE_PATH} fill="var(--ona-accent)" opacity="0.35" />
+          <path d={WAVE_PATH} transform="translate(800 0)" fill="var(--ona-accent)" opacity="0.35" />
+        </svg>
+        <svg
+          className="animate-hero-wave-fast absolute bottom-0 left-0 h-2/3 w-[200%]"
+          viewBox="0 0 1600 200"
+          preserveAspectRatio="none"
+        >
+          <path d={WAVE_PATH} fill="var(--ona-accent)" opacity="0.45" />
+          <path d={WAVE_PATH} transform="translate(800 0)" fill="var(--ona-accent)" opacity="0.45" />
+        </svg>
+      </div>
     </div>
   );
 }
