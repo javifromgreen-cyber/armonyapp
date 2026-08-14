@@ -8,6 +8,7 @@ import { ToolsCatalogue } from "@/components/platform/home/ToolsCatalogue";
 import { TrialSection } from "@/components/platform/home/TrialSection";
 import { PricingSection } from "@/components/platform/home/PricingSection";
 import { FinalCta } from "@/components/platform/home/FinalCta";
+import { getPlatformAccess } from "@/platform/access";
 
 export const metadata: Metadata = {
   title: "ONA",
@@ -20,13 +21,15 @@ export default async function PlatformHomePage({
   const { locale } = await params;
   setRequestLocale(locale);
 
+  const access = await getPlatformAccess();
+
   return (
     <div className="ona-shell flex min-h-full flex-col bg-ona-bg text-ona-fg">
-      <PlatformHeader variant="public" />
+      <PlatformHeader variant={access ? "loggedIn" : "public"} />
       <main className="flex-1">
         <Hero />
         <IntroSection />
-        <ToolsCatalogue />
+        <ToolsCatalogue access={access} />
         <TrialSection />
         <PricingSection />
         <FinalCta />

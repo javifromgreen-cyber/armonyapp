@@ -1,33 +1,34 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { PlatformHeader } from "@/components/platform/PlatformHeader";
 import { PlatformFooter } from "@/components/platform/PlatformFooter";
 import { AccountStateCard } from "@/components/platform/account/AccountStateCard";
-import { getMockAccount, isMockAccessStatus } from "@/platform/mockAccount";
+import { getPlatformAccess } from "@/platform/access";
+import { signOutAction } from "@/platform/auth/signOutAction";
 
 export const metadata: Metadata = { title: "ONA — Account" };
 
 /**
- * Visual-only Account page (product-spec.md §18). No real session exists,
- * so the access status shown is centralized mock data (`getMockAccount`).
- * An optional `?state=` override (trialing/monthly/annual/cancelled) lets
- * every documented visual state be reviewed on the same Vercel preview
- * without building a live in-UI switcher — a fresh sign-up defaults to
- * `trialing`.
+ * Real Account page (ONA Functional Phase 1) — the mocked
+ * `getMockAccount`/`?state=` override is gone; every value here comes from
+ * `getPlatformAccess()`, which reads the authenticated Supabase user and
+ * their `platform_access` row. Deliberately minimal, per product-spec.md
+ * §18-19: access status, email, sign out — nothing else yet.
  */
 export default async function AccountPage({
   params,
-  searchParams,
 }: PageProps<"/[locale]/account">) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { state } = await searchParams;
-  const requestedState = Array.isArray(state) ? state[0] : state;
-  const account = getMockAccount(
-    requestedState && isMockAccessStatus(requestedState) ? requestedState : "trialing",
-  );
+
+  const access = await getPlatformAccess();
+  if (!access) {
+    return redirect({ href: { pathname: "/sign-in", query: { returnTo: "/account" } }, locale });
+  }
 
   const t = await getTranslations("platform.account");
+  const status = access.entitlements.status === "expired" ? "expired" : "trialing";
 
   return (
     <div className="ona-shell flex min-h-full flex-col bg-ona-bg text-ona-fg">
@@ -40,22 +41,24 @@ export default async function AccountPage({
             <h2 className="text-sm font-medium tracking-wide text-ona-fg-muted uppercase">
               {t("accessStatus")}
             </h2>
-            <AccountStateCard account={account} />
+            <AccountStateCard status={status} trialEndsAt={access.trialEndsAt} />
           </section>
 
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium tracking-wide text-ona-fg-muted uppercase">
               {t("email")}
             </h2>
-            <p className="text-ona-fg">{account.email}</p>
+            <p className="text-ona-fg">{access.email}</p>
           </section>
 
-          <button
-            type="button"
-            className="w-fit rounded-full border border-ona-border px-5 py-2 text-sm text-ona-fg-muted transition-colors hover:border-ona-fg-muted hover:text-ona-fg"
-          >
-            {t("signOut")}
-          </button>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="w-fit rounded-full border border-ona-border px-5 py-2 text-sm text-ona-fg-muted transition-colors hover:border-ona-fg-muted hover:text-ona-fg"
+            >
+              {t("signOut")}
+            </button>
+          </form>
         </div>
       </main>
       <PlatformFooter />

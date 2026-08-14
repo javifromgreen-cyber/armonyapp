@@ -1339,19 +1339,27 @@ system.
 
 # Infrastructure phases (resume after R1–R4)
 
-## Phase 10A — Authentication + 72-hour trial foundation
-- [ ] Supabase auth: email/password, verification, reset; Google OAuth
-- [ ] Onboarding (primary instrument, main goal)
-- [ ] `trial_started_at` set server-side at registration; trial status computable from it
+## Phase 10A — ONA Functional Phase 1: authentication + 72-hour trial foundation (done)
+- [x] Supabase auth — **revised while implementing**: Google OAuth + passwordless email only (no
+      password, no signup/verification/reset flows) — see the "ONA Functional Phase 1" deviations
+      entry below for why this replaced the originally-sketched email/password design.
+- [ ] Onboarding (primary instrument, main goal) — deliberately deferred, out of this phase's scope
+- [x] `trial_started_at` set server-side, exactly once, at first account creation (a DB trigger on
+      `auth.users`, not application code); trial status computable from it via
+      `src/domain/entitlements`
+- [x] `/app` protected server-side (unauthenticated → sign-in with `returnTo`; expired → Trial
+      Ended); real Account page, real header state, real sign-out
 
 ## Phase 10B — Project persistence
 - [ ] Project CRUD, RLS
 - [ ] Serialize/hydrate `Progression`/explorer state to/from a saved project
 
-## Phase 11 — Entitlement enforcement
-- [ ] Central entitlements module + `useEntitlements()` (`trialing`/`active`/`expired` →
-      `canUseApp`/`canSaveProjects`/`canExport`)
-- [ ] Server-side enforcement of post-trial/post-expiry access locking
+## Phase 11 — Entitlement enforcement (partially done — see Phase 10A above)
+- [x] Central entitlements module (`src/domain/entitlements`) — `trialing`/`expired` →
+      `canUseApp`/`canSaveProjects`/`canExport`; `active`/`past_due`/`canceled` are modeled but not
+      yet produced by anything (no billing exists yet)
+- [x] Server-side enforcement of post-trial access locking for `/app` (Phase 10A)
+- [ ] Remaining: nothing until Phase 12 (Stripe) introduces `active`/`past_due`/`canceled` for real
 
 ## Phase 12 — Annual Stripe billing
 - [ ] Checkout for the single Annual license (no Lifetime)
@@ -1379,3 +1387,23 @@ system.
   `docs/product-spec.md` §9/§19/§20/§25/§26 and this file's R1 entry above. Documentation-only;
   no code changed in this pass — Phases R2 (audio) and R3 (navigation) are the next controlled
   steps, each requiring separate approval before starting.
+
+- **2026-08-14 — ONA Functional Phase 1: real Supabase auth, 72-hour trial, `/app` protection.**
+  Replaced every previously-mocked auth/account/trial behavior (`src/platform/mockAccount.ts`,
+  now deleted) with real backend state, built on `@supabase/ssr`. Auth is Google OAuth +
+  passwordless email only — a deliberate narrowing of Phase 10A's original "email/password,
+  verification, reset; Google OAuth" sketch, decided at implementation time to avoid building and
+  maintaining a full password lifecycle (reset flows, breach exposure, verification emails) for a
+  product whose commercial model is a single 72-hour trial + one annual plan, not a password-based
+  account system. One sign-in screen serves both new and returning visitors. The 72-hour trial
+  starts exactly once, at first `auth.users` row creation, via a `SECURITY DEFINER` Postgres
+  trigger (`supabase/migrations/20260814120000_platform_access.sql`) — never in application code,
+  never per-session/device, never reset by sign-out+sign-in. `src/domain/entitlements` (pure,
+  framework-free, per `CLAUDE.md`'s domain-layer rule) computes `trialing`/`expired` only — `active`
+  stays reserved for Phase 12's Stripe integration, never faked. `/app` is protected server-side
+  (`src/app/[locale]/app/page.tsx` calls `getPlatformAccess()`; Armony's own map/audio/panel code is
+  untouched). See `docs/architecture.md`'s "Entitlements" and "Data model" sections and this repo's
+  `docs/supabase-setup.md` for the full design and required external Supabase/Google Cloud Console
+  setup. **Explicitly not done in this phase** (per the request that scoped it): Stripe, paid Pro
+  activation, billing portal, transactional emails, trial-reminder email, MIDI export, additional
+  apps, anti-fraud/fingerprinting — all remain future phases.

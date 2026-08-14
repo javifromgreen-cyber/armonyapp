@@ -25,7 +25,9 @@
         "name": "Armony",
         "description": "Explore progressions, discover new harmonic possibilities and hear where your music could go next.",
         "concepts": ["Harmony", "Exploration", "Composition"],
-        "cta": "Try now"
+        "cta": "Try now",
+        "ctaOpen": "Open",
+        "ctaGoPro": "Go Pro"
       }
     },
     "trial": {
@@ -66,7 +68,15 @@
       "headline": "Welcome to ONA",
       "subtitle": "Sign in or start your 72-hour trial to access every tool on the platform.",
       "continueWithGoogle": "Continue with Google",
-      "continueWithEmail": "Continue with email"
+      "continueWithEmail": "Continue with email",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "you@example.com",
+      "sendLink": "Send sign-in link",
+      "back": "Back",
+      "checkEmailHeadline": "Check your email",
+      "checkEmailBody": "We sent a sign-in link to {email}. Open it on this device to continue.",
+      "errorGeneric": "Something went wrong. Please try again.",
+      "errorAuth": "That sign-in link was invalid or has expired. Please try again."
     },
     "account": {
       "title": "Account",
@@ -77,6 +87,12 @@
       "trial": {
         "title": "Free trial",
         "endsAt": "Your trial ends on {date} at {time}.",
+        "cta": "Go Pro"
+      },
+      "expired": {
+        "title": "Trial ended",
+        "endedAt": "Your free trial ended on {date} at {time}.",
+        "body": "You can activate Pro to regain access to the tools.",
         "cta": "Go Pro"
       },
       "monthly": {

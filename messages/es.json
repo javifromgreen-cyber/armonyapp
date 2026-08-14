@@ -25,7 +25,9 @@
         "name": "Armony",
         "description": "Explora progresiones, descubre nuevas posibilidades armónicas y escucha cómo puede continuar tu música.",
         "concepts": ["Armonía", "Exploración", "Composición"],
-        "cta": "Probar ahora"
+        "cta": "Probar ahora",
+        "ctaOpen": "Abrir",
+        "ctaGoPro": "Pasar a Pro"
       }
     },
     "trial": {
@@ -66,7 +68,15 @@
       "headline": "Bienvenido a ONA",
       "subtitle": "Inicia sesión o empieza tu prueba de 72 horas para acceder a todas las herramientas de la plataforma.",
       "continueWithGoogle": "Continuar con Google",
-      "continueWithEmail": "Continuar con email"
+      "continueWithEmail": "Continuar con email",
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tucorreo@ejemplo.com",
+      "sendLink": "Enviar enlace de acceso",
+      "back": "Atrás",
+      "checkEmailHeadline": "Revisa tu correo",
+      "checkEmailBody": "Te hemos enviado un enlace de acceso a {email}. Ábrelo en este dispositivo para continuar.",
+      "errorGeneric": "Ha ocurrido un error. Inténtalo de nuevo.",
+      "errorAuth": "Ese enlace de acceso no es válido o ha caducado. Inténtalo de nuevo."
     },
     "account": {
       "title": "Cuenta",
@@ -77,6 +87,12 @@
       "trial": {
         "title": "Prueba gratuita",
         "endsAt": "Tu prueba termina el {date} a las {time}.",
+        "cta": "Pasar a Pro"
+      },
+      "expired": {
+        "title": "Prueba finalizada",
+        "endedAt": "Tu prueba gratuita terminó el {date} a las {time}.",
+        "body": "Puedes activar Pro para recuperar el acceso a las herramientas.",
         "cta": "Pasar a Pro"
       },
       "monthly": {

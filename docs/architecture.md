@@ -54,20 +54,21 @@ components from accumulating hidden harmonic rules.
 
 ## Entitlements
 
-**Revised R1, then R3.4** — R1 replaced the previous permanent `plan: "free" | "pro"` model
-(`docs/product-spec.md` §25/§26); R3.4 makes explicit that this entitlement is PLATFORM-LEVEL, not
-Armony-specific — Armony is documented as the first app in a future multi-app platform
-(`docs/product-spec.md` §0/§2), so this module (once built) must model one account-wide
+**Revised R1, then R3.4, then implemented in ONA Functional Phase 1** — R1 replaced the previous
+permanent `plan: "free" | "pro"` model (`docs/product-spec.md` §25/§26); R3.4 made explicit that
+this entitlement is PLATFORM-LEVEL, not Armony-specific — Armony is documented as the first app in
+a future multi-app platform (`docs/product-spec.md` §0/§2), so this module models one account-wide
 `trialing`/`active`/`expired` status shared by every platform app, never a per-app flag like
 `armony_pro`/`future_app_2_pro`. There is no permanent Free tier and no Lifetime license; access is
-governed by the 72-hour full-platform trial and a single annual Platform Pro license. **Not yet
-implemented as of R3.4** — this section documents the intended shape only.
+governed by the 72-hour full-platform trial and (in a future phase) a single annual Platform Pro
+license.
 
-A single module (`src/domain/entitlements`) maps an account's PLATFORM entitlement **status** to a
-typed capability object:
+`src/domain/entitlements` (framework-free — no React/Next/Supabase imports, per this file's
+`/domain` boundary rule) maps an account's PLATFORM entitlement **status** to a typed capability
+object:
 
 ```ts
-type EntitlementStatus = "trialing" | "active" | "expired"; // + reserved for later: "past_due" | "canceled"
+type EntitlementStatus = "trialing" | "active" | "expired" | "past_due" | "canceled";
 
 interface Entitlements {
   status: EntitlementStatus;
@@ -83,28 +84,51 @@ model — all four Zoom depths and each instrument's complete catalogue are part
 ever added for `active` accounts, is a decision for the phase that implements enforcement (Phase
 11), not decided here.
 
-Server-side, the user's entitlement status is derived from `trial_started_at` (set at registration)
-and the `subscriptions`/`entitlements` table (updated only by verified Stripe webhooks), never from
-client state. UI reads entitlements through a single hook (`useEntitlements()`) that wraps this —
-no `user.plan === "pro"` or ad-hoc trial-timer checks scattered through components.
+**As of ONA Functional Phase 1**, only `trialing`/`expired` are ever actually produced (by
+`src/platform/access/getPlatformAccess.ts`, comparing the DB-stored `trial_ends_at` against the
+server's own clock) — `active`/`past_due`/`canceled` remain reserved for Phase 12's Stripe
+integration and are never faked. Server-side, `getPlatformAccess()` is the single entry point:
+it calls Supabase's `getUser()` (JWT-revalidating, not the unsafe `getSession()`) to identify the
+visitor, reads their `platform_access` row, and derives status from `trial_ends_at` — never from
+client-supplied state. Every page/route that needs auth or access state calls this one function
+rather than talking to Supabase directly (`src/app/[locale]/app/page.tsx`,
+`src/app/[locale]/account/page.tsx`, the Home page, `sign-in`, `LegalPage`). There is no
+`useEntitlements()` client hook — access state is resolved server-side per request, matching the
+project's "never trust client-side entitlement state" rule.
 
-## Data model (initial, Supabase/Postgres)
+## Data model (Supabase/Postgres)
+
+**As implemented in ONA Functional Phase 1** (minimal, deliberately smaller than the fuller model
+sketched below — see "Deviations" for why):
+
+- `platform_access` — `user_id` (PK, references `auth.users`, cascade-deletes with the account),
+  `trial_started_at`, `trial_ends_at`, `created_at`. Row is created automatically by a
+  `SECURITY DEFINER` trigger (`handle_new_platform_user()`) on `auth.users` insert — see
+  `supabase/migrations/20260814120000_platform_access.sql` — never by application code, so no
+  service-role key is needed anywhere in the app. RLS: `select` only, scoped to
+  `auth.uid() = user_id`; there is deliberately no `insert`/`update`/`delete` policy, so the client
+  can never write or reset its own trial timestamps.
+
+**Sketched for future phases, not yet built:**
 
 - `profiles` — id (references `auth.users`), display_name, primary_instrument, main_goal,
-  locale, marketing_consent, created_at, `trial_started_at`.
-- `entitlements` — user_id, status (`trialing` | `active` | `expired`, reserved: `past_due` |
-  `canceled`), current_period_end (nullable), stripe_customer_id, stripe_subscription_id,
-  updated_at. **Revised R1**: the previous `plan` (`free` | `pro_annual` | `pro_lifetime`) column
-  is replaced by `status` above — there is only one paid product (Annual), so a `plan` column
-  distinguishing multiple paid tiers no longer applies.
+  locale, marketing_consent, created_at. (`trial_started_at` lives on `platform_access` instead,
+  as built — see above.)
+- `entitlements` — a fuller future table (user_id, status incl. `active`/`past_due`/`canceled`,
+  current_period_end, stripe_customer_id, stripe_subscription_id, updated_at) that Phase 12's
+  Stripe integration will need once `active` becomes a real status. `platform_access` is NOT this
+  table — it only ever tracks the trial window; Phase 12 will decide whether to extend
+  `platform_access` or add this table alongside it.
 - `projects` — id, user_id, name, key_context (nullable — no locked tonal key; this is the TONAL
   "free mode" concept from `docs/product-spec.md` §5/§6, unrelated to account entitlement status),
-  bpm, time_signature, instrument, created_at, updated_at.
-- `progression_chords` — id, project_id, chord_symbol, duration_beats, position, created_at.
+  instrument, created_at, updated_at. **Revised R3.4**: no `bpm`/`time_signature` columns — Armony
+  is not a rhythmic composition tool (`docs/product-spec.md` §16/§18).
+- `progression_chords` — id, project_id, chord_symbol, position, created_at. **Revised R3.4**: no
+  `duration_beats` column, matching the `projects` revision above.
 - `stripe_webhook_events` — event_id (unique, for idempotency), type, processed_at.
 
-RLS: every table except `stripe_webhook_events` is scoped `user_id = auth.uid()`. Webhook table is
-service-role only.
+RLS (future tables): scoped `user_id = auth.uid()`, except the webhook table which is service-role
+only.
 
 ## Preview deployment (recorded ahead of Phase 4, not yet set up)
 
@@ -714,3 +738,25 @@ flatten that back into one-node-per-edge.
   via computed style (`animation-duration` collapses to ~0 on both wave layers). A final `/app`
   screenshot (desktop + mobile, EN + ES) confirmed Armony itself untouched — this pass modified no
   file outside the wave/Home-background system.
+
+- **ONA Functional Phase 1 (2026-08-14) — real auth/trial/entitlements, minimal `platform_access`
+  table instead of the fuller sketched `entitlements` table.** All of `src/platform/mockAccount.ts`
+  is deleted; auth, the 72-hour trial, and `/app` protection are now real (`@supabase/ssr`, a DB
+  trigger, RLS) — see the "Entitlements" and "Data model" sections above for the shape, and
+  `docs/roadmap.md`'s matching deviations entry for the product-level rationale (notably: Google +
+  passwordless email only, no password lifecycle). Two implementation notes worth recording here
+  specifically as architecture decisions:
+  - **`unstable_rethrow` in `getPlatformAccess`/`refreshSupabaseSession`.** Both wrap their
+    Supabase calls in try/catch so a missing/unreachable Supabase config degrades to "visitor is
+    signed out" rather than crashing `next build`'s prerendering or the whole site. Without
+    `unstable_rethrow(error)` as the first line of the catch block, Next's own internal
+    control-flow signals (the dynamic-rendering bailout `cookies()` throws during static
+    generation, plus `redirect()`/`notFound()`) get swallowed and logged as if they were genuine
+    failures — `unstable_rethrow` lets those pass through untouched so only a real Supabase/env
+    error is ever caught.
+  - **`src/proxy.ts` composes two middlewares instead of the usual one-middleware-owns-the-response
+    pattern.** `refreshSupabaseSession(request)` (`src/platform/supabase/middleware.ts`) returns a
+    list of cookies to set rather than owning a `NextResponse`, so it can be layered onto whatever
+    response next-intl's locale-routing middleware produces (pass-through or redirect) — necessary
+    because Supabase's session-refresh needs to run in the same middleware pass as locale routing,
+    but next-intl's `createMiddleware` already owns response construction.

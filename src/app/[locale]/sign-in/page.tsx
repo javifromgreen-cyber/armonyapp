@@ -1,22 +1,24 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
+import { redirect } from "@/i18n/navigation";
 import { AuthShell } from "@/components/platform/AuthShell";
+import { SignInActions } from "@/components/platform/SignInActions";
 import { resolveSafeReturnTo } from "@/platform/safeReturnTo";
+import { getPlatformAccess } from "@/platform/access";
 
 export const metadata: Metadata = { title: "ONA — Sign in" };
 
 const DEFAULT_DESTINATION = "/account";
 
 /**
- * Visual-only sign-in/trial-start screen (product-spec.md §17/§20). No real
- * auth backend — both mock actions land on a `returnTo` destination
- * (validated against the platform's own known app routes by
- * `resolveSafeReturnTo`, never trusted blindly): arriving from an app's
- * "Try now" sends the user back to that app after mock sign-in; arriving
- * from the header's plain "Sign in" (no `returnTo`) lands on Account, same
- * as today. The routing shape is already correct once real Google/email
- * auth is wired in.
+ * Real sign-in/trial-start screen (ONA Functional Phase 1). One screen
+ * serves both a brand-new visitor (their 72-hour trial starts the moment
+ * Supabase creates their `auth.users` row — see
+ * `supabase/migrations/20260814120000_platform_access.sql`'s trigger) and a
+ * returning one (same account, same trial, restored). `returnTo` is
+ * validated by `resolveSafeReturnTo` and threaded through
+ * `SignInActions` -> `/auth/callback` so both Google OAuth and passwordless
+ * email land back on the right destination.
  */
 export default async function SignInPage({
   params,
@@ -24,9 +26,17 @@ export default async function SignInPage({
 }: PageProps<"/[locale]/sign-in">) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { returnTo } = await searchParams;
+  const { returnTo, authError } = await searchParams;
   const returnToValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
   const destination = resolveSafeReturnTo(returnToValue, DEFAULT_DESTINATION);
+
+  // Already signed in — sending them back through the sign-in screen would
+  // be confusing (and, for Google, would trigger a redundant OAuth round
+  // trip), so resolve the same safe destination immediately server-side.
+  const access = await getPlatformAccess();
+  if (access) {
+    return redirect({ href: destination, locale });
+  }
 
   const t = await getTranslations("platform.signIn");
 
@@ -37,20 +47,7 @@ export default async function SignInPage({
           <h1 className="text-2xl font-semibold text-ona-fg">{t("headline")}</h1>
           <p className="mt-2 text-sm text-ona-fg-muted">{t("subtitle")}</p>
         </div>
-        <div className="flex w-full flex-col gap-3">
-          <Link
-            href={destination}
-            className="w-full rounded-full bg-ona-accent px-5 py-3 text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90"
-          >
-            {t("continueWithGoogle")}
-          </Link>
-          <Link
-            href={destination}
-            className="w-full rounded-full border border-ona-border px-5 py-3 text-sm font-medium text-ona-fg transition-colors hover:border-ona-fg-muted"
-          >
-            {t("continueWithEmail")}
-          </Link>
-        </div>
+        <SignInActions returnTo={returnToValue} hasAuthError={authError === "1"} />
       </div>
     </AuthShell>
   );
