@@ -1101,12 +1101,77 @@ spec). Phase R4 (Export system, below) and any other remaining Armony-specific p
 revisited before or after Platform Foundation, depending on future direction — nothing here commits
 to an order between them.
 
+**Update (Phase P0, below):** the first bullet above — the shared website shell — has now been
+built as a VISUAL-ONLY preview (platform name decided: ONA). The remaining bullets
+(authentication, the real trial, entitlement enforcement, persistence, billing) are still fully
+unstarted; Phase P0 explicitly does not touch any of them.
+
 ## Phase R4 — Export system
 - [ ] Progression PDF; chord/instrument PDF; Piano representation PDF; Guitar diagram/TAB PDF;
       Guitar TAB/text; Bass pattern/TAB PDF; Bass TAB/text
 - [ ] Gated by entitlement status (`trialing`/`active`) once Phase 11 enforcement exists — until
       then, available in dev without gating (same "inspectable, not enforced yet" pattern used for
       Free/Pro catalogue tags in Phases 7–9)
+
+## Phase P0 — ONA platform shell (visual only)
+- [x] Platform name decided: **ONA** ("wave" in Catalan) — supersedes R3.4's "name undecided," still
+      not to be treated as unconditionally final without the user's explicit say-so
+- [x] Brand: typographic "ONA" wordmark (`src/components/platform/Logo.tsx`) — no approved logo
+      asset was supplied to this build, so no raster tracing/recreation was attempted; swapping in a
+      real asset later means editing this one file
+- [x] Separate `.ona-shell`-scoped color tokens (`src/app/globals.css`) — charcoal/warm-ivory/
+      petroleum-accent per spec, completely independent from Armony's own tokens, which are
+      untouched
+- [x] `platform` i18n namespace (EN/ES) covering header, hero, intro, tools, trial, pricing,
+      final CTA, footer, sign-in, account (all 4 states), trial-ended, and 3 legal placeholders —
+      the exact copy the spec provided verbatim; old unused `common`/`marketing` namespaces removed
+- [x] Centralized tool catalogue (`src/platform/tools.ts`) — Armony is the only entry; the
+      component that renders it is generic, so a second app is one array entry, not new UI
+- [x] Public + logged-in header variants, mobile menu drawer, locale switcher (persists locale
+      across navigation, including onto unprefixed routes via the existing next-intl cookie), footer
+- [x] Home: Hero (abstract animated wave backdrop, reduced-motion-safe, one CTA), short editorial
+      intro, Tools catalogue grid (Armony only, no fake "coming soon" cards, ready for more),
+      72-hour trial band, single-tier Pro pricing with a Monthly/Annual billing toggle, final CTA,
+      footer — `#tools`/`#pricing` in-page anchors from the header, no separate Apps/Pricing pages
+- [x] Sign-in (visual only — Google/email buttons navigate to `/account` as a routing placeholder,
+      no real auth), Account (visual only, mock data, all 4 documented states reachable via
+      `?state=` for review, no live countdown), Trial-ended (visual only), 3 legal placeholder pages
+- [x] Armony integration: one discreet "back to ONA" wordmark link
+      (`src/components/platform/PlatformBackLink.tsx`) added above `<ExplorerApp />` in
+      `src/app/[locale]/app/page.tsx` — styled with Armony's OWN tokens, not `.ona-shell`'s. No
+      other line of Armony (component, reducer, or domain module) touched.
+- [x] Explicitly NOT implemented, per the phase's own scope boundary: Supabase, real
+      Google/email auth, Stripe, real subscriptions/billing/webhooks, transactional email,
+      anti-abuse systems, a production database, a real trial timer, additional music apps,
+      "Coming soon" cards, MIDI export, and a global project system
+
+This is the first executed slice of "Roadmap After Armony"'s shared **Platform Foundation** —
+specifically its "shared website shell" line item, done visual-first per explicit instruction so the
+design can be reviewed on Vercel before any backend is wired in. It is NOT Phase 10A/10B/11/12/13 —
+those (real auth, persistence, entitlement enforcement, billing, full translation audit) remain
+fully unstarted; nothing in this phase creates or reads a real session, and the "logged-in" header
+variant / account states are reachable only by direct navigation, never by an actual sign-in. It
+also is not a redo of the already-planned Phase 14 ("Marketing website") — Phase 14's checklist
+(Home/Features/Pricing/FAQ/Login/Register/Privacy/Terms) is now substantially covered by this
+phase's visual output; what Phase 14 will still need once resumed is wiring Login/Register to real
+auth and any FAQ content this phase didn't include.
+
+Verified 2026-08-14: `npm run test` (676 tests, unchanged — this phase touches zero files under
+`src/domain`), `next typegen && tsc --noEmit`, `npm run lint`, `npm run build` all pass with zero
+errors or warnings; `next build`'s route table confirms every new route (`/`, `/sign-in`,
+`/account`, `/trial-ended`, `/privacy`, `/terms`, `/cookies`) prerenders per locale except
+`account`/`sign-in`, which are correctly dynamic (they read `searchParams`).
+
+Live-browser verification (Playwright, desktop 1440×900 + mobile 390×844, English + Spanish): zero
+console/page errors on every route in both viewports; mobile menu opens and lists Apps/Pricing/Sign
+in (or Account)/Try for free and closes on selection; clicking "Apps" in the header smooth-scrolls
+to the Tools section, landing correctly below the sticky header; the locale switcher persists across
+navigation to an unprefixed route (visited `/es` then `/account` in the same session and it still
+rendered in Spanish); all four account states (`?state=trialing|monthly|annual|cancelled`) render
+their documented copy with real formatted dates/times, no live countdown anywhere; the pricing
+Monthly/Annual toggle switches price and note text correctly; Armony's `/app` route (desktop and
+mobile) renders fully intact with the new back-link occupying one unobtrusive row that crowds
+nothing in the existing toolbar.
 
 ---
 

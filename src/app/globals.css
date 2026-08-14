@@ -26,6 +26,29 @@
   --chromatic: #c98cf0;
 }
 
+/*
+ * ONA platform-shell tokens (R4, docs/product-spec.md §0/§2's "future
+ * platform"). Deliberately a SEPARATE variable namespace from Armony's own
+ * tokens above, scoped to `.ona-shell` rather than `:root` — the platform
+ * marketing/account shell has its own distinct visual identity (charcoal +
+ * warm ivory + a restrained petroleum accent), while Armony keeps its own
+ * unrelated dark palette untouched everywhere under `/app`. Never merge
+ * these two token sets.
+ */
+.ona-shell {
+  color-scheme: dark;
+
+  --ona-bg: #0d0d0e;
+  --ona-surface: #171718;
+  --ona-border: rgba(242, 240, 233, 0.12);
+
+  --ona-fg: #f2f0e9;
+  --ona-fg-muted: #a8a6a0;
+
+  --ona-accent: #2e6f73;
+  --ona-accent-foreground: #f2f0e9;
+}
+
 .light {
   color-scheme: light;
 
@@ -63,11 +86,24 @@
   --color-chromatic: var(--chromatic);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-ona-bg: var(--ona-bg);
+  --color-ona-surface: var(--ona-surface);
+  --color-ona-border: var(--ona-border);
+  --color-ona-fg: var(--ona-fg);
+  --color-ona-fg-muted: var(--ona-fg-muted);
+  --color-ona-accent: var(--ona-accent);
+  --color-ona-accent-foreground: var(--ona-accent-foreground);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* In-page anchor nav (ONA header's Apps/Pricing links, product-spec.md §5) — reset to instant under prefers-reduced-motion by the blanket rule below. */
+html {
+  scroll-behavior: smooth;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -114,6 +150,30 @@ body {
   100% {
     transform: scale(1);
   }
+}
+
+/*
+ * ONA home hero's abstract wave backdrop (product-spec.md §8) — a slow,
+ * calm horizontal drift, never literal music notes. Deliberately plain CSS
+ * (no animation/canvas library): two translucent paths at different
+ * durations drift left at different speeds for subtle parallax. Neutralized
+ * for prefers-reduced-motion by the blanket rule above.
+ */
+@keyframes hero-wave-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-hero-wave-slow {
+  animation: hero-wave-drift 36s linear infinite;
+}
+
+.animate-hero-wave-fast {
+  animation: hero-wave-drift 22s linear infinite reverse;
 }
 
 .animate-map-arrive {

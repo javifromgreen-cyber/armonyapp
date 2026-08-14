@@ -1,20 +1,131 @@
 {
-  "common": {
-    "brand": "Armony",
-    "startFree": "Start Free",
-    "logIn": "Log in"
-  },
-  "marketing": {
-    "hero": {
-      "title": "See where your chords can go.",
-      "subtitle": "Explore harmony. Hear every path. Play it on your instrument. Build your progression."
+  "platform": {
+    "brand": "ONA",
+    "nav": {
+      "apps": "Apps",
+      "pricing": "Pricing",
+      "signIn": "Sign in",
+      "account": "Account",
+      "tryFree": "Try for free",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "backToPlatform": "Back to ONA"
     },
-    "loop": {
-      "explore": "Explore",
-      "understand": "Understand",
-      "hear": "Hear",
-      "play": "Play",
-      "compose": "Compose"
+    "hero": {
+      "headline": "Visual tools to explore, understand and create music.",
+      "subtitle": "New ways to see, hear and experience music.",
+      "cta": "Try for free"
+    },
+    "intro": {
+      "body": "Each tool is designed to help you explore a different dimension of music in a visual, practical and interactive way."
+    },
+    "tools": {
+      "title": "Tools",
+      "armony": {
+        "name": "Armony",
+        "description": "Explore progressions, discover new harmonic possibilities and hear where your music could go next.",
+        "concepts": ["Harmony", "Exploration", "Composition"],
+        "cta": "Try now"
+      }
+    },
+    "trial": {
+      "headline": "72 hours. Every tool. No card required.",
+      "body": "Create your account and enjoy 72 hours of full access to every app and feature on the platform.",
+      "steps": "Create your account → Explore everything for 72 hours → Decide whether to continue with Pro",
+      "cta": "Try for free"
+    },
+    "pricing": {
+      "title": "Pro",
+      "tagline": "Every tool. Every feature.",
+      "billing": {
+        "monthly": "Monthly",
+        "annual": "Annual"
+      },
+      "monthly": {
+        "price": "€7.99/month",
+        "note": "Pay month to month. Cancel anytime."
+      },
+      "annual": {
+        "price": "€59.99/year",
+        "note": "12 months of full access. Save approximately 37%.",
+        "equivalent": "Equivalent to around €5/month."
+      },
+      "cta": "Try free for 72 hours",
+      "secondary": "No card required."
+    },
+    "finalCta": {
+      "headline": "Explore music in a different way.",
+      "cta": "Try for free"
+    },
+    "footer": {
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "cookies": "Cookies"
+    },
+    "signIn": {
+      "headline": "Welcome to ONA",
+      "subtitle": "Sign in or start your 72-hour trial to access every tool on the platform.",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithEmail": "Continue with email"
+    },
+    "account": {
+      "title": "Account",
+      "accessStatus": "Access status",
+      "subscription": "Subscription",
+      "email": "Account email",
+      "signOut": "Sign out",
+      "trial": {
+        "title": "Free trial",
+        "endsAt": "Your trial ends on {date} at {time}.",
+        "cta": "Go Pro"
+      },
+      "monthly": {
+        "title": "Pro monthly",
+        "price": "€7.99/month",
+        "nextCharge": "Next charge: {date}",
+        "manage": "Manage subscription"
+      },
+      "annual": {
+        "title": "Pro annual",
+        "price": "€59.99/year",
+        "accessUntil": "Access until: {date}",
+        "manage": "Manage subscription"
+      },
+      "cancelled": {
+        "title": "Pro monthly · Cancelled",
+        "accessUntil": "You'll have access until {date}.",
+        "willNotRenew": "Your subscription will not renew."
+      }
+    },
+    "trialEnded": {
+      "headline": "Your free trial has ended",
+      "bodyIntro": "We hope you enjoyed exploring the tools.",
+      "bodyCta": "Continue with Pro to regain full access to every app and feature.",
+      "monthly": {
+        "price": "€7.99/month",
+        "note": "Cancel anytime."
+      },
+      "annual": {
+        "price": "€59.99/year",
+        "note": "12 months of access · save approximately 37%."
+      },
+      "cta": "Choose Pro",
+      "backHome": "Back to Home",
+      "backAccount": "Back to Account"
+    },
+    "legal": {
+      "privacy": {
+        "title": "Privacy",
+        "body": "This is a placeholder privacy page for the ONA platform visual preview. Full legal copy will be published before the platform's commercial launch."
+      },
+      "terms": {
+        "title": "Terms",
+        "body": "This is a placeholder terms page for the ONA platform visual preview. Full legal copy will be published before the platform's commercial launch."
+      },
+      "cookies": {
+        "title": "Cookies",
+        "body": "This is a placeholder cookies page for the ONA platform visual preview. Full legal copy will be published before the platform's commercial launch."
+      }
     }
   },
   "app": {

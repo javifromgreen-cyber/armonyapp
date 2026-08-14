@@ -32,9 +32,11 @@
       /bass                  fretboard model, patterns/arpeggios
       /piano                 keyboard model, voicings/inversions
     /entitlements            entitlement status (trialing/active/expired) -> capability flags, pure functions, no Stripe/Supabase imports
+  /platform                 platform-shell metadata — NOT music domain: tool catalogue (tools.ts), mock account data (mockAccount.ts, P0 only)
   /app/[locale]             Next.js App Router: marketing routes + /app (the product) routes, one locale segment
-                            globals.css (Tailwind entry + dark-first design tokens) lives in src/app
+                            globals.css (Tailwind entry + dark-first design tokens, plus the separate .ona-shell token set) lives in src/app
   /components               presentational + composed UI components (React), consume /domain only through hooks/adapters
+    /platform                ONA platform shell (header/footer/logo/locale switcher/home sections/account states) — separate from Armony's own components
   /server                   Supabase server clients, Stripe webhook handlers, route handlers
   /lib                      cross-cutting utilities (not music domain, not UI)
   /i18n                     next-intl routing/navigation/request config
@@ -412,3 +414,77 @@ flatten that back into one-node-per-edge.
     `docs/roadmap.md`'s "Roadmap After Armony" section records the intended future high-level
     sequence (Platform Foundation, then individually-designed future mini-apps) without building or
     scoping any of it now.
+- **Platform Foundation P0: ONA platform shell, visual only.** The platform's provisional name is
+  now decided — **ONA** ("wave" in Catalan) — superseding R3.4's "name undecided" note; still never
+  assume it becomes final without explicit confirmation. This phase builds the first VISUAL slice of
+  the "shared website shell" line item from `docs/roadmap.md`'s "Roadmap After Armony" (home,
+  sign-in, account, trial-ended, legal placeholders, tools catalogue) — explicitly NOT the
+  auth/entitlement/persistence/billing infrastructure those same bullets also list; that remains
+  Phases 10A–13, unstarted. Armony itself is untouched functionally — only a one-line discreet
+  back-link was added to its page shell.
+  - **New top-level `src/platform/` module** (deliberately NOT under `src/domain` — this is
+    product/catalogue metadata, not music theory): `tools.ts` holds the centralized app catalogue
+    (`{id, route}[]`, currently just `armony`) that `ToolsCatalogue`/`ToolCard` render generically
+    by localized-key lookup, so a second future app is one array entry, not a new component.
+    `mockAccount.ts` centralizes the ONLY invented account data in the codebase (email, access
+    status, a relevant date) behind `getMockAccount(status)`, so it's trivially deletable once a
+    real entitlement system (Phase 11) exists.
+  - **New `src/components/platform/` tree**: `PlatformHeader` (public/loggedIn variant prop, no
+    real session read), `PlatformFooter`, `Logo`/`LogoLink` (typographic "ONA" wordmark — no
+    approved raster/vector asset was supplied to this build; swapping in a real logo later means
+    editing this one file), `LocaleSwitcher` (swaps the locale segment via next-intl's locale-aware
+    router, preserving path/query/hash), `MobileNav` (a plain disclosure drawer, no new dependency),
+    `AuthShell` (minimal brand+language bar for the focused sign-in/trial-ended screens, deliberately
+    NOT the full marketing header), `LegalPage` (shared shell for the three placeholder legal
+    routes), `PlatformBackLink` (the sole ONA presence inside Armony — see below), and a `home/`
+    subtree (`Hero`, `HeroWaves`, `IntroSection`, `ToolsCatalogue`, `ToolCard`, `ToolCardVisual`,
+    `TrialSection`, `PricingSection`, `FinalCta`) plus an `account/AccountStateCard` covering the
+    four documented access states (trialing/monthly/annual/cancelled).
+  - **Separate token namespace, not a redesign of Armony's tokens.** `src/app/globals.css` adds a
+    SECOND, independent set of CSS variables scoped to a new `.ona-shell` class (`--ona-bg`,
+    `--ona-surface`, `--ona-border`, `--ona-fg`, `--ona-fg-muted`, `--ona-accent`,
+    `--ona-accent-foreground`), registered as `bg-ona-*`/`text-ona-*` Tailwind utilities via
+    `@theme inline`. Armony's own `--background`/`--surface`/`--accent`/etc. tokens (and the
+    harmonic-territory colors) are completely untouched — the two palettes never merge, matching the
+    governing spec's "the platform should be visually restrained enough that individual apps can
+    later introduce their own visual identities" and "Armony should visually belong to ONA without
+    losing its own identity." Every ONA page wraps its content in a `.ona-shell` div; nothing under
+    `/app` does.
+  - **Routes added**, all under `src/app/[locale]/`: `page.tsx` (replaced the old placeholder
+    marketing page with the full ONA home — Hero/Intro/ToolsCatalogue/TrialSection/PricingSection/
+    FinalCta, `#tools`/`#pricing` in-page anchors), `sign-in/page.tsx`, `account/page.tsx` (accepts
+    an optional `?state=` override across the four mock states for design review — not a live
+    in-UI switcher, so it can't be mistaken for a real state selector), `trial-ended/page.tsx`,
+    `privacy/page.tsx`, `terms/page.tsx`, `cookies/page.tsx`. `account`/`sign-in` render dynamically
+    (they read `searchParams`); everything else prerenders statically per locale, confirmed via
+    `next build`'s route table.
+  - **i18n**: the old `common`/`marketing` namespaces (only ever consumed by the placeholder home
+    page just replaced) were removed outright rather than left orphaned; a new `platform` namespace
+    holds every string this phase introduces, in both `messages/en.json` and `messages/es.json`,
+    with the exact EN/ES copy the governing spec specified verbatim. No hard-coded UI copy was
+    introduced anywhere in `src/components/platform` or the new routes.
+  - **Armony integration**: `src/app/[locale]/app/page.tsx` gained one import
+    (`PlatformBackLink`) rendered above `<ExplorerApp />` — a thin bar styled with Armony's OWN
+    existing `border`/`foreground-muted` tokens (not `.ona-shell`'s palette), linking to ONA Home.
+    `ExplorerApp.tsx` itself, its reducer, and every domain module are byte-for-byte untouched
+    (confirmed via `git diff` before commit).
+  - **Deliberately not implemented, per the phase's own explicit scope boundary**: Supabase, real
+    Google/email authentication, Stripe, real subscriptions/billing/webhooks, transactional email,
+    anti-abuse systems, a production database, a real 72-hour trial timer, additional music apps,
+    "Coming soon" cards, and MIDI export. The sign-in screen's two buttons and a tool card's "Try
+    now" link do navigate to `/account` as a structural placeholder for "where the user lands after
+    a real sign-up," carrying an unused `?from=` app id through the chain — but no session, cookie,
+    or account record is ever created; reloading `/account` directly shows the same mock trialing
+    state to anyone.
+
+  Verified 2026-08-14: `npm run test` (676 tests, unchanged — no domain code touched), `next
+  typegen && tsc --noEmit`, `npm run lint`, `npm run build` all pass with zero errors/warnings.
+  Live-browser verification (Playwright, desktop 1440×900 + mobile 390×844, English + Spanish):
+  zero console/page errors across home, `/app`, sign-in, all four account states (via `?state=`),
+  trial-ended, and `/privacy`; the mobile menu opens/closes and lists Apps/Pricing/Sign in/Try for
+  free; the header's "Apps" link scroll-anchors correctly to the Tools section under the sticky
+  header (`scroll-mt-20` clears it); the locale switcher persists across navigation (visiting
+  `/account` after `/es` correctly still renders Spanish, confirming the governing spec's "selected
+  locale persists through platform navigation" requirement); Armony's `/app` route renders fully
+  intact on both desktop and mobile with the new back-link occupying a single unobtrusive row above
+  the existing toolbar, crowding nothing.
