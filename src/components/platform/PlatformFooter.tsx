@@ -10,7 +10,7 @@ export async function PlatformFooter() {
   return (
     <footer className="ona-shell border-t border-ona-border bg-ona-bg">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6 py-10 text-sm sm:flex-row sm:justify-between">
-        <Logo className="text-base" />
+        <Logo heightPx={32} />
         <nav className="flex flex-wrap items-center justify-center gap-6 text-ona-fg-muted">
           <Link href="/privacy" className="transition-colors hover:text-ona-fg">
             {t("footer.privacy")}

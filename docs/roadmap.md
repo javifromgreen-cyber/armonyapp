@@ -1173,6 +1173,40 @@ Monthly/Annual toggle switches price and note text correctly; Armony's `/app` ro
 mobile) renders fully intact with the new back-link occupying one unobtrusive row that crowds
 nothing in the existing toolbar.
 
+**Follow-up (same phase): real ONA logo + Armony card refinement.** Two focused visual fixes on top
+of the above, once the approved logo image was supplied — structure/copy/routes/pricing/auth mocks
+unchanged.
+- [x] Processed the supplied logo into two transparent, ivory (`#F2F0E9`) PNGs under `public/brand/`
+      (`ona-logo-full.png` — the full lettering+waveform lockup; `ona-mark-compact.png` — a
+      waveform-only crop of the SAME asset, kept available as a compact fallback but not currently
+      needed anywhere at tested sizes) — no retracing/redrawing, straight background-removal +
+      recolor from the source file
+- [x] `Logo`/`LogoLink` now render the real asset (`next/image`, height-driven sizing, `variant`
+      prop for full vs. compact) everywhere the temporary typographic "ONA" mark previously
+      appeared: desktop/mobile header, footer, sign-in, account, trial-ended, and the 3 legal pages
+- [x] Confirmed the small floating circular "N" seen in earlier dev screenshots is Next.js's own
+      `next dev`-only indicator, not part of this codebase — absent from a production
+      `next build && next start` run; nothing to remove from shipped code
+- [x] Replaced the Armony card's generic unlabeled node/star graphic
+      (`ToolCardVisual.tsx`) with a small static excerpt of a real C-major harmonic-map state —
+      labeled chord nodes (C center; Dm/Em/F/Am natural; G7 tension), reusing the SAME node/edge
+      styling formulas and CSS custom properties as `MapNode.tsx`/`MapEdge.tsx` (filled accent
+      center vs. territory-coloured outlined candidates, the same per-territory dash-pattern
+      language) — no `@/domain` import, no live `HarmonicMap` reuse, just the same visual
+      vocabulary and colours
+
+Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676, unchanged),
+`npm run build` all pass. Live-browser verification against the PRODUCTION build (`next start`, not
+`next dev`, specifically to settle the "N" question) — desktop 1440×900 + mobile 390×844, English +
+Spanish: zero console/page/4xx-5xx errors on `/`, `/es`, `/app`, `/sign-in`, `/account`; no
+horizontal overflow on either viewport; the real logo reads clearly at header scale on both desktop
+and mobile and in the footer/sign-in/account close-ups; the Armony card visibly shows real chord
+labels (C/Dm/Em/F/Am/G7) with Armony's real accent/tonic/dominant colours and dash styling; the
+mobile menu still opens correctly with the logo in place; Armony's `/app` route (desktop + mobile)
+is pixel-identical to before this follow-up except the untouched plain-text "Volver a ONA"/"Back to
+ONA" link (left as text, not swapped to the image mark, since it lives inside Armony's own toolbar
+styling, not the ONA platform shell).
+
 ---
 
 # Infrastructure phases (resume after R1–R4)

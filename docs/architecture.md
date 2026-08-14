@@ -488,3 +488,47 @@ flatten that back into one-node-per-edge.
   locale persists through platform navigation" requirement); Armony's `/app` route renders fully
   intact on both desktop and mobile with the new back-link occupying a single unobtrusive row above
   the existing toolbar, crowding nothing.
+- **P0 follow-up: real ONA logo + Armony-map-style card thumbnail.** Two narrowly-scoped fixes once
+  the approved logo image was supplied, with everything else from P0 (structure, copy, routes,
+  pricing, auth mocks, EN/ES architecture, Armony) left untouched.
+  - **Real logo asset processing.** The supplied source image (light background, black ink) was
+    processed once, offline, into `public/brand/ona-logo-full.png` (the full lettering+waveform
+    lockup) and `public/brand/ona-mark-compact.png` (a waveform-only crop of the SAME asset) — both
+    transparent PNGs recolored to the platform's warm-ivory token (`#F2F0E9`), via a luminance-based
+    alpha extraction (background→transparent, ink→ivory) with no retracing or redrawing of the
+    lettering itself, then palette-quantized for file size. `src/components/platform/Logo.tsx` was
+    rewritten from a temporary `<span>` wordmark to a `next/image`-based component with a `variant`
+    prop (`"full" | "compact"`) and a `heightPx` prop that derives the rendered width from the
+    asset's real aspect ratio — every existing call site (`LogoLink` in `PlatformHeader`/
+    `AuthShell`, `Logo` in `PlatformFooter`) now renders the approved mark with no other changes
+    needed, confirming the original "modular, easy to replace later" design held. The compact
+    waveform-only mark is wired into the component API but not currently used anywhere — the full
+    lockup read clearly enough at real header/footer scale in live-browser testing that no call
+    site needed the fallback.
+  - **The stray circular "N" was Next.js's own dev indicator, not application code.** Confirmed by
+    running a PRODUCTION build (`next build && next start`, not `next dev`) and screenshotting the
+    same routes: the badge is absent. It never reaches the actual Vercel preview the user reviews
+    (Vercel serves the production build), so there was nothing in this codebase to remove.
+  - **Armony card thumbnail rebuilt from Armony's real map styling, not a generic diagram.**
+    `src/components/platform/home/ToolCardVisual.tsx` no longer renders an unlabeled abstract
+    node/star graphic — it now renders a small static excerpt of a real C-major harmonic-map state
+    (center chord `C`; `Dm`/`Em`/`F`/`Am` as natural-territory neighbors, `G7` as the
+    tension-territory dominant), with every node showing its real chord label. Node/edge styling
+    literally reuses the same CSS custom properties `src/components/map/MapNode.tsx`/`MapEdge.tsx`
+    read (`var(--color-accent)`, `var(--color-tonic)`, `var(--color-dominant)`, etc.) and the same
+    territory dash-pattern convention (`territoryVisuals.ts`), so the card's colors automatically
+    stay in sync with Armony's real palette — but it imports nothing from `@/domain` and does not
+    mount the live `HarmonicMap` component, keeping the marketing card a cheap static SVG rather
+    than a second consumer of the harmony engine.
+
+  Verified 2026-08-14: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test` (676,
+  unchanged), `npm run build` all pass with zero errors. Live-browser verification against the
+  PRODUCTION build specifically (to settle the "N" question with evidence, not assertion) —
+  desktop 1440×900 + mobile 390×844, English + Spanish: zero console/page/4xx-5xx errors on `/`,
+  `/es`, `/app`, `/sign-in`, `/account`; zero horizontal overflow on either viewport; the logo reads
+  clearly in the header (both breakpoints), footer, sign-in card, and account page; the Armony card
+  shows the real chord labels and colors described above at both desktop and mobile card widths;
+  the mobile menu still opens correctly with the new logo in the header; Armony's `/app` route is
+  visually identical to before this follow-up, including the still-plain-text (not image) "Volver a
+  ONA"/"Back to ONA" link, which was intentionally left alone since it's styled with Armony's own
+  tokens, not the ONA platform shell's.
