@@ -28,7 +28,6 @@ export default async function AccountPage({
   }
 
   const t = await getTranslations("platform.account");
-  const status = access.entitlements.status === "expired" ? "expired" : "trialing";
 
   return (
     <div className="ona-shell flex min-h-full flex-col bg-ona-bg text-ona-fg">
@@ -41,7 +40,11 @@ export default async function AccountPage({
             <h2 className="text-sm font-medium tracking-wide text-ona-fg-muted uppercase">
               {t("accessStatus")}
             </h2>
-            <AccountStateCard status={status} trialEndsAt={access.trialEndsAt} />
+            <AccountStateCard
+              status={access.entitlements.status}
+              trialEndsAt={access.trialEndsAt}
+              billing={access.billing}
+            />
           </section>
 
           <section className="flex flex-col gap-3">

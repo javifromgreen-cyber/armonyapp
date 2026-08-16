@@ -31,7 +31,7 @@ export default async function PlatformHomePage({
         <IntroSection />
         <ToolsCatalogue access={access} />
         <TrialSection />
-        <PricingSection />
+        <PricingSection isAuthenticated={!!access} isPro={access?.entitlements.status === "active"} />
         <FinalCta />
       </main>
       <PlatformFooter />

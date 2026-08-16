@@ -9,10 +9,9 @@
  * label it "anon public"; see `docs/supabase-setup.md`). Both values are
  * safe to ship to the browser by design — this key only ever grants what
  * RLS policies allow (see `supabase/migrations/`), never a privileged
- * bypass. Never read `SUPABASE_SERVICE_ROLE_KEY` (or any secret key) here —
- * that key must never reach client code and is not needed by ONA's
- * auth/trial architecture (trial-row creation runs entirely inside a
- * database trigger, not application code).
+ * bypass. Never read `SUPABASE_SECRET_KEY` here — that key must never reach
+ * client code; it's read only by `src/platform/supabase/admin.ts`, which a
+ * `"server-only"` import guards against ever landing in a client bundle.
  */
 export function getSupabasePublicEnv(): { url: string; publishableKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -53,7 +53,9 @@
         "equivalent": "Equivalent to around €5/month."
       },
       "cta": "Try free for 72 hours",
-      "secondary": "No card required."
+      "secondary": "No card required.",
+      "subscribeCta": "Subscribe now",
+      "alreadyPro": "You already have ONA Pro."
     },
     "finalCta": {
       "headline": "Explore music in a different way.",
@@ -108,9 +110,25 @@
         "manage": "Manage subscription"
       },
       "cancelled": {
-        "title": "Pro monthly · Cancelled",
         "accessUntil": "You'll have access until {date}.",
         "willNotRenew": "Your subscription will not renew."
+      },
+      "pastDue": {
+        "title": "Payment issue",
+        "body": "We couldn't process your latest payment. Stripe is automatically retrying — your Pro access continues in the meantime. Please check your payment method."
+      },
+      "manageNote": "Subscription and payment management for ONA Pro is handled by Stripe Link.",
+      "goPro": {
+        "monthly": {
+          "price": "€7.99/month",
+          "note": "Pay month to month. Cancel anytime.",
+          "cta": "Choose monthly"
+        },
+        "annual": {
+          "price": "€59.99/year",
+          "note": "12 months of full access. Save approximately 37%.",
+          "cta": "Choose annual"
+        }
       }
     },
     "trialEnded": {
@@ -119,15 +137,34 @@
       "bodyCta": "Continue with Pro to regain full access to every app and feature.",
       "monthly": {
         "price": "€7.99/month",
-        "note": "Cancel anytime."
+        "note": "Cancel anytime.",
+        "cta": "Choose monthly"
       },
       "annual": {
         "price": "€59.99/year",
-        "note": "12 months of access · save approximately 37%."
+        "note": "12 months of access · save approximately 37%.",
+        "cta": "Choose annual"
       },
-      "cta": "Choose Pro",
       "backHome": "Back to Home",
       "backAccount": "Back to Account"
+    },
+    "billing": {
+      "startingCheckout": "Starting checkout…",
+      "checkoutError": "Something went wrong starting checkout. Please try again.",
+      "alreadySubscribed": "You already have an active ONA Pro subscription.",
+      "success": {
+        "title": "Thanks for subscribing",
+        "confirming": "We're confirming your payment with Stripe — this can take a few seconds. If your status doesn't update right away, refresh this page or check your Account.",
+        "active": "ONA Pro is active on your account.",
+        "ctaAccount": "Go to Account",
+        "ctaApp": "Open Armony"
+      },
+      "cancel": {
+        "title": "Checkout cancelled",
+        "body": "No payment was made and nothing changed on your account.",
+        "ctaPricing": "Back to pricing",
+        "ctaAccount": "Back to Account"
+      }
     },
     "legal": {
       "privacy": {

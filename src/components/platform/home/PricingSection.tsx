@@ -3,16 +3,32 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { CheckoutButton } from "@/components/platform/billing/CheckoutButton";
 
 type BillingPeriod = "monthly" | "annual";
 
 /**
  * product-spec.md §13 — a single Pro tier; monthly/annual are billing
  * periods of the SAME access, never separate feature tiers. Client
- * component only because of the local toggle state.
+ * component only because of the local toggle state (now also because the
+ * CTA itself is a real Checkout button for an eligible authenticated
+ * visitor — ONA Functional Phase 2).
+ *
+ * `isAuthenticated`/`isPro` are the only access state this component
+ * receives — plain booleans computed server-side by the Home page, not the
+ * full `PlatformAccess` object, so this stays a simple serializable prop
+ * boundary rather than threading Supabase-shaped data into a client
+ * component.
  */
-export function PricingSection() {
+export function PricingSection({
+  isAuthenticated,
+  isPro,
+}: {
+  isAuthenticated: boolean;
+  isPro: boolean;
+}) {
   const t = useTranslations("platform.pricing");
+  const tNav = useTranslations("platform.nav");
   const [period, setPeriod] = useState<BillingPeriod>("annual");
 
   return (
@@ -53,13 +69,35 @@ export function PricingSection() {
           </div>
         )}
 
-        <Link
-          href="/sign-in"
-          className="w-full rounded-full bg-ona-accent px-6 py-3 text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90"
-        >
-          {t("cta")}
-        </Link>
-        <p className="text-xs text-ona-fg-muted">{t("secondary")}</p>
+        {!isAuthenticated && (
+          <>
+            <Link
+              href="/sign-in"
+              className="w-full rounded-full bg-ona-accent px-6 py-3 text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90"
+            >
+              {t("cta")}
+            </Link>
+            <p className="text-xs text-ona-fg-muted">{t("secondary")}</p>
+          </>
+        )}
+        {isAuthenticated && isPro && (
+          <>
+            <p className="text-sm text-ona-fg-muted">{t("alreadyPro")}</p>
+            <Link
+              href="/account"
+              className="w-full rounded-full bg-ona-accent px-6 py-3 text-center text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90"
+            >
+              {tNav("account")}
+            </Link>
+          </>
+        )}
+        {isAuthenticated && !isPro && (
+          <CheckoutButton
+            plan={period}
+            label={t("subscribeCta")}
+            className="w-full rounded-full bg-ona-accent px-6 py-3 text-sm font-medium text-ona-accent-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        )}
       </div>
     </section>
   );

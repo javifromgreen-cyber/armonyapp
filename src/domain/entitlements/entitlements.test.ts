@@ -28,9 +28,4 @@ describe("entitlementsFor", () => {
       canExport: false,
     });
   });
-
-  it("denies every capability for past_due and canceled", () => {
-    expect(entitlementsFor("past_due").canUseApp).toBe(false);
-    expect(entitlementsFor("canceled").canUseApp).toBe(false);
-  });
 });

@@ -54,21 +54,23 @@ components from accumulating hidden harmonic rules.
 
 ## Entitlements
 
-**Revised R1, then R3.4, then implemented in ONA Functional Phase 1** — R1 replaced the previous
-permanent `plan: "free" | "pro"` model (`docs/product-spec.md` §25/§26); R3.4 made explicit that
-this entitlement is PLATFORM-LEVEL, not Armony-specific — Armony is documented as the first app in
-a future multi-app platform (`docs/product-spec.md` §0/§2), so this module models one account-wide
-`trialing`/`active`/`expired` status shared by every platform app, never a per-app flag like
+**Revised R1, then R3.4, implemented in ONA Functional Phase 1, extended in Phase 2 with real
+Stripe Pro** — R1 replaced the previous permanent `plan: "free" | "pro"` model
+(`docs/product-spec.md` §25/§26); R3.4 made explicit that this entitlement is PLATFORM-LEVEL, not
+Armony-specific — Armony is documented as the first app in a future multi-app platform
+(`docs/product-spec.md` §0/§2), so this module models one account-wide `trialing`/`active`/
+`expired` status shared by every platform app, never a per-app flag like
 `armony_pro`/`future_app_2_pro`. There is no permanent Free tier and no Lifetime license; access is
-governed by the 72-hour full-platform trial and (in a future phase) a single annual Platform Pro
-license.
+governed by the 72-hour full-platform trial and, as of Phase 2, a real annual/monthly Platform Pro
+subscription via Stripe (`CLAUDE.md`'s commercial model: one subscription unlocks every app, no
+tiers).
 
-`src/domain/entitlements` (framework-free — no React/Next/Supabase imports, per this file's
-`/domain` boundary rule) maps an account's PLATFORM entitlement **status** to a typed capability
-object:
+`src/domain/entitlements` (framework-free — no React/Next/Supabase/**Stripe** imports, per this
+file's `/domain` boundary rule, which names Stripe explicitly for this exact reason) maps an
+account's PLATFORM entitlement **status** to a typed capability object:
 
 ```ts
-type EntitlementStatus = "trialing" | "active" | "expired" | "past_due" | "canceled";
+type EntitlementStatus = "trialing" | "active" | "expired";
 
 interface Entitlements {
   status: EntitlementStatus;
@@ -84,51 +86,100 @@ model — all four Zoom depths and each instrument's complete catalogue are part
 ever added for `active` accounts, is a decision for the phase that implements enforcement (Phase
 11), not decided here.
 
-**As of ONA Functional Phase 1**, only `trialing`/`expired` are ever actually produced (by
-`src/platform/access/getPlatformAccess.ts`, comparing the DB-stored `trial_ends_at` against the
-server's own clock) — `active`/`past_due`/`canceled` remain reserved for Phase 12's Stripe
-integration and are never faked. Server-side, `getPlatformAccess()` is the single entry point:
-it calls Supabase's `getUser()` (JWT-revalidating, not the unsafe `getSession()`) to identify the
-visitor, reads their `platform_access` row, and derives status from `trial_ends_at` — never from
-client-supplied state. Every page/route that needs auth or access state calls this one function
-rather than talking to Supabase directly (`src/app/[locale]/app/page.tsx`,
-`src/app/[locale]/account/page.tsx`, the Home page, `sign-in`, `LegalPage`). There is no
+`EntitlementStatus` is the OVERALL tri-state result, not Stripe's own richer per-subscription
+vocabulary — that lives separately as `StripeSubscriptionStatus`
+(`src/domain/entitlements/billing.ts`: `active`/`trialing`/`past_due`/`canceled`/`incomplete`/
+`incomplete_expired`/`unpaid`/`paused`, matching Stripe's `Subscription.status` values). `"active"`
+here means "has Pro access right now", computed by `hasProAccess` from the stored
+`StripeSubscriptionStatus` + `currentPeriodEnd` — `active`/`trialing` grant access while their
+period hasn't lapsed, `past_due` grants it unconditionally while Stripe retries payment, every
+other raw status denies it. `computeOverallStatus`
+(`src/domain/entitlements/overallStatus.ts`) is the entire "trial and Pro are independent" rule
+from product-spec.md §9 in one place: Pro always wins when present, otherwise the account falls
+back to its own 72-hour trial's `trialing`/`expired` status — trial timestamps are never touched by
+billing events (separate tables, separate writers — see "Data model" below), so a canceled
+subscription never restarts or shortens a still-active original trial, and Pro overrides an
+already-expired one.
+
+Server-side, `getPlatformAccess()` (`src/platform/access/getPlatformAccess.ts`) is the single entry
+point: it calls Supabase's `getUser()` (JWT-revalidating, not the unsafe `getSession()`) to
+identify the visitor, reads both `platform_access` (trial) and `platform_billing` (Stripe) rows,
+and combines them via `computeOverallStatus` — never from client-supplied state. The
+`platform_billing` read has its OWN isolated error handling (`fetchBillingSnapshot`): a failure
+there (including the Phase 2 migration not having been applied yet in some environment) fails
+closed for Pro without taking down trial-based access. Every page/route that needs auth or access
+state calls this one function rather than talking to Supabase directly. There is no
 `useEntitlements()` client hook — access state is resolved server-side per request, matching the
 project's "never trust client-side entitlement state" rule.
 
+### Stripe integration (Phase 2)
+
+- `src/platform/stripe/env.ts` — the only place `STRIPE_SECRET_KEY`, the two configured Price IDs,
+  and `STRIPE_WEBHOOK_SECRET` are read from, mirroring `src/platform/supabase/env.ts`'s pattern.
+  Guarded by `import "server-only"` so an accidental client-bundle import is a build-time error.
+  `STRIPE_WEBHOOK_SECRET` is read only by the webhook route, not by checkout — the app must build
+  and the checkout flow must work before that secret exists (see `docs/stripe-billing-setup.md`).
+- `src/platform/stripe/client.ts` — the single `getStripeClient()` factory, pinned to the installed
+  `stripe@22.5.0` package's own default API version (`2026-07-29.dahlia`) explicitly rather than
+  implicitly, so a future SDK bump that changes the default is a reviewed TypeScript error, not a
+  silent behavior change.
+- `src/platform/supabase/admin.ts` — the ONLY Supabase client allowed to bypass RLS, built directly
+  with `@supabase/supabase-js`'s `createClient` (not the cookie-aware `@supabase/ssr` client),
+  session persistence/refresh both disabled since it's never tied to a visitor. Used exclusively by
+  `src/app/api/stripe/checkout` and `src/app/api/stripe/webhook` to write `platform_billing`.
+- `src/app/api/stripe/checkout/route.ts` — creates a Stripe-hosted Checkout Session
+  (`mode: "subscription"`, `managed_payments: { enabled: true }`, quantity 1). The client sends
+  only a trusted `"monthly" | "annual"` plan identifier — never a raw Price ID — resolved
+  server-side via `getStripePriceId`. Reuses an existing Stripe Customer for the account if one is
+  on file; verifies against Stripe's own live subscription state (not local data) before blocking a
+  duplicate active subscription.
+- `src/app/api/stripe/webhook/route.ts` — the authoritative sync path. Verifies the raw-body Stripe
+  signature before doing anything else; fails closed (503) if `STRIPE_WEBHOOK_SECRET` isn't
+  configured yet. Idempotent via `stripe_webhook_events`: an event ID is recorded only AFTER its
+  sync succeeds, never before, so a failed sync can still be retried. For every relevant event,
+  always re-`retrieve()`s the CURRENT subscription state from Stripe rather than trusting the
+  event payload's own snapshot, to self-correct against out-of-order delivery.
+- `src/platform/stripe/syncSubscription.ts` — `syncSubscriptionToSupabase` writes the full current
+  billing snapshot (never an incremental delta) keyed by the Supabase user id in the
+  subscription's own metadata (set by this app's checkout route, never trusted from anywhere the
+  customer could influence). A subscription with no such metadata is refused, not guessed at.
+
 ## Data model (Supabase/Postgres)
 
-**As implemented in ONA Functional Phase 1** (minimal, deliberately smaller than the fuller model
-sketched below — see "Deviations" for why):
+**As implemented (ONA Functional Phase 1 + Phase 2)**, deliberately smaller than the fuller model
+originally sketched below — see "Deviations" for why:
 
 - `platform_access` — `user_id` (PK, references `auth.users`, cascade-deletes with the account),
   `trial_started_at`, `trial_ends_at`, `created_at`. Row is created automatically by a
   `SECURITY DEFINER` trigger (`handle_new_platform_user()`) on `auth.users` insert — see
-  `supabase/migrations/20260814120000_platform_access.sql` — never by application code, so no
-  service-role key is needed anywhere in the app. RLS: `select` only, scoped to
-  `auth.uid() = user_id`; there is deliberately no `insert`/`update`/`delete` policy, so the client
-  can never write or reset its own trial timestamps.
+  `supabase/migrations/20260814120000_platform_access.sql` — never by application code. RLS:
+  `select` only, scoped to `auth.uid() = user_id`; no `insert`/`update`/`delete` policy, so the
+  client can never write or reset its own trial timestamps. **Untouched by Phase 2** — billing
+  events never write here, by design (see "Entitlements" above).
+- `platform_billing` (Phase 2, `supabase/migrations/20260816120000_platform_billing.sql`) —
+  `user_id` (PK), `stripe_customer_id`, `stripe_subscription_id`, `stripe_price_id`, `plan`
+  (`"monthly" | "annual"`, derived server-side from the trusted configured Price IDs — never
+  inferred from amount or trusted from Stripe/client input), `subscription_status` (Stripe's raw
+  status string), `current_period_end`, `cancel_at_period_end`, `created_at`, `updated_at`. RLS:
+  `select` only for `authenticated`, scoped to the caller's own row; no write policy for any
+  client-facing role — only the admin client (service/secret key, bypasses RLS) writes it.
+- `stripe_webhook_events` (Phase 2, same migration) — `event_id` (PK, for idempotency),
+  `event_type`, `stripe_created_at`, `processed_at`. No RLS policies at all for any client-facing
+  role — zero browser access, read or write, under any circumstance.
 
 **Sketched for future phases, not yet built:**
 
 - `profiles` — id (references `auth.users`), display_name, primary_instrument, main_goal,
   locale, marketing_consent, created_at. (`trial_started_at` lives on `platform_access` instead,
   as built — see above.)
-- `entitlements` — a fuller future table (user_id, status incl. `active`/`past_due`/`canceled`,
-  current_period_end, stripe_customer_id, stripe_subscription_id, updated_at) that Phase 12's
-  Stripe integration will need once `active` becomes a real status. `platform_access` is NOT this
-  table — it only ever tracks the trial window; Phase 12 will decide whether to extend
-  `platform_access` or add this table alongside it.
 - `projects` — id, user_id, name, key_context (nullable — no locked tonal key; this is the TONAL
   "free mode" concept from `docs/product-spec.md` §5/§6, unrelated to account entitlement status),
   instrument, created_at, updated_at. **Revised R3.4**: no `bpm`/`time_signature` columns — Armony
   is not a rhythmic composition tool (`docs/product-spec.md` §16/§18).
 - `progression_chords` — id, project_id, chord_symbol, position, created_at. **Revised R3.4**: no
   `duration_beats` column, matching the `projects` revision above.
-- `stripe_webhook_events` — event_id (unique, for idempotency), type, processed_at.
 
-RLS (future tables): scoped `user_id = auth.uid()`, except the webhook table which is service-role
-only.
+RLS (future tables): scoped `user_id = auth.uid()`.
 
 ## Preview deployment (recorded ahead of Phase 4, not yet set up)
 
@@ -774,3 +825,34 @@ flatten that back into one-node-per-edge.
   (`decideAppAccess`) — a small pure function factoring `/app`'s three-way redirect decision
   (sign-in / trial-ended / allow) out of `app/page.tsx` so it's unit-testable without mocking
   Next.js or Supabase; the actual redirect wiring and production behavior are unchanged.
+
+- **ONA Functional Phase 2 (2026-08-16) — Stripe Pro subscriptions.** Extends the tri-state
+  `EntitlementStatus` (`trialing`/`active`/`expired`) with a real Stripe-backed `"active"` (Pro)
+  instead of Phase 1's reserved-but-unused value; the reserved `"past_due"`/`"canceled"` literals
+  that used to live directly on `EntitlementStatus` are removed from that type — they're modeled
+  properly now, as a separate `StripeSubscriptionStatus` union in
+  `src/domain/entitlements/billing.ts`, since Stripe's own subscription-status vocabulary is richer
+  than the three-state platform-level access this app actually needs to render. See the
+  "Entitlements"/"Data model" sections above for the full shape and `docs/stripe-billing-setup.md`
+  for the required external Stripe/Supabase setup. Two implementation notes worth recording here:
+  - **`import "server-only"` on the new secret-touching modules, and its Vitest workaround.**
+    `src/platform/stripe/{env,client}.ts` and `src/platform/supabase/admin.ts` all import
+    `"server-only"` — a marker package that unconditionally throws when resolved outside a
+    bundler's `react-server` condition, turning an accidental client-bundle import into a
+    build-time error. Since Vitest doesn't set that condition, importing these modules directly in
+    a test throws; the fix (used in `src/platform/stripe/env.test.ts` and
+    `syncSubscription.test.ts`) is `vi.mock("server-only", () => ({}))` before importing the module
+    under test — the standard pattern for unit-testing a server-only-guarded module without
+    weakening the guard itself. Phase 1's Supabase `env.ts`/`client.ts`/`server.ts` don't use this
+    guard because `env.ts` deliberately serves both the browser AND server Supabase clients (it
+    only ever holds public values) — the guard is new to Phase 2's genuinely secret-only modules.
+  - **A caught bug: the checkout route crashed with a raw 500 instead of failing closed.** During
+    verification, POSTing to `/api/stripe/checkout` without Supabase env configured threw an
+    unhandled exception (`createSupabaseServerClient()`'s own `getSupabasePublicEnv()` throw was
+    never caught in the route) instead of the intended 401. Fixed by wrapping the
+    user-authentication lookup in its own try/catch that treats any failure as unauthenticated —
+    matching `getPlatformAccess()`'s own established fail-closed pattern — and by wrapping the
+    subsequent `platform_billing` pre-check read the same way (falling back to "no existing
+    customer on file" rather than crashing). Caught via manual smoke testing against a local dev
+    server with no Stripe/Supabase env vars set, not by an automated test — recorded here as a
+    concrete example of why that manual pass matters even with heavy unit-test coverage elsewhere.

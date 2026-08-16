@@ -1,1 +1,1 @@
-export { getPlatformAccess, type PlatformAccess } from "./getPlatformAccess";
+export { getPlatformAccess, type PlatformAccess, type BillingSnapshot } from "./getPlatformAccess";

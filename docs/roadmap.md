@@ -1354,16 +1354,27 @@ system.
 - [ ] Project CRUD, RLS
 - [ ] Serialize/hydrate `Progression`/explorer state to/from a saved project
 
-## Phase 11 — Entitlement enforcement (partially done — see Phase 10A above)
-- [x] Central entitlements module (`src/domain/entitlements`) — `trialing`/`expired` →
-      `canUseApp`/`canSaveProjects`/`canExport`; `active`/`past_due`/`canceled` are modeled but not
-      yet produced by anything (no billing exists yet)
+## Phase 11 — Entitlement enforcement (done — see Phase 10A and Phase 12 below)
+- [x] Central entitlements module (`src/domain/entitlements`) — `trialing`/`active`/`expired` →
+      `canUseApp`/`canSaveProjects`/`canExport`
 - [x] Server-side enforcement of post-trial access locking for `/app` (Phase 10A)
-- [ ] Remaining: nothing until Phase 12 (Stripe) introduces `active`/`past_due`/`canceled` for real
+- [x] `active` (Pro) now genuinely produced from real Stripe subscription state (Phase 12) —
+      nothing further planned for this phase
 
-## Phase 12 — Annual Stripe billing
-- [ ] Checkout for the single Annual license (no Lifetime)
-- [ ] Webhook handling, idempotency, entitlement sync (`trialing` → `active` on payment)
+## Phase 12 — ONA Functional Phase 2: Stripe Pro subscriptions (done — TEST/SANDBOX only)
+- [x] Stripe-hosted Checkout, subscription mode, Managed Payments explicitly enabled
+      (`managed_payments: { enabled: true }`), monthly (€7.99) and annual (€59.99) plans — a
+      single ONA Pro product, no tiers, no Lifetime (per `CLAUDE.md`'s commercial model)
+- [x] Webhook handling (`checkout.session.completed`/`async_payment_succeeded`/
+      `async_payment_failed`, `customer.subscription.created`/`updated`/`deleted`,
+      `invoice.paid`/`payment_failed`), signature-verified, idempotent via
+      `stripe_webhook_events`, fails closed (503) if `STRIPE_WEBHOOK_SECRET` isn't configured yet
+- [x] Entitlement sync: `trialing` → `active` on a real active/trialing/past_due subscription,
+      independent of the original 72-hour trial (product-spec.md §9) — see
+      `docs/architecture.md`'s "Entitlements" section
+- [ ] **Explicitly not done in this phase** (per the request that scoped it, "STOP after this
+      pass"): Stripe live mode, coupons/promo codes, team/seat billing, usage billing, custom
+      invoices, a custom admin/billing dashboard — all remain future work
 
 ## Phase 13 — Complete English/Spanish UI
 - [ ] Full copy translated, no missing keys
@@ -1438,3 +1449,41 @@ system.
 
   Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build` all
   pass — see this session's completion report for exact counts.
+
+- **2026-08-16 — ONA Functional Phase 2: Stripe Pro subscriptions (TEST/SANDBOX).** Real,
+  server-verified paid access replaces the "reserved but never produced" `active` status from
+  Phase 1. One product, one subscription unlocks every platform app — €7.99/month or €59.99/year,
+  no tiers, no Lifetime (`CLAUDE.md`'s commercial model). Stripe-hosted Checkout in subscription
+  mode with Managed Payments explicitly enabled (`stripe@22.5.0`, pinned API version
+  `2026-07-29.dahlia` — see `docs/architecture.md`'s "Stripe integration" subsection for exactly
+  which SDK/API version supports `managed_payments` and why). A dedicated `platform_billing` table
+  (separate from `platform_access`, the trial table — different writers, different lifecycles) is
+  synced by a signature-verified, idempotent webhook
+  (`supabase/migrations/20260816120000_platform_billing.sql`,
+  `src/app/api/stripe/webhook/route.ts`). The 72-hour trial and Stripe Pro are fully independent,
+  as product-spec.md §9 requires: buying Pro never touches `trial_started_at`/`trial_ends_at`;
+  canceling Pro falls back to a still-active original trial rather than locking the account out;
+  `cancel_at_period_end` keeps access until the paid period genuinely ends, not immediately. See
+  `docs/stripe-billing-setup.md` for the full design, required external Supabase/Stripe/Vercel
+  setup, and manual QA checklist.
+
+  **Explicitly not done in this pass** (per the request that scoped it, "STOP after this pass"):
+  Stripe live mode, live Price IDs, coupons, promo codes, team/seat billing, usage billing, custom
+  invoices, a custom admin/billing dashboard, and — per the same explicit instruction — no
+  entitlement bypass/testing backdoor of any kind was added to the product; expired-trial
+  verification against a real account uses the manual, dedicated-QA-account SQL procedure in
+  `docs/supabase-setup.md` §8 only.
+
+  **A bug caught during this pass's own verification, not by an automated test:** manually
+  smoke-testing `/api/stripe/checkout` against a local dev server with no Stripe/Supabase env vars
+  configured revealed it crashed with a raw, unhandled 500 instead of the intended 401
+  (`createSupabaseServerClient()`'s own config-missing throw wasn't caught). Fixed by wrapping the
+  auth lookup in the same fail-closed try/catch pattern `getPlatformAccess()` already established
+  — see `docs/architecture.md`'s Phase 2 deviations entry for the full account of what broke and
+  why manual smoke testing, not just unit coverage, is what caught it.
+
+  Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build` all
+  pass; manual smoke testing against a local dev server confirmed every Stripe-touching route
+  fails closed (401/400/503, never a raw crash) with no Stripe/Supabase credentials configured —
+  see this session's completion report for exact counts and what genuinely required live
+  credentials and was therefore NOT end-to-end verified.

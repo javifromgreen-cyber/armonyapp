@@ -1,12 +1,16 @@
 /**
  * Platform-wide entitlement status (docs/architecture.md "Entitlements",
- * CLAUDE.md's commercial-model rules) — never a per-app flag. ONA Functional
- * Phase 1 only ever produces `"trialing"` or `"expired"`; `"active"` and the
- * reserved `"past_due"`/`"canceled"` states exist here so the billing phase
- * can extend this module without redesigning it, but nothing in this phase
- * computes or fakes them.
+ * CLAUDE.md's commercial-model rules) — never a per-app flag. This is the
+ * OVERALL tri-state platform access result, not a raw Stripe subscription
+ * status — those are a richer, separate vocabulary (see
+ * `StripeSubscriptionStatus` in `./billing.ts`) that `hasProAccess` folds
+ * down into whether `"active"` applies here. `"active"` means the account
+ * currently has Pro access, whether via an active/trialing/past_due Stripe
+ * subscription — see `./billing.ts` for exactly which raw statuses qualify
+ * and why (e.g. `past_due` still grants access while Stripe retries
+ * payment, `canceled` never does).
  */
-export type EntitlementStatus = "trialing" | "active" | "expired" | "past_due" | "canceled";
+export type EntitlementStatus = "trialing" | "active" | "expired";
 
 export interface Entitlements {
   status: EntitlementStatus;
