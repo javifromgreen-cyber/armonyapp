@@ -80,25 +80,75 @@ const BASS_SAMPLES: SampleMap = {
 /**
  * The single distorted electric-guitar signal chain (product spec §18 — no
  * clean/distorted selector, exactly one convincing distorted timbre) built
- * from the same clean steel-string samples as Acoustic Guitar:
- * `Distortion` for real waveshaping grit (0.45 — clearly distorted without
- * collapsing into pure fuzz noise, tuned by ear for low drop tunings like
- * Drop C/Drop A to still read as pitched notes, not mush), `EQ3` scooping
- * the lows slightly and lifting the mids (very low drop tunings otherwise
- * turn to undefined rumble once distorted — see product spec §18's own
- * "make low rock/metal tunings feel meaningful" requirement) and lifting
- * presence, and a `Compressor` for sustain/glue, matching how a real
- * distorted electric guitar signal chain is typically built. Lazily
- * created once, shared by every Electric Guitar note this session.
+ * from the same clean steel-string samples as Acoustic Guitar.
+ *
+ * Revision note: the first version of this chain (plain `Distortion` ->
+ * `EQ3` boosting highs -> `Compressor`) read as "clean acoustic-steel pluck
+ * with fuzz laid on top" rather than a real amp tone. `acoustic_guitar_steel`
+ * is a genuinely bright, broadband, plucky source (lots of string/pick noise
+ * well above 5kHz) — waveshaping distortion amplifies that high-frequency
+ * content roughly as much as everything else, so the result kept the
+ * source's steel-string jangle instead of gaining amp character. A real
+ * guitar amp signal chain does three things this first version didn't:
+ * drives the input hard before clipping (not just clips lightly), rolls off
+ * sharply above ~4-5kHz the way a mic'd speaker cabinet does, and pushes the
+ * midrange forward rather than the treble. This revision adds exactly those,
+ * in order:
+ *
+ * 1. `preFilter` — a gentle highpass at 32Hz, well below the lowest actual
+ *    note this app ever plays (F1 ≈ 43.65Hz, the low string of 7-string
+ *    Drop F). This is not a tone control — it only removes inaudible
+ *    sub-rumble/DC bias that the waveshaper could otherwise turn into
+ *    audible mud, it never touches a real note's fundamental.
+ * 2. `drive` — a fixed +8dB pre-gain boost so the signal is pushed hard
+ *    into the waveshaper (genuine overdrive/saturation), not merely
+ *    clipped at low level (which is what reads as "fuzz pedal on a clean
+ *    sample" rather than "driven amp").
+ * 3. `distortion` — raised to 0.7 (from 0.45) with 4x oversampling.
+ *    Oversampling is the single biggest fix for the "metallic/digital"
+ *    complaint: un-oversampled WaveShaper distortion on an already-bright
+ *    source generates harsh aliased high-frequency content; 4x oversampling
+ *    removes most of that artifact.
+ * 4. `cabinet` — a -24dB/oct lowpass at 4.2kHz emulating a mic'd guitar
+ *    cabinet's natural rolloff. This is the second big fix: a real amp
+ *    simply does not reproduce much energy above ~4-5kHz, so leaving that
+ *    content in is what made the distorted result still sound like a bright
+ *    steel-string acoustic. The highest fundamental this app ever plays
+ *    (7-string B3 + 24 frets ≈ B5, ~987Hz) sits far below this cutoff, so
+ *    only harmonic/distortion content is tamed, never a note's own pitch.
+ * 5. `eq` — re-tuned from the first version: mids pushed up hard (+5, not
+ *    +3) for the "electric guitar in the room" midrange character and
+ *    single-note intelligibility on low drop tunings, lows trimmed
+ *    slightly (-2, not -3) to control boom without thinning the
+ *    fundamental, highs cut (-6, not boosted +1) since brightness was the
+ *    problem, not the fix — `cabinet` above already did the heavy lifting.
+ * 6. `compressor` — attack nudged out to 8ms (from 3ms) so the pick
+ *    transient pokes through briefly before gain reduction engages (a
+ *    clearer attack), threshold/ratio raised for stronger sustain/glue
+ *    across the existing ~1s note duration.
+ * 7. `outputTrim` — the extra drive and heavier distortion raise perceived
+ *    loudness; trimmed back down so Electric Guitar isn't jarringly louder
+ *    than Acoustic Guitar/Bass, which are intentionally left untouched.
+ *
+ * Lazily created once, shared by every Electric Guitar note this session.
  */
 function buildElectricGuitarChain(): Tone.ToneAudioNode {
-  const distortion = new Tone.Distortion(0.45);
-  const eq = new Tone.EQ3({ low: -3, mid: 3, high: 1 });
-  const compressor = new Tone.Compressor({ threshold: -22, ratio: 4, attack: 0.003, release: 0.15 });
-  distortion.connect(eq);
+  const preFilter = new Tone.Filter({ frequency: 32, type: "highpass", rolloff: -12 });
+  const drive = new Tone.Gain(8, "decibels");
+  const distortion = new Tone.Distortion({ distortion: 0.7, oversample: "4x" });
+  const cabinet = new Tone.Filter({ frequency: 4200, type: "lowpass", rolloff: -24 });
+  const eq = new Tone.EQ3({ low: -2, mid: 5, high: -6 });
+  const compressor = new Tone.Compressor({ threshold: -24, ratio: 6, attack: 0.008, release: 0.2 });
+  const outputTrim = new Tone.Gain(0.75);
+
+  preFilter.connect(drive);
+  drive.connect(distortion);
+  distortion.connect(cabinet);
+  cabinet.connect(eq);
   eq.connect(compressor);
-  compressor.toDestination();
-  return distortion;
+  compressor.connect(outputTrim);
+  outputTrim.toDestination();
+  return preFilter;
 }
 
 interface InstrumentVoice {
