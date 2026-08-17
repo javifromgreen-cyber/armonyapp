@@ -28,6 +28,14 @@
         "cta": "Probar ahora",
         "ctaOpen": "Abrir",
         "ctaGoPro": "Pasar a Pro"
+      },
+      "tuningExplorer": {
+        "name": "Tuning Explorer",
+        "description": "Explora afinaciones alternativas para guitarra y bajo. Visualiza cada traste y escucha cada nota.",
+        "concepts": ["Afinaciones", "Diapasón", "Sonido"],
+        "cta": "Probar ahora",
+        "ctaOpen": "Abrir",
+        "ctaGoPro": "Pasar a Pro"
       }
     },
     "trial": {
@@ -393,6 +401,46 @@
       },
       "commonTone": "Relación de tono común",
       "distantKey": "Tonalidad distante (a un tritono)"
+    }
+  },
+  "tuningExplorer": {
+    "instrument": {
+      "label": "Instrumento",
+      "electricGuitar": "Guitarra eléctrica",
+      "acousticGuitar": "Guitarra acústica",
+      "bass": "Bajo"
+    },
+    "strings": {
+      "label": "Cuerdas"
+    },
+    "family": {
+      "groupLabel": "Tipo de afinación",
+      "standard": "Estándar",
+      "drop": "Drop",
+      "open": "Abierta",
+      "alternate": "Alternativa",
+      "custom": "Personalizada"
+    },
+    "tuningLabel": "Afinación",
+    "notation": {
+      "groupLabel": "Notación",
+      "sharpSymbol": "♯",
+      "flatSymbol": "♭"
+    },
+    "custom": {
+      "stringLabel": "Cuerda {number}",
+      "reset": "Restablecer a estándar"
+    },
+    "customTuningTitle": "Afinación personalizada",
+    "openStringsAriaLabel": "Cuerdas al aire, de grave a agudo",
+    "stringsCount": "{count, plural, one {# cuerda} other {# cuerdas}}",
+    "fretsCount": "{count, plural, one {# traste} other {# trastes}}",
+    "playOpenStrings": "Escuchar cuerdas al aire",
+    "audioError": "No se pudo iniciar la reproducción de audio.",
+    "dismiss": "Descartar",
+    "fretboard": {
+      "gridLabel": "Diapasón",
+      "noteAt": "{note}, cuerda {string}, traste {fret}"
     }
   }
 }

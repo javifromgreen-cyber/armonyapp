@@ -6,6 +6,10 @@ describe("resolveSafeReturnTo", () => {
     expect(resolveSafeReturnTo("/app", "/account")).toBe("/app");
   });
 
+  it("accepts Tuning Explorer's route (ONA app #2) — the allowlist is built from platformTools, no separate edit needed", () => {
+    expect(resolveSafeReturnTo("/tuning-explorer", "/account")).toBe("/tuning-explorer");
+  });
+
   it("falls back for undefined input", () => {
     expect(resolveSafeReturnTo(undefined, "/account")).toBe("/account");
   });

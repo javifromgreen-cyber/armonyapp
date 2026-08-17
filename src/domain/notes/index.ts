@@ -9,3 +9,4 @@ export {
   isLetter,
   NoteParseError,
 } from "./note";
+export { noteForPitchClass, type Notation } from "./chromaticSpelling";

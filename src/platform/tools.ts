@@ -11,4 +11,7 @@ export interface PlatformTool {
   route: string;
 }
 
-export const platformTools: PlatformTool[] = [{ id: "armony", route: "/app" }];
+export const platformTools: PlatformTool[] = [
+  { id: "armony", route: "/app" },
+  { id: "tuningExplorer", route: "/tuning-explorer" },
+];

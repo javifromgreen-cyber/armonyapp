@@ -3,16 +3,19 @@ import { Link } from "@/i18n/navigation";
 import type { PlatformTool } from "@/platform/tools";
 import type { PlatformAccess } from "@/platform/access";
 import { ToolCardVisual } from "./ToolCardVisual";
+import { TuningExplorerCardVisual } from "./TuningExplorerCardVisual";
 
 /**
- * One catalogue card (product-spec.md §11/§16, ONA Functional Phase 1).
- * Deliberately generic — reads all copy from `platform.tools.<id>` so a
- * second future app slots in without a new component. The CTA now reflects
- * REAL platform access rather than always linking to sign-in: signed-out
- * visitors still go through sign-in (carrying `returnTo=<tool.route>`);
- * a trialing user opens the tool directly; an expired user is sent to the
- * Trial Ended experience — never a fake "purchase" (Stripe is a later
- * phase).
+ * One catalogue card (product-spec.md §11/§16, ONA Functional Phase 1;
+ * Tuning Explorer added as ONA app #2). Reads all copy from
+ * `platform.tools.<id>` — only the small illustrative preview graphic is
+ * per-app (each app gets its own static, non-interactive visual, matching
+ * `ToolCardVisual`'s own precedent of a stylized excerpt rather than a
+ * reused live component). The CTA reflects REAL platform access, identical
+ * for every app: signed-out visitors go through sign-in (carrying
+ * `returnTo=<tool.route>`); a trialing/Pro user opens the tool directly; an
+ * expired user is sent to the shared Trial Ended experience — never an
+ * app-specific trial or purchase.
  */
 export async function ToolCard({
   tool,
@@ -28,7 +31,7 @@ export async function ToolCard({
 
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-ona-border bg-ona-surface">
-      <ToolCardVisual />
+      {tool.id === "tuningExplorer" ? <TuningExplorerCardVisual /> : <ToolCardVisual />}
       <div className="flex flex-1 flex-col gap-4 p-6">
         <h3 className="text-xl font-semibold text-ona-fg">{t("name")}</h3>
         <p className="text-sm text-ona-fg-muted">{t("description")}</p>

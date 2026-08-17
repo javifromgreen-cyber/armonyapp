@@ -1388,6 +1388,25 @@ system.
 - [ ] Playwright e2e for core flows
 - [ ] Final production build verification
 
+## Phase 16 — Tuning Explorer v1 (ONA app #2) — done
+- [x] `/tuning-explorer` route, added to `platformTools`, same platform-wide trial/Pro access
+      guard as Armony (`getPlatformAccess` + `decideAppAccess`) — no app-specific trial/purchase
+- [x] Instruments: Electric Guitar (6/7-string, 24 frets), Acoustic Guitar (6-string, 22 frets),
+      Electric Bass (4/5-string, 24 frets)
+- [x] Curated v1 tuning library (~90 presets: Standard/Drop/Open/Alternate families, data-driven,
+      real MIDI pitches) + Custom tuning (pitch-class-only per-string selectors, deterministic
+      octave inference, "Reset to standard")
+- [x] Framework-free fretboard pitch domain (`src/domain/tuningExplorer/`) — `pitch = openString +
+      fret`, sharp/flat display toggle, every position always visible (never a guessing game)
+- [x] Isolated Tone.js audio (`src/audio/tuningExplorerPlayer.ts`) reusing Armony's existing
+      licensed samples — clean Acoustic Guitar/Bass, Electric Guitar through an isolated
+      distortion/EQ/compression chain; polyphonic independent note triggering; "Play open strings"
+      (low → high, fixed spacing)
+- [x] ONA catalogue card added (`platform.tools.tuningExplorer`), reusing the existing catalogue
+      visual language
+- [x] EN/ES localization throughout; no backend persistence (no new Supabase table/migration/API
+      route/env var) — session-local React state only
+
 ## Deviations / notable decisions log
 
 - **2026-08-13 — R1 business-model revision.** Removed the permanent Free/Pro/Lifetime commercial
@@ -1518,3 +1537,39 @@ system.
   Components" under Vitest), this asserts on the actual message content the component reads
   instead of attempting a render test, matching this codebase's existing convention of testing
   pure logic/data rather than JSX output.
+
+- **2026-08-17 — Tuning Explorer v1 (ONA app #2).** ONA's second real app, a sibling to Armony
+  under the same platform shell and access model — see `docs/architecture.md`'s matching
+  deviations entry for the full design (route choice rationale, domain/audio architecture, custom
+  octave inference rule). Two decisions worth calling out here specifically:
+  - **Route is `/tuning-explorer`, not the task's own suggested `/app/tuning-explorer`.** `/app`
+    is already Armony's own product route; nesting a second app underneath it would incorrectly
+    imply Tuning Explorer is part of Armony rather than a sibling. A flat top-level route matches
+    every other existing platform route (`/account`, `/sign-in`, `/trial-ended`) and is what
+    `src/platform/tools.ts`'s catalogue already expects a tool's `route` to look like.
+  - **`noteForPitchClass` (sharp/flat spelling) was added to the shared `src/domain/notes` module,
+    not kept local to Tuning Explorer.** It's a generically useful primitive — any future ONA app
+    needing a plain chromatic sharp/flat toggle can reuse it — matching the task's own explicit
+    goal of "future ONA apps able to reuse musical primitives if needed," while everything
+    genuinely Tuning-Explorer-specific (tuning presets, fretboard generation, custom octave
+    inference, playback timing) stayed in its own `src/domain/tuningExplorer/` module rather than
+    being folded into Armony's `src/domain/instruments/guitar|bass` (a genuinely different concern
+    — chord-voicing generation for one fixed tuning vs. arbitrary-tuning fretboard exploration).
+
+  Manually verified in a local dev server (Playwright, desktop 1440×900 + mobile 390×844, English
+  + Spanish, zero console errors): default state opens ready-to-use (Electric Guitar, 6 strings, E
+  Standard, sharps); every instrument/string-count combination (6/7-string Electric, 6-string
+  Acoustic stopping at fret 22, 4/5-string Bass) renders correctly with the right open strings and
+  fret markers; switching tuning family/preset/instrument/string-count instantly rebuilds every
+  fret label; the sharp/flat toggle instantly re-labels every note without changing pitch; Custom
+  tuning's per-string pitch-class selectors render and "Reset to standard" works; clicking a fret
+  illuminates only that exact position; "Play open strings" visibly sequences low-to-high with
+  natural overlap; the ONA home catalogue shows the new card correctly. No real audio output was
+  verified (headless browser) — see the completion report for exactly what audio behavior is
+  unit-tested (scheduling/timing math) vs. requires a manual listening pass.
+
+  Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build` all
+  pass — see this session's completion report for exact counts. No Armony file was modified except
+  `src/components/platform/home/ToolCard.tsx` (catalogue card selection) and
+  `src/platform/tools.ts`/`src/platform/safeReturnTo.test.ts` (catalogue/route registration) —
+  Armony's own domain/audio/map/panel code is untouched.

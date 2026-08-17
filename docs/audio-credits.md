@@ -5,6 +5,9 @@ R2 — uses a small set of real recorded samples instead of pure synthesis, so e
 genuine, distinguishable identity. "Hear chord" and progression playback stay on a neutral
 synthesized voice (product-spec.md §18) and use none of the samples below.
 
+Tuning Explorer (ONA app #2) reuses the same Guitar and Bass sample sets described below for its own,
+fully isolated audio player — see "Where this is wired up" for details.
+
 ## Source
 
 - **Soundfont**: [FluidR3_GM](http://www.synthfont.com/SoundFonts/FluidR3_GM.sfArk), a General MIDI
@@ -50,3 +53,15 @@ downloaded once during development and committed to this repository).
 `src/audio/player.ts`'s `SAMPLE_MAPS` and `getInstrumentVoice()` — each instrument's `Tone.Sampler`
 lazy-loads its own sample set only the first time that instrument's "Hear this voicing/pattern" is
 used, and stays cached for the rest of the session.
+
+`src/audio/tuningExplorerPlayer.ts` — Tuning Explorer's own, fully isolated audio module (no shared
+imports with `player.ts`, no effect on Armony's audio behavior) — reuses the exact same
+`acoustic_guitar_steel` and `electric_bass_finger` MP3 files above for its Electric/Acoustic Guitar
+and Bass timbres, rather than downloading a second set of samples. `Tone.Sampler`'s own pitch-shifting
+covers the wider MIDI range that alternate tunings and 24-fret necks require, down to and including
+very low drop tunings. For Electric Guitar only, the sampler output is routed through an isolated
+signal chain — `Tone.Distortion` → `Tone.EQ3` → `Tone.Compressor` — built solely from these same clean
+guitar samples (no separate distorted sample pack, licensed or otherwise, was sourced), so that low
+tunings (Drop C/B/A/G/F♯/F) read as a genuine distorted electric tone rather than a detuned clean
+guitar. Acoustic Guitar and Bass play the same samples unprocessed, connected straight to the
+destination.

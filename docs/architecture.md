@@ -856,3 +856,68 @@ flatten that back into one-node-per-edge.
     customer on file" rather than crashing). Caught via manual smoke testing against a local dev
     server with no Stripe/Supabase env vars set, not by an automated test — recorded here as a
     concrete example of why that manual pass matters even with heavy unit-test coverage elsewhere.
+
+- **Tuning Explorer — ONA app #2.** A guitar/bass alternate-tuning fretboard explorer, a genuine
+  sibling to Armony under the same platform shell — CHOOSE INSTRUMENT → CHOOSE TUNING → SEE THE
+  FRETBOARD → HEAR OPEN STRINGS → CLICK ANY FRET TO HEAR THAT NOTE. Deliberately NOT a chord
+  builder, tuner, tab editor, or scale tool.
+  - **Route: `/tuning-explorer`** (a NEW top-level route, sibling to `/app`, `/account`,
+    `/sign-in`) — deliberately NOT nested under `/app` as the task's own suggested
+    `/app/tuning-explorer` would have done. `/app` already IS Armony's own product route; nesting
+    a second, unrelated app underneath it would incorrectly imply Tuning Explorer is a sub-feature
+    of Armony rather than a sibling platform app. A flat top-level route also matches every other
+    existing platform route's own convention. Added to `src/platform/tools.ts`'s `platformTools`
+    catalogue, which is also `safeReturnTo.ts`'s allowlist source — no separate allowlist edit was
+    needed for its `returnTo` to survive the sign-in round trip.
+  - **Access model: IDENTICAL to Armony's, byte-for-byte.** `src/app/[locale]/tuning-explorer/page.tsx`
+    calls the exact same `getPlatformAccess()` + `decideAppAccess()` pair `src/app/[locale]/app/page.tsx`
+    uses — the platform-wide trial/Pro entitlement, never an app-specific trial or purchase. No
+    Stripe/Supabase/billing/auth code was touched beyond this one page's route wiring.
+  - **No backend persistence.** No new Supabase table, migration, API route, or environment
+    variable — all state (instrument, string count, tuning selection, custom tuning, notation
+    preference) lives in a single `useReducer` in `src/components/tuningExplorer/tuningExplorerState.ts`,
+    reset on page reload. Custom tunings are session-local only — no save/named-presets/cloud sync
+    in v1 (an explicit, deliberate exclusion, not an oversight).
+  - **Domain layer (`src/domain/tuningExplorer/`, framework-free)**: a genuinely separate module
+    from Armony's `src/domain/instruments/guitar|bass` (which models chord-VOICING generation for
+    one fixed standard tuning) — different concern, reusing only the truly shared primitives
+    (`src/domain/notes`, `playablePitch`'s MIDI/frequency math). `tuningPresets.ts` holds the
+    curated v1 library (~90 presets across Electric Guitar 6/7-string, Acoustic Guitar 6-string,
+    Bass 4/5-string), each open string stored as a real MIDI pitch (never just a note-name string)
+    computed once from a compact spec at module load. `fretboard.ts`'s `generateFretboard` is the
+    entire pitch model: `pitch = openStringMidi + fret`, framework-free, exhaustively tested for
+    octave transitions (fret 12 = +1 octave, fret 24 = +2 octaves, letter-name wraparound). Display
+    spelling is a SEPARATE concern (`src/domain/notes/chromaticSpelling.ts`'s new
+    `noteForPitchClass(pitchClass, notation)` — added to the shared, reusable `src/domain/notes`
+    module since a global sharp/flat display toggle is generically useful, not guitar-specific) —
+    a fret position's `midi` never changes when notation is switched, only its label.
+  - **Custom tuning octave inference** (`customTuning.ts`): the musician picks a pitch CLASS only,
+    never an octave. `nearestMidiForPitchClass` picks the nearest MIDI pitch with that class to a
+    FIXED reference — that string's own position in the standard tuning for the current
+    instrument/string-count (`standardReferenceMidis`), never the tuning's own previously-edited
+    value. Anchoring to the standard reference (not "whatever it was a moment ago") is what keeps
+    repeated custom edits from drifting octaves further and further out over successive changes.
+  - **Audio (`src/audio/tuningExplorerPlayer.ts`), fully isolated from Armony's `src/audio/player.ts`**
+    — its own module-level sampler cache, its own `ensureAudioReady`, never imports or is imported
+    by Armony's audio code. Reuses the SAME licensed local sample files Armony already ships
+    (`public/audio/guitar/*.mp3` = `acoustic_guitar_steel`, `public/audio/bass/*.mp3` =
+    `electric_bass_finger` — see `docs/audio-credits.md`), never a new download. Acoustic Guitar
+    and Bass play those samples directly/clean; Electric Guitar routes the SAME guitar samples
+    through an isolated `Tone.Distortion` → `Tone.EQ3` → `Tone.Compressor` chain (explicitly
+    permitted by the product brief when no distorted-electric sample exists locally) tuned so very
+    low drop tunings (Drop C/B/A/G/F#/F) still read as pitched notes rather than collapsing into
+    mud. `Tone.Sampler`'s own pitch-shifting covers the full required range (down to the low 0th
+    octave for extreme bass drop tunings, up through 24 frets on the highest string) — never an
+    artificially clamped/wrong octave for coverage. Manual note clicks are independent polyphonic
+    triggers (`Tone.Sampler`'s own default polyphony — never chord-building/note-list state);
+    "Play open strings" schedules low-to-high via `Tone.now()`-relative offsets (the same
+    lightweight pattern Armony's own `hearPitches` strum-delay already uses for a short sequence —
+    no `Tone.Transport` needed here). All scheduling/timing math itself
+    (`src/domain/tuningExplorer/playbackTiming.ts`) is pure and unit-tested independent of any
+    real Tone.js/Web Audio context.
+  - **Deliberate v1 exclusions** (see the task's own full list): chord builder/detection, scale or
+    interval highlighting, key selector, capo, tabs, recording, MIDI/audio input, tuner,
+    metronome, loops, strum mode, clean/distorted selector, amp models/pedals, saved custom
+    tunings, tuning search, 8-string guitar, 6-string bass, artist/style recommendations. None of
+    this is a gap to fill later without an explicit new request — it's the intentionally focused
+    v1 scope.

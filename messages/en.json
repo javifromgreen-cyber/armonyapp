@@ -28,6 +28,14 @@
         "cta": "Try now",
         "ctaOpen": "Open",
         "ctaGoPro": "Go Pro"
+      },
+      "tuningExplorer": {
+        "name": "Tuning Explorer",
+        "description": "Explore alternate tunings on guitar and bass. See every fret and hear every note.",
+        "concepts": ["Tunings", "Fretboard", "Sound"],
+        "cta": "Try now",
+        "ctaOpen": "Open",
+        "ctaGoPro": "Go Pro"
       }
     },
     "trial": {
@@ -393,6 +401,46 @@
       },
       "commonTone": "Common-tone relationship",
       "distantKey": "Distant key (a tritone away)"
+    }
+  },
+  "tuningExplorer": {
+    "instrument": {
+      "label": "Instrument",
+      "electricGuitar": "Electric Guitar",
+      "acousticGuitar": "Acoustic Guitar",
+      "bass": "Bass"
+    },
+    "strings": {
+      "label": "Strings"
+    },
+    "family": {
+      "groupLabel": "Tuning type",
+      "standard": "Standard",
+      "drop": "Drop",
+      "open": "Open",
+      "alternate": "Alternate",
+      "custom": "Custom"
+    },
+    "tuningLabel": "Tuning",
+    "notation": {
+      "groupLabel": "Notation",
+      "sharpSymbol": "♯",
+      "flatSymbol": "♭"
+    },
+    "custom": {
+      "stringLabel": "String {number}",
+      "reset": "Reset to standard"
+    },
+    "customTuningTitle": "Custom tuning",
+    "openStringsAriaLabel": "Open strings, low to high",
+    "stringsCount": "{count, plural, one {# string} other {# strings}}",
+    "fretsCount": "{count, plural, one {# fret} other {# frets}}",
+    "playOpenStrings": "Play open strings",
+    "audioError": "Audio playback could not be started.",
+    "dismiss": "Dismiss",
+    "fretboard": {
+      "gridLabel": "Fretboard",
+      "noteAt": "{note}, string {string}, fret {fret}"
     }
   }
 }
