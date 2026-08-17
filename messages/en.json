@@ -100,14 +100,12 @@
       "monthly": {
         "title": "Pro monthly",
         "price": "€7.99/month",
-        "nextCharge": "Next charge: {date}",
-        "manage": "Manage subscription"
+        "nextCharge": "Next charge: {date}"
       },
       "annual": {
         "title": "Pro annual",
         "price": "€59.99/year",
-        "accessUntil": "Access until: {date}",
-        "manage": "Manage subscription"
+        "accessUntil": "Access until: {date}"
       },
       "cancelled": {
         "accessUntil": "You'll have access until {date}.",
@@ -117,7 +115,11 @@
         "title": "Payment issue",
         "body": "We couldn't process your latest payment. Stripe is automatically retrying — your Pro access continues in the meantime. Please check your payment method."
       },
-      "manageNote": "Subscription and payment management for ONA Pro is handled by Stripe Link.",
+      "manage": {
+        "title": "Manage your subscription with Link",
+        "body": "Stripe sends subscription receipts and notifications to your email. Use the link included in those emails to access Link and manage your subscription and payment method.",
+        "openLink": "Go to link.com"
+      },
       "goPro": {
         "monthly": {
           "price": "€7.99/month",

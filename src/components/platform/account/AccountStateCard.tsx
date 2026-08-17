@@ -11,6 +11,17 @@ import { GoProOptions } from "@/components/platform/billing/GoProOptions";
  * Checkout wired in via `GoProOptions` instead of Phase 1's inert
  * placeholder button. No live countdown anywhere: exact date/time only,
  * formatted through next-intl.
+ *
+ * `ProCard`'s subscription-management block is deliberately explanatory
+ * text, not a "Manage subscription" button pointing at a subscription — the
+ * `stripe` package's bundled types confirm Managed Payments only ever
+ * exposes `{ enabled: boolean }` on a Checkout Session/Subscription, never
+ * a transaction-specific management URL, so nothing here fabricates one.
+ * Per Stripe's own Managed Payments documentation, that URL only ever
+ * arrives via the customer's own receipt/notification email from Stripe.
+ * The `https://link.com` link is clearly labeled as opening Link generally
+ * (`manage.openLink`), never implied to jump straight into this
+ * subscription.
  */
 export async function AccountStateCard({
   status,
@@ -83,15 +94,18 @@ async function ProCard({ billing }: { billing: BillingSnapshot }) {
           <p className="text-ona-fg-muted">{t("pastDue.body")}</p>
         </div>
       )}
-      <p className="mt-3 text-xs text-ona-fg-muted">{t("manageNote")}</p>
-      <a
-        href="https://link.com"
-        target="_blank"
-        rel="noreferrer"
-        className="mt-1 w-fit text-sm font-medium text-ona-accent transition-opacity hover:opacity-80"
-      >
-        {t(`${plan}.manage`)}
-      </a>
+      <div className="mt-3 rounded-lg border border-ona-border bg-ona-bg/40 p-3">
+        <p className="text-sm font-medium text-ona-fg">{t("manage.title")}</p>
+        <p className="mt-1 text-xs text-ona-fg-muted">{t("manage.body")}</p>
+        <a
+          href="https://link.com"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-block text-xs font-medium text-ona-accent transition-opacity hover:opacity-80"
+        >
+          {t("manage.openLink")} <span aria-hidden="true">↗</span>
+        </a>
+      </div>
     </StateCard>
   );
 }

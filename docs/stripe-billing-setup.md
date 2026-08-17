@@ -132,6 +132,67 @@ Use [Stripe's documented test card numbers](https://docs.stripe.com/testing) —
 9. **Sign out/in confirms persistence.** Sign out and back in on a Pro account — Account should
    still show Pro immediately, with no re-checkout prompt.
 
+## E.1 Manually verified in the real Stripe TEST/SANDBOX + Supabase + production Vercel deployment
+
+The following was actually performed and confirmed working end-to-end (not just unit-tested) —
+recorded here as the authoritative record of what real-world QA has and hasn't covered:
+
+- **Monthly checkout, on a previously-expired trial account.** An ONA account whose original
+  72-hour trial had already expired purchased ONA Pro Monthly. Stripe Checkout completed; the
+  webhook synchronized the subscription into `platform_billing`; Account correctly showed "Pro
+  monthly", €7.99/month, and a renewal date; the account regained access to `/app` (§E.1/E.4/E.5
+  above, all confirmed).
+- **Annual checkout, on a Google-authenticated account.** A separate account, signed in via Google,
+  purchased ONA Pro Annual at €59.99/year; Account correctly showed "Pro annual" and an
+  access-until date (§E.6, confirmed).
+- **Cancellation at period end.** The annual subscription was canceled in the Stripe Dashboard with
+  "cancel at the end of the current period" (no refund). The webhook updated ONA correctly; Account
+  showed "Pro annual", an access-until date matching the real period end, and the "won't renew"
+  notice; `/app` remained accessible after cancellation, exactly as `cancel_at_period_end` is
+  designed to behave (§E.7, confirmed).
+- **Not yet completed:** sign-out/sign-in persistence for the passwordless-email QA account (§E.9)
+  — blocked during this QA pass by Supabase's built-in email service returning
+  `over_email_send_rate_limit` after repeated magic-link requests. This is an email-DELIVERY
+  limitation of Supabase's shared/default email sending, not a billing defect — Google OAuth
+  sign-out/in continued to work normally throughout. **Configuring a production SMTP provider in
+  Supabase (Project Settings → Auth → SMTP Settings) removes this rate limit and is a genuine
+  pre-launch task, but is explicitly OUT OF SCOPE for this billing patch** — it doesn't touch
+  Stripe, `platform_billing`, or entitlement logic at all.
+- **Not yet manually tested:** `past_due`/payment-failure behavior (§E.8) — this remains covered
+  by automated tests only (`src/domain/entitlements/billing.test.ts`'s `past_due` cases), not a
+  real Stripe test-clock/failing-card run. Do not treat it as end-to-end verified.
+- **Sandbox receipt emails are not sent automatically** by Stripe TEST/SANDBOX mode by default —
+  during this QA pass they were manually previewed/sent from the Stripe Dashboard (Payments →
+  the relevant Checkout/Invoice → "Send receipt" or the dashboard's email preview) rather than
+  arriving unprompted, which is expected sandbox behavior, not a configuration gap.
+
+## E.2 "Manage subscription" UX fix (this patch)
+
+Earlier, Account's Pro state showed a **"Manage subscription"** button whose destination was
+simply `https://link.com` — misleading, since clicking it only opens Link's generic landing
+experience, not this specific ONA subscription (confirmed during the sandbox QA above).
+
+**Investigated whether Stripe's API exposes a transaction-specific Managed Payments/Link
+management URL that could be generated/retrieved server-side and verified as belonging to the
+authenticated user's subscription:** inspecting the `stripe@22.5.0` package's own bundled
+TypeScript definitions (`node_modules/stripe/cjs/resources/{Checkout/Sessions,Subscriptions}.d.ts`)
+shows the `ManagedPayments` object on both a Checkout Session and a Subscription contains
+**only** `{ enabled: boolean }` — no URL field of any kind. Stripe's own Managed Payments
+documentation states that the customer's transaction-specific Link management access arrives via
+the **receipt/notification email Stripe sends the customer directly** (a Link-associated URL tied
+to that specific purchase) — never something this app's server can generate, retrieve, or verify
+via the Checkout/Subscription/Invoice APIs. `Invoice.hosted_invoice_url` and
+`Charge.receipt_url` do exist, but are documented as viewing/paying a specific invoice or receipt,
+not as a subscription self-service management portal, so neither was used as a substitute.
+
+**Conclusion: no officially-supported, API-retrievable, transaction-specific management URL
+exists to build a direct "Manage subscription" button from.** Account's Pro state now shows
+explanatory text instead (`platform.account.manage.{title,body}` in
+`messages/en.json`/`messages/es.json`) explaining that Stripe emails the customer a link to Link
+for subscription/payment-method management, plus a clearly-labeled secondary link to
+`https://link.com` (`manage.openLink`) that is never presented as opening this subscription
+directly.
+
 ## F. Tax QA (Managed Payments)
 
 Because Managed Payments makes Stripe the merchant of record, Stripe — not this app — handles
@@ -155,28 +216,39 @@ application code — the displayed prices (€7.99/month, €59.99/year) are UI 
 (`messages/en.json`/`messages/es.json`), entirely independent of what Stripe actually charges.
 Keep them in sync manually if the Stripe Price objects ever change.
 
-## What this repo cannot verify for you
+## What has now been confirmed vs. what still hasn't
 
-No real Stripe/Supabase credentials exist in the environment this code was built in, so the
-following were **not** end-to-end tested and must be verified manually via section E above:
+**Confirmed end-to-end against the real Stripe TEST/SANDBOX + Supabase + production Vercel
+deployment** (see §E.1 for the full account): monthly checkout on a previously-expired-trial
+account, webhook activation, Account correctly showing Pro state, regained `/app` access; annual
+checkout on a Google-authenticated account; cancellation at period end with access correctly
+retained until the period genuinely ends; the corrected "manage subscription" explanatory copy no
+longer implying `link.com` opens the subscription directly.
 
-- A real Checkout Session actually completing with Managed Payments enabled, and the webhook
-  correctly activating Pro.
-- Webhook signature verification against a REAL `whsec_...` secret and real Stripe-signed
-  payloads (only the missing-secret fail-closed path and the pure status-parsing/plan-mapping
-  logic are unit tested — see below).
-- Duplicate-subscription prevention and existing-Stripe-Customer reuse against the real Stripe API.
-- The expired-trial QA procedure combined with a real purchase (§E.5 above) — the expired-trial
-  procedure itself is documented in `docs/supabase-setup.md` §8 and has not yet been combined with
-  a real Stripe purchase.
-- Cancellation-at-period-end and past_due behavior against real Stripe subscription lifecycle
-  events (§E.7–8).
+**Still not manually end-to-end tested** — do not treat these as verified:
 
-What *is* covered by automated tests without live credentials: the full trial+Pro entitlement
-combination logic for all 10 scenarios in `src/domain/entitlements/overallStatus.test.ts`, the
-`hasProAccess` status rules in `src/domain/entitlements/billing.test.ts`, plan/Price-ID mapping
-and plan-identifier validation, the Stripe env-config contract (including the webhook secret's
-fail-closed behavior) in `src/platform/stripe/env.test.ts`, Stripe subscription-status parsing in
-`src/platform/stripe/syncSubscription.test.ts` — plus `next build` succeeding and the checkout
-route responding safely (401/400/503, never a raw crash) when Stripe/Supabase env vars are absent,
-confirmed via manual smoke testing against a local dev server during this phase's implementation.
+- `past_due`/payment-failure behavior (§E section 8) — covered by automated tests only
+  (`src/domain/entitlements/billing.test.ts`'s `past_due` cases), never a real failing-card or
+  Stripe test-clock run.
+- Sign-out/sign-in persistence specifically for a passwordless-email account (§E section 9) —
+  blocked during QA by Supabase's default email service's `over_email_send_rate_limit` after
+  repeated magic-link requests; Google OAuth sign-out/in was confirmed working normally. Retry
+  this once a production SMTP provider is configured (see §E.1) or after the rate limit's window
+  passes.
+- Webhook signature verification against a REAL `whsec_...` secret was exercised as part of the
+  confirmed flows above (the webhook only ever activated Pro because signatures verified
+  correctly), but the specific invalid-signature/missing-signature REJECTION paths were only ever
+  exercised via automated tests and local smoke testing, not by deliberately sending a
+  malformed/unsigned request to the real production endpoint.
+
+What *is* covered by automated tests regardless of live credentials: the full trial+Pro
+entitlement combination logic for all 10 scenarios in
+`src/domain/entitlements/overallStatus.test.ts`, the `hasProAccess` status rules in
+`src/domain/entitlements/billing.test.ts`, plan/Price-ID mapping and plan-identifier validation,
+the Stripe env-config contract (including the webhook secret's fail-closed behavior) in
+`src/platform/stripe/env.test.ts`, Stripe subscription-status parsing in
+`src/platform/stripe/syncSubscription.test.ts`, and the "manage subscription" copy regression
+guard in `src/components/platform/account/manageSubscriptionCopy.test.ts` — plus `next build`
+succeeding and the checkout route responding safely (401/400/503, never a raw crash) when
+Stripe/Supabase env vars are absent, confirmed via manual smoke testing against a local dev
+server.

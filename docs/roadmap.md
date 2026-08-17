@@ -1487,3 +1487,34 @@ system.
   fails closed (401/400/503, never a raw crash) with no Stripe/Supabase credentials configured —
   see this session's completion report for exact counts and what genuinely required live
   credentials and was therefore NOT end-to-end verified.
+
+- **2026-08-17 — ONA Phase 2 closing patch: real sandbox QA + "manage subscription" UX fix.** The
+  core billing flow from the Phase 2 entry above is now manually confirmed end-to-end against the
+  real Stripe TEST/SANDBOX + Supabase + production Vercel deployment: an expired-trial account
+  bought Monthly Pro and regained `/app`; a Google-authenticated account bought Annual Pro;
+  canceling at period end correctly kept access until the real period end. Full account in
+  `docs/stripe-billing-setup.md` §E.1. Not yet manually tested: `past_due`/payment-failure (still
+  automated-tests-only) and passwordless-email sign-out/in persistence (blocked by Supabase's
+  default email service hitting `over_email_send_rate_limit` during repeated magic-link QA —
+  configuring production SMTP is a real pre-launch task, explicitly out of scope for this patch).
+
+  Separately, QA surfaced that Account's "Manage subscription" button — pointing at
+  `https://link.com` — was misleading: it opens Link's generic landing page, not the customer's
+  specific ONA subscription. Investigated whether the Stripe API exposes a transaction-specific
+  Managed Payments/Link management URL that could be generated and verified server-side: the
+  `stripe@22.5.0` package's own bundled types confirm `ManagedPayments` on both a Checkout Session
+  and a Subscription is only ever `{ enabled: boolean }` — no URL field exists to retrieve. Per
+  Stripe's own documentation, that transaction-specific link only ever reaches the customer via
+  their receipt/notification email. No such URL was fabricated. Fixed by replacing the button with
+  explanatory copy (`platform.account.manage.{title,body}`) plus a clearly-labeled, non-implying
+  secondary link to `https://link.com` (`manage.openLink`) — see
+  `docs/stripe-billing-setup.md` §E.2 for the full investigation record. No checkout/webhook/
+  entitlement/schema/Stripe-price change; no new secrets; no entitlement bypass.
+
+  Verified: `next typegen && tsc --noEmit`, `npm run lint`, `npm run test`, `npm run build` all
+  pass. Added `src/components/platform/account/manageSubscriptionCopy.test.ts` — since
+  `AccountStateCard` is an async Server Component that `next-intl/server` refuses to run outside a
+  real Next.js request (confirmed empirically: `getTranslations` throws "not supported in Client
+  Components" under Vitest), this asserts on the actual message content the component reads
+  instead of attempting a render test, matching this codebase's existing convention of testing
+  pure logic/data rather than JSX output.
